@@ -1,0 +1,53 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="256" height="256" rx="24" fill="#262626"/>
+<g filter="url(#filter0_gn_1926_1930)">
+<g clip-path="url(#clip0_1926_1930)">
+<rect x="32" y="224" width="192" height="192" rx="96" transform="rotate(-90 32 224)" fill="url(#paint0_linear_1926_1930)"/>
+<path d="M259.898 -47.5762L313.256 72.2673C318.647 84.3762 313.201 98.5628 301.093 103.954L168.647 162.923" stroke="black"/>
+<path d="M247.018 -43.2969L300.376 76.5466C305.767 88.6555 300.321 102.842 288.212 108.233L157.342 166.501" stroke="black"/>
+<path d="M235.714 -39.7188L289.072 80.1247C294.463 92.2336 289.017 106.42 276.908 111.811L144.463 170.78" stroke="black"/>
+<path d="M222.807 -35.5244L276.164 84.3191C281.556 96.4279 276.11 110.615 264.001 116.006L131.555 174.974" stroke="black"/>
+<path d="M209.928 -31.2451L263.286 88.5984C268.677 100.707 263.232 114.894 251.123 120.285L120.252 178.552" stroke="black"/>
+<path d="M198.623 -27.666L251.98 92.1775C257.372 104.286 251.926 118.473 239.817 123.864L107.371 182.833" stroke="black"/>
+<path d="M185.717 -23.4727L239.074 96.3708C244.466 108.48 239.02 122.666 226.911 128.058L94.4653 187.026" stroke="black"/>
+<path d="M172.837 -19.1934L226.195 100.65C231.586 112.759 226.14 126.946 214.031 132.337L83.1609 190.604" stroke="black"/>
+<path d="M161.533 -15.6162L214.891 104.227C220.282 116.336 214.837 130.523 202.728 135.914L70.2822 194.883" stroke="black"/>
+<path d="M148.626 -11.4209L201.984 108.423C207.375 120.531 201.929 134.718 189.82 140.109L57.3745 199.078" stroke="black"/>
+<path d="M135.748 -7.14355L189.105 112.7C194.497 124.809 189.051 138.995 176.942 144.387L46.0715 202.654" stroke="black"/>
+<path d="M124.444 -3.56445L177.802 116.279C183.193 128.388 177.747 142.575 165.638 147.966L33.1928 206.934" stroke="black"/>
+<path d="M111.536 0.630859L164.894 120.474C170.285 132.583 164.84 146.77 152.731 152.161L20.2851 211.13" stroke="black"/>
+<path d="M98.6562 4.9082L152.014 124.752C157.405 136.861 151.96 151.047 139.851 156.438L8.9802 214.706" stroke="black"/>
+<path d="M87.3525 8.4873L140.71 128.331C146.102 140.44 140.656 154.626 128.547 160.018L-3.89873 218.986" stroke="black"/>
+</g>
+</g>
+<defs>
+<filter id="filter0_gn_1926_1930" x="28" y="28" width="200" height="200" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feTurbulence type="fractalNoise" baseFrequency="2 2" numOctaves="3" seed="1679" />
+<feDisplacementMap in="shape" scale="8" xChannelSelector="R" yChannelSelector="G" result="displacedImage" width="100%" height="100%" />
+<feMerge result="effect1_texture_1926_1930">
+<feMergeNode in="displacedImage"/>
+</feMerge>
+<feTurbulence type="fractalNoise" baseFrequency="2 2" stitchTiles="stitch" numOctaves="3" result="noise" seed="7396" />
+<feColorMatrix in="noise" type="luminanceToAlpha" result="alphaNoise" />
+<feComponentTransfer in="alphaNoise" result="coloredNoise1">
+<feFuncA type="discrete" tableValues="0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 "/>
+</feComponentTransfer>
+<feComposite operator="in" in2="effect1_texture_1926_1930" in="coloredNoise1" result="noise1Clipped" />
+<feFlood flood-color="#FFFF50" result="color1Flood" />
+<feComposite operator="in" in2="noise1Clipped" in="color1Flood" result="color1" />
+<feMerge result="effect2_noise_1926_1930">
+<feMergeNode in="effect1_texture_1926_1930" />
+<feMergeNode in="color1" />
+</feMerge>
+</filter>
+<linearGradient id="paint0_linear_1926_1930" x1="128" y1="224" x2="128" y2="416" gradientUnits="userSpaceOnUse">
+<stop stop-color="#88B6FF"/>
+<stop offset="1" stop-color="white"/>
+</linearGradient>
+<clipPath id="clip0_1926_1930">
+<rect x="32" y="224" width="192" height="192" rx="96" transform="rotate(-90 32 224)" fill="white"/>
+</clipPath>
+</defs>
+</svg>
