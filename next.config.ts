@@ -39,6 +39,15 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  redirects: async () => {
+    return [
+      {
+        source: "/discord",
+        destination: "https://discord.gg/txUhHEXHs9",
+        permanent: false,
+      },
+    ];
+  },
   //   skipTrailingSlashRedirect: true,
 };
 
