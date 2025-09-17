@@ -24,7 +24,7 @@ export async function POST(req: Request) {
 
 	// Determine model and tools based on search preference
 	if (useFirecrawl) {
-		selectedModel = "openai/gpt-5-mini";
+		selectedModel = "openai/gpt-5-nano";
 		tools = { webSearch: firecrawlTool };
 	} else if (webSearch) {
 		selectedModel = "perplexity/sonar";
