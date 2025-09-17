@@ -15,30 +15,32 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://wav0.app'),
-  applicationName: 'WAVFLIP',
-  title: 'WAV0 — AI-Native Music Studio',
+  applicationName: 'WAV0',
+  title: 'WAV0 AI — Idea to Sound in Seconds',
   description:
-    'AI-Native Music Studio. Prompt to sound, agent-powered editing, and Vault storage.',
+    'Go from idea to sound in seconds. AI-Native Music Studio with the fastest AI producer, songwriter, and sound designer right in your pocket. Create reference tracks, soundpacks, samples, and beats.',
   keywords: [
-    'AI audio sampler',
-    'prompt to sound',
-    'multi-track',
-    'cursor',
-    'sampling',
-    'AI-Native',
-    'stems',
+    'AI music generation',
+    'idea to sound',
     'music production',
+    'AI producer',
+    'soundpacks',
+    'beats',
+    'samples',
+    'AI-Native',
+    'music studio',
     'browser-based',
     'web app',
+    'WAV0 AI',
     'WAV0',
   ],
   alternates: {
     canonical: 'https://wav0.app',
   },
   openGraph: {
-    title: 'WAV0 — AI-Native Music Studio',
+    title: 'WAV0 AI — Idea to Sound in Seconds',
     description:
-      'AI-Assist for music production in your browser. Prompt to sound, generate and edit stems, multi-track arranging, and exporting or saving to your Vault.',
+      'Go from idea to sound in seconds. AI-Native Music Studio with the fastest AI producer, songwriter, and sound designer right in your pocket. Create reference tracks, soundpacks, samples, and beats.',
     url: 'https://wav0.app',
     siteName: 'WAV0',
     images: [
@@ -46,7 +48,7 @@ export const metadata: Metadata = {
         url: '/og.png',
         width: 1200,
         height: 630,
-        alt: 'WAV0 — AI-Native Music Studio',
+        alt: 'WAV0 AI — Idea to Sound in Seconds, the fastest producer in your pocket',
       },
     ],
     locale: 'en_US',
@@ -54,9 +56,11 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'WAV0 — AI-Native Music Studio',
+    site: '@wav0ai',
+    creator: '@wav0ai',
+    title: 'WAV0 AI — Idea to Sound in Seconds',
     description:
-      'AI-Native Music Studio. Prompt to sound, agent-powered editing, and Vault storage.',
+      'Go from idea to sound in seconds. AI-Native Music Studio with the fastest AI producer, songwriter, and sound designer right in your pocket. Create reference tracks, soundpacks, samples, and beats.',
     images: ['/og.png'],
   },
 };
