@@ -13,7 +13,7 @@ Built for creators. By creators at [FLUID.TOOLS](https://fluid.tools).
 
 ## Capabilities
 
-* [WAV0 **Agent**](https://wav0.app/agent), just ask and it turns your idea to sound in seconds.
+* [WAV0 **Agent**](https://wav0.app/agent), just ask and it turns your idea to sound in seconds. Powered by [ElevenLabs](https://elevenlabs.io/).
 * [WAV0 **Studio**](https://wav0.app/studio), a minimal AI-powered DAW. Bring your own audio files, edit them, and export them.
 * [WAV0 **Vault**](https://wav0.app/vault), secure flexible storage for your music. Easily store and share your music with the world.
 * Version Control - Easily toggle between versions of your audio files in Vault and generations in WAV0 Agent.
