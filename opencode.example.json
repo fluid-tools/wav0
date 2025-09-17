@@ -10,6 +10,7 @@
 			"enabled": true
 		},
 		"firecrawl": {
+            "enabled": true,
 			"type": "local",
 			"command": ["bun", "x", "firecrawl-mcp", "--stdio"],
 			"environment": {
