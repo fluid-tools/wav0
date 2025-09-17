@@ -64,6 +64,7 @@ export default function ChatBotDemo() {
 	const [input, setInput] = useState("");
 	const [model, setModel] = useState<string>(models[0].value);
 	const [webSearch, setWebSearch] = useState(false);
+	const [useFirecrawl, setUseFirecrawl] = useState(false);
 	const { messages, sendMessage, status, setMessages } = useChat();
 
 	const regenerate = () => {
@@ -97,6 +98,7 @@ export default function ChatBotDemo() {
 							body: {
 								model: model,
 								webSearch: webSearch,
+								useFirecrawl: useFirecrawl,
 							},
 						},
 					);
@@ -122,6 +124,7 @@ export default function ChatBotDemo() {
 				body: {
 					model: model,
 					webSearch: webSearch,
+					useFirecrawl: useFirecrawl,
 				},
 			},
 		);
@@ -241,10 +244,23 @@ export default function ChatBotDemo() {
 							</PromptInputActionMenu>
 							<PromptInputButton
 								variant={webSearch ? "default" : "ghost"}
-								onClick={() => setWebSearch(!webSearch)}
+								onClick={() => {
+									setWebSearch(!webSearch);
+									if (!webSearch) setUseFirecrawl(false);
+								}}
 							>
 								<GlobeIcon size={16} />
-								<span>Search</span>
+								<span>Sonar</span>
+							</PromptInputButton>
+							<PromptInputButton
+								variant={useFirecrawl ? "default" : "ghost"}
+								onClick={() => {
+									setUseFirecrawl(!useFirecrawl);
+									if (!useFirecrawl) setWebSearch(false);
+								}}
+							>
+								<GlobeIcon size={16} />
+								<span>Firecrawl</span>
 							</PromptInputButton>
 							<PromptInputModelSelect
 								onValueChange={(value) => {
