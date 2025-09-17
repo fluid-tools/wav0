@@ -2,7 +2,7 @@ import "server-only";
 
 import "dotenv/config";
 import FirecrawlApp from "@mendable/firecrawl-js";
-import { generateText, stepCountIs, tool } from "ai";
+import { tool } from "ai";
 import { z } from "zod";
 
 const app = new FirecrawlApp({ apiKey: process.env.FIRECRAWL_API_KEY });
@@ -31,16 +31,10 @@ export const webSearch = tool({
 	},
 });
 
-const main = async () => {
-	const { text } = await generateText({
-		model: "openai/gpt-5-mini", // can be any model that supports tools
-		prompt: "Get the latest blog post from vercel.com/blog",
-		tools: {
-			webSearch,
-		},
-		stopWhen: stepCountIs(5),
-	});
-	console.log(text);
-};
-
-main();
+// Example usage:
+// const { text } = await generateText({
+//   model: "openai/gpt-5-mini",
+//   prompt: "Get the latest blog post from vercel.com/blog",
+//   tools: { webSearch },
+//   stopWhen: stepCountIs(5),
+// });
