@@ -3,11 +3,7 @@
 	"mcp": {
 		"github": {
 			"type": "local",
-			"command": [
-				"bun",
-				"x",
-				"@modelcontextprotocol/server-github"
-			],
+			"command": ["bun", "x", "@modelcontextprotocol/server-github"],
 			"environment": {
 				"GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
 			},
@@ -16,12 +12,7 @@
 		"firecrawl": {
 			"enabled": true,
 			"type": "local",
-			"command": [
-				"bun",
-				"x",
-				"firecrawl-mcp",
-				"--stdio"
-			],
+			"command": ["bun", "x", "firecrawl-mcp", "--stdio"],
 			"environment": {
 				"FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY}"
 			}
