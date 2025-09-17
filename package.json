@@ -54,7 +54,7 @@
 		"idb-keyval": "^6.2.2",
 		"jotai": "^2.14.0",
 		"lucide-react": "^0.544.0",
-		"motion": "^12.23.13",
+		"motion": "^12.23.14",
 		"nanoid": "^5.1.5",
 		"next": "15.5.3",
 		"next-safe-action": "^8.0.11",
