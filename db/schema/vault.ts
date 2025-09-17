@@ -1,85 +1,108 @@
-import { z } from "zod";
 import {
-	FOLDER_NAME_MAX_LENGTH,
-	NAME_MIN_LENGTH,
-	PROJECT_NAME_MAX_LENGTH,
-} from "@/lib/constants";
+	type AnyPgColumn,
+	bigint,
+	integer,
+	json,
+	pgEnum,
+	pgTable,
+	real,
+	text,
+	timestamp,
+	unique,
+} from "drizzle-orm/pg-core";
+import { user } from "./auth";
 
-// Common validation schemas
-const folderNameSchema = z
-	.string()
-	.min(NAME_MIN_LENGTH, "Name is required")
-	.max(
-		FOLDER_NAME_MAX_LENGTH,
-		`Name is too long (max ${FOLDER_NAME_MAX_LENGTH} characters)`,
-	)
-	.trim();
+// Access type enum for projects and tracks
+export const accessTypeEnum = pgEnum("access_type", [
+	"private",
+	"public",
+	"invite-only",
+]);
 
-const projectNameSchema = z
-	.string()
-	.min(NAME_MIN_LENGTH, "Name is required")
-	.max(
-		PROJECT_NAME_MAX_LENGTH,
-		`Name is too long (max ${PROJECT_NAME_MAX_LENGTH} characters)`,
-	)
-	.trim();
-
-const optionalIdSchema = z.string().nullable().optional();
-
-// Folder operation schemas
-export const createFolderSchema = z.object({
-	name: folderNameSchema,
-	parentFolderId: optionalIdSchema,
+// Folders table - contains projects and other folders (nested)
+export const folder = pgTable("folder", {
+	id: text("id").primaryKey(),
+	name: text("name").notNull(),
+	parentFolderId: text("parent_folder_id").references(
+		(): AnyPgColumn => folder.id,
+	),
+	// nullable - null means root level folder
+	userId: text("user_id")
+		.notNull()
+		.references(() => user.id, { onDelete: "cascade" }),
+	order: integer("order").notNull().default(0),
+	createdAt: timestamp("created_at")
+		.$defaultFn(() => /* @__PURE__ */ new Date())
+		.notNull(),
+	updatedAt: timestamp("updated_at")
+		.$defaultFn(() => /* @__PURE__ */ new Date())
+		.notNull(),
 });
 
-export const deleteFolderSchema = z.object({
-	folderId: z.string().min(1, "Folder ID is required"),
+// Projects table - contains tracks, can be in folders or vault root
+export const project = pgTable("project", {
+	id: text("id").primaryKey(),
+	name: text("name").notNull(),
+	image: text("image"),
+	folderId: text("folder_id").references(() => folder.id, {
+		onDelete: "cascade",
+	}), // nullable - projects can exist in vault root
+	userId: text("user_id")
+		.notNull()
+		.references(() => user.id, { onDelete: "cascade" }),
+	accessType: accessTypeEnum("access_type").notNull().default("private"),
+	order: integer("order").notNull().default(0),
+	createdAt: timestamp("created_at")
+		.$defaultFn(() => /* @__PURE__ */ new Date())
+		.notNull(),
+	updatedAt: timestamp("updated_at")
+		.$defaultFn(() => /* @__PURE__ */ new Date())
+		.notNull(),
+	metadata: json("metadata"),
 });
 
-export const renameFolderSchema = z.object({
-	folderId: z.string().min(1, "Folder ID is required"),
-	name: folderNameSchema,
+// Tracks table - metadata only, actual audio data in track_versions
+export const track = pgTable("track", {
+	id: text("id").primaryKey(),
+	name: text("name").notNull(),
+	projectId: text("project_id")
+		.notNull()
+		.references(() => project.id, { onDelete: "cascade" }),
+	userId: text("user_id")
+		.notNull()
+		.references(() => user.id, { onDelete: "cascade" }),
+	activeVersionId: text("active_version_id"), // Will reference track_version.id
+	accessType: accessTypeEnum("access_type").notNull().default("private"),
+	order: integer("order").notNull().default(0),
+	createdAt: timestamp("created_at")
+		.$defaultFn(() => /* @__PURE__ */ new Date())
+		.notNull(),
+	updatedAt: timestamp("updated_at")
+		.$defaultFn(() => /* @__PURE__ */ new Date())
+		.notNull(),
+	metadata: json("metadata"),
 });
 
-export const moveFolderSchema = z.object({
-	folderId: z.string().min(1, "Folder ID is required"),
-	parentFolderId: optionalIdSchema,
-	sourceParentFolderId: optionalIdSchema,
-});
-
-// Project operation schemas
-export const createProjectSchema = z.object({
-	name: projectNameSchema,
-	folderId: optionalIdSchema,
-});
-
-export const deleteProjectSchema = z.object({
-	projectId: z.string().min(1, "Project ID is required"),
-	folderId: optionalIdSchema,
-});
-
-export const renameProjectSchema = z.object({
-	projectId: z.string().min(1, "Project ID is required"),
-	name: projectNameSchema,
-	folderId: optionalIdSchema,
-});
-
-export const moveProjectSchema = z.object({
-	projectId: z.string().min(1, "Project ID is required"),
-	folderId: optionalIdSchema,
-	sourceFolderId: optionalIdSchema,
-});
-
-export const combineProjectsSchema = z
-	.object({
-		sourceProjectId: z.string().min(1, "Source project ID is required"),
-		targetProjectId: z.string().min(1, "Target project ID is required"),
-		parentFolderId: optionalIdSchema,
-	})
-	.refine((data) => data.sourceProjectId !== data.targetProjectId, {
-		message: "Cannot combine a project with itself",
-		path: ["targetProjectId"],
-	});
-
-// Export common schemas for reuse
-export { folderNameSchema, projectNameSchema, optionalIdSchema };
+// Track versions table - actual file data and version history
+export const trackVersion = pgTable(
+	"track_version",
+	{
+		id: text("id").primaryKey(),
+		trackId: text("track_id")
+			.notNull()
+			.references(() => track.id, { onDelete: "cascade" }),
+		version: integer("version").notNull(), // Auto-increment per track
+		fileKey: text("file_key").notNull(), // S3/R2 key (not a URL)
+		size: bigint("size", { mode: "number" }), // File size in bytes
+		duration: real("duration"), // Duration in seconds
+		mimeType: text("mime_type"), // audio/mpeg, audio/wav, etc.
+		createdAt: timestamp("created_at")
+			.$defaultFn(() => /* @__PURE__ */ new Date())
+			.notNull(),
+		metadata: json("metadata"), // Version-specific metadata
+	},
+	(table) => [
+		// Unique version numbers per track
+		unique("unique_version_per_track").on(table.trackId, table.version),
+	],
+);
