@@ -1,9 +1,9 @@
 import { AppProviders } from "@/lib/state/providers";
 
 export default async function ProtectedLayout({
-  children,
+	children,
 }: {
-  children: React.ReactNode;
+	children: React.ReactNode;
 }) {
-  return <AppProviders>{children}</AppProviders>;
+	return <AppProviders>{children}</AppProviders>;
 }
