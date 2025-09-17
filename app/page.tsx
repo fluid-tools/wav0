@@ -1,13 +1,12 @@
 import Link from "next/link";
-import dynamic from "next/dynamic";
-
-const ThemeToggle = dynamic(() => import("@/components/theme-toggle").then(mod => ({ default: mod.ThemeToggle })), {
-  ssr: false,
-});
+import ThemeToggle from "@/components/theme-toggle.client";
 
 export default function Home() {
   return (
-    <main suppressHydrationWarning className="flex flex-col items-center justify-between gap-12 h-screen py-12">
+    <main
+      suppressHydrationWarning
+      className="flex flex-col items-center justify-between gap-12 h-screen py-12"
+    >
       <nav className="flex items-center text-muted-foreground justify-start font-mono tracking-tight uppercase text-xs gap-4">
         <Link
           href="#hero"
