@@ -11,7 +11,6 @@ export const webSearch = tool({
 	description: "Search the web for up-to-date information",
 	inputSchema: z.object({
 		urlToCrawl: z
-			.string()
 			.url()
 			.min(1)
 			.max(100)
