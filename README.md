@@ -1,44 +1,120 @@
+<div align="center">
+
 # [WAV0 AI](https://wav0.app)
 
-[WAV0](https://wav0.app) is an open-source AI Producer that lets you go from idea to sound in seconds. Create 
-soundpacks, samples, beats, and more.
+**The Open-Source AI Native Music Studio**
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Website](https://img.shields.io/badge/website-wav0.app-blue)](https://wav0.app)
+[![Discord](https://img.shields.io/badge/discord-join%20us-5865F2)](https://discord.gg/wav0)
+[![Twitter Follow](https://img.shields.io/twitter/follow/wav0ai?style=social)](https://twitter.com/wav0ai)
 
 ![WAV0](https://di2lwe4r5jgy9jlt.public.blob.vercel-storage.com/og0image.png)
 
-Meet the fastest producer, songwriter, and sound designer right in your pocket.
+*Go from idea to sound in seconds. Create reference tracks, soundpacks, samples, beats, and more with the fastest producer, songwriter, and sound designer right in your pocket.*
 
-Built for creators. By creators at [FLUID.TOOLS](https://fluid.tools).
+**Built for creators, by creators at [FLUID.TOOLS](https://fluid.tools)**
 
+[🎵 Try Live Demo](https://wav0.app/agent) • [📚 Documentation](https://wav0.app/docs) • [💬 Discord](https://discord.gg/wav0) • [🐦 Twitter](https://twitter.com/wav0ai)
 
+</div>
 
-## Capabilities
+---
 
-* [WAV0 **Agent**](https://wav0.app/agent), just ask and it turns your idea to sound in seconds. Powered by [ElevenLabs](https://elevenlabs.io/).
-* [WAV0 **Studio**](https://wav0.app/studio), a minimal AI-powered DAW. Bring your own audio files, edit them, and export them.
-* [WAV0 **Vault**](https://wav0.app/vault), secure flexible storage for your music. Easily store and share your music with the world.
-* Version Control - Easily toggle between versions of your audio files in Vault and generations in WAV0 Agent.
+## ✨ Features
 
-## Roadmap
+### 🤖 [**WAV0 AI**](https://wav0.app/agent)
+Just ask and it turns your idea to sound in seconds. Music Generation powered by [ElevenLabs](https://elevenlabs.io/). Built with [AI SDK](https://ai-sdk.dev/).
 
-* Background Generations
-* [WAV0 **Community**](https://wav0.app/community), a library of music and sounds by the wav0 community.
+### 🎛️ [**Music Studio**](https://wav0.app/studio)
+A minimal AI-powered DAW. Bring your own audio files, edit them, and export them (superfast, in your browser with [MediaBunny](https://mediabunny.dev)).
 
-## What can you ask [WAV0 **Agent**](https://wav0.app/agent)?
+### 🗄️ [**Music Vault**](https://wav0.app/vault)
+Secure flexible storage for your music. Easily store and have control over who has access to your music. Private by default.
 
-* edit audio files for you.
-* generate and edit songs for you.
-* create custom soundpacks/beatpacks for your project/youtube video/twitch stream/etc.
-* write lyrics for you.
+### 📝 **Version Control**
+Easily toggle between versions of your audio files in Vault and generations in WAV0 Agent.
 
-## Sponsors & Partners
-* [ElevenLabs](https://elevenlabs.io/)
-* [GLOWW](https://gloww.studio/)
-* [FLUID.TOOLS](https://fluid.tools)
+## 🚀 Quick Start
 
-## Contributing
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/wav0.git
 
-Contributions are welcome! Please feel free to open an issue or submit a pull request.
+# Install dependencies
+cd wav0
+bun install
 
-## License
+# Set up environment variables
+cp .env.example .env.local
+
+# Start the development server
+bun dev
+```
+
+Visit [http://localhost:3000](http://localhost:3000) to see your local instance running.
+
+## 🎯 What can you ask [WAV0 **Agent**](https://wav0.app/agent)?
+
+- **Edit audio files** for you
+- **Generate and edit songs** for you
+- **Create custom soundpacks/beatpacks** for your project/youtube video/twitch stream/etc
+- **Write lyrics** for you
+
+## 🗺️ Roadmap
+
+- [ ] **Background Generations**
+- [ ] [**WAV0 Community**](https://wav0.app/community) - A library of music and sounds by the wav0 community
+
+## 🤝 Sponsors & Partners
+
+<table>
+  <tr>
+    <td align="center">
+      <a href="https://elevenlabs.io/">
+        <img src="https://elevenlabs.io/favicon.ico" width="64" height="64" alt="ElevenLabs" />
+        <br />
+        <strong>ElevenLabs</strong>
+        <p>Startup Grants Partner</p>
+      </a>
+    </td>
+   
+  </tr>
+</table>
+
+## 🙏 OSS Shoutouts
+
+- [MediaBunny](https://mediabunny.dev) - Fast browser-based media processing
+- [AI SDK](https://ai-sdk.dev/) - The TypeScript toolkit for AI apps
+
+## 📖 Documentation
+
+For detailed documentation, visit our [docs](https://wav0.app/docs) or check out:
+
+- [Getting Started Guide](https://wav0.app/docs/getting-started)
+- [API Reference](https://wav0.app/docs/api)
+- [Examples](https://wav0.app/docs/examples)
+
+## 🤝 Contributing
+
+We love contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### Development
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+<div align="center">
+
+**[wav0.app](https://wav0.app) • Made with ❤️ by [FLUID.TOOLS](https://fluid.tools)**
+
+</div>
