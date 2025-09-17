@@ -6,7 +6,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Website](https://img.shields.io/badge/website-wav0.app-blue)](https://wav0.app)
-[![Discord](https://img.shields.io/badge/discord-join%20us-5865F2)](https://discord.gg/wav0)
+[![Discord](https://img.shields.io/badge/discord-join%20us-5865F2)](https://wav0.app/discord)
 [![Twitter Follow](https://img.shields.io/twitter/follow/wav0ai?style=social)](https://twitter.com/wav0ai)
 
 ![WAV0](https://di2lwe4r5jgy9jlt.public.blob.vercel-storage.com/og0image.png)
