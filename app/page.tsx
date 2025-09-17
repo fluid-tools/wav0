@@ -1,5 +1,5 @@
 import Link from "next/link";
-import ThemeToggle from "@/components/theme-toggle.client";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function Home() {
   return (

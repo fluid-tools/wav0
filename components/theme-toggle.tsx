@@ -13,15 +13,14 @@ import {
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
+  const { setTheme } = useTheme();
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button size="icon" variant="outline">
-          {theme === 'light' && <Sun className="h-[1.2rem] w-[1.2rem]" />}
-          {theme === 'dark' && <Moon className="h-[1.2rem] w-[1.2rem]" />}
-          {theme === 'system' && <Monitor className="h-[1.2rem] w-[1.2rem]" />}
+          <Sun className="h-[1.2rem] w-[1.2rem] dark:hidden" />
+          <Moon className="hidden h-[1.2rem] w-[1.2rem] dark:block" />
           <span className="sr-only">Toggle theme</span>
         </Button>
       </DropdownMenuTrigger>
