@@ -1,36 +1,44 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# [WAV0 AI](https://wav0.app)
 
-## Getting Started
+[WAV0](https://wav0.app) is an open-source AI Producer that lets you go from idea to sound in seconds. Create 
+soundpacks, samples, beats, and more.
 
-First, run the development server:
+![WAV0](https://di2lwe4r5jgy9jlt.public.blob.vercel-storage.com/og0image.png)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Meet the fastest producer, songwriter, and sound designer right in your pocket.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Built for creators. By creators at [FLUID.TOOLS](https://fluid.tools).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-## Learn More
+## Capabilities
 
-To learn more about Next.js, take a look at the following resources:
+* [WAV0 **Agent**](https://wav0.app/agent), just ask and it turns your idea to sound in seconds.
+* [WAV0 **Studio**](https://wav0.app/studio), a minimal AI-powered DAW. Bring your own audio files, edit them, and export them.
+* [WAV0 **Vault**](https://wav0.app/vault), secure flexible storage for your music. Easily store and share your music with the world.
+* Version Control - Easily toggle between versions of your audio files in Vault and generations in WAV0 Agent.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Roadmap
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+* Background Generations
+* [WAV0 **Community**](https://wav0.app/community), a library of music and sounds by the wav0 community.
 
-## Deploy on Vercel
+## What can you ask [WAV0 **Agent**](https://wav0.app/agent)?
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+* edit audio files for you.
+* generate and edit songs for you.
+* create custom soundpacks/beatpacks for your project/youtube video/twitch stream/etc.
+* write lyrics for you.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Sponsors & Partners
+* [ElevenLabs](https://elevenlabs.io/)
+* [GLOWW](https://gloww.studio/)
+* [FLUID.TOOLS](https://fluid.tools)
+
+## Contributing
+
+Contributions are welcome! Please feel free to open an issue or submit a pull request.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
