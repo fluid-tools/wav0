@@ -1,3 +1,4 @@
+import { AIDevtools } from '@ai-sdk-tools/devtools'
 import { AppProviders } from "@/lib/state/providers";
 
 export default async function ProtectedLayout({
@@ -5,5 +6,7 @@ export default async function ProtectedLayout({
 }: {
 	children: React.ReactNode;
 }) {
-	return <AppProviders>{children}</AppProviders>;
+	return <AppProviders>{children}
+		<AIDevtools />
+	</AppProviders>;
 }

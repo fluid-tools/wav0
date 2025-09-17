@@ -1,4 +1,9 @@
-import { convertToModelMessages, streamText, type UIMessage } from "ai";
+import {
+	convertToModelMessages,
+	stepCountIs,
+	streamText,
+	type UIMessage,
+} from "ai";
 import { webSearch as firecrawlTool } from "@/ai/tools/firecrawl";
 
 export async function POST(req: Request) {
@@ -31,6 +36,7 @@ export async function POST(req: Request) {
 		system:
 			"You are a helpful assistant that can answer questions and help with tasks",
 		...(tools && { tools }),
+		stopWhen: stepCountIs(5),
 	});
 
 	// send sources and reasoning back to the client
