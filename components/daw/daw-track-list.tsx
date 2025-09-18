@@ -58,10 +58,10 @@ export function DAWTrackList() {
 				{tracks.map((track) => (
 					<div
 						key={track.id}
-						className={`w-full border-b transition-colors ${
+						className={`w-full border-b border-border/50 transition-colors ${
 							selectedTrackId === track.id
-								? "bg-muted border-primary"
-								: "bg-background hover:bg-muted/50"
+								? "bg-muted/30"
+								: "bg-background hover:bg-muted/20"
 						}`}
 						style={{
 							height: DAW_ROW_HEIGHT,
@@ -113,7 +113,7 @@ export function DAWTrackList() {
 									<Button
 										variant="ghost"
 										size="sm"
-										className="h-6 w-6 p-0 flex-shrink-0"
+										className="h-6 w-6 p-0 flex-shrink-0 opacity-60 hover:opacity-100"
 									>
 										<MoreVertical className="w-3 h-3" />
 									</Button>
@@ -146,7 +146,7 @@ export function DAWTrackList() {
 							<Button
 								variant={track.muted ? "default" : "ghost"}
 								size="sm"
-								className="h-6 w-6 p-0 flex-shrink-0"
+								className="h-7 w-7 p-0 flex-shrink-0"
 								onClick={(e) => {
 									e.stopPropagation();
 									toggleMute(track.id, track.muted);
@@ -162,7 +162,7 @@ export function DAWTrackList() {
 							<Button
 								variant={track.soloed ? "default" : "ghost"}
 								size="sm"
-								className="h-6 w-6 p-0 flex-shrink-0"
+								className="h-7 w-7 p-0 flex-shrink-0"
 								onClick={(e) => {
 									e.stopPropagation();
 									toggleSolo(track.id, track.soloed);

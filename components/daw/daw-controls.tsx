@@ -2,13 +2,17 @@
 
 import { useAtom } from "jotai";
 import {
+	Minus,
 	Pause,
 	Play,
+	Plus,
 	Repeat,
 	SkipBack,
 	SkipForward,
 	Square,
 	Volume2,
+	ZoomIn,
+	ZoomOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
