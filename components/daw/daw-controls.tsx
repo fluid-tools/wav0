@@ -2,10 +2,8 @@
 
 import { useAtom } from "jotai";
 import {
-	Minus,
 	Pause,
 	Play,
-	Plus,
 	Repeat,
 	SkipBack,
 	SkipForward,
@@ -16,10 +14,13 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DAW_PIXELS_PER_SECOND_AT_ZOOM_1 } from "@/lib/constants";
 import {
 	playbackAtom,
 	setBpmAtom,
 	setCurrentTimeAtom,
+	setTimelineZoomAtom,
+	timelineAtom,
 	togglePlaybackAtom,
 	totalDurationAtom,
 } from "@/lib/state/daw-store";
@@ -27,9 +28,11 @@ import { formatDuration } from "@/lib/storage/opfs";
 
 export function DAWControls() {
 	const [playback] = useAtom(playbackAtom);
+	const [timeline] = useAtom(timelineAtom);
 	const [, togglePlayback] = useAtom(togglePlaybackAtom);
 	const [, setCurrentTime] = useAtom(setCurrentTimeAtom);
 	const [, setBpm] = useAtom(setBpmAtom);
+	const [, setTimelineZoom] = useAtom(setTimelineZoomAtom);
 	const [totalDuration] = useAtom(totalDurationAtom);
 
 	const handleStop = () => {
@@ -47,6 +50,14 @@ export function DAWControls() {
 	const handleBpmChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const bpm = parseInt(e.target.value, 10);
 		setBpm(bpm);
+	};
+
+	const handleZoomIn = () => {
+		setTimelineZoom(Math.min(timeline.zoom * 1.5, 4));
+	};
+
+	const handleZoomOut = () => {
+		setTimelineZoom(Math.max(timeline.zoom / 1.5, 0.25));
 	};
 
 	return (
@@ -76,25 +87,61 @@ export function DAWControls() {
 					</Button>
 				</div>
 
-				<div className="flex items-center gap-2">
-					<span className="text-sm font-mono text-muted-foreground min-w-16">
+				<div className="flex items-center gap-3 bg-background/50 rounded-lg px-3 py-1.5 border">
+					<span className="text-xs font-mono text-muted-foreground min-w-14 tabular-nums">
 						{formatDuration(playback.currentTime / 1000)}
 					</span>
-					<input
-						type="range"
-						min={0}
-						max={totalDuration}
-						value={playback.currentTime}
-						onChange={handleTimeChange}
-						className="w-48 h-2 bg-muted rounded-lg appearance-none cursor-pointer"
-					/>
-					<span className="text-sm font-mono text-muted-foreground min-w-16">
+					<div className="relative flex-1">
+						<input
+							type="range"
+							min={0}
+							max={totalDuration}
+							value={playback.currentTime}
+							onChange={handleTimeChange}
+							className="w-48 h-1.5 bg-muted/50 rounded-full appearance-none cursor-pointer slider"
+							style={{
+								background: `linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) ${
+									(playback.currentTime / totalDuration) * 100
+								}%, hsl(var(--muted)) ${
+									(playback.currentTime / totalDuration) * 100
+								}%, hsl(var(--muted)) 100%)`,
+							}}
+						/>
+					</div>
+					<span className="text-xs font-mono text-muted-foreground min-w-14 tabular-nums">
 						{formatDuration(totalDuration / 1000)}
 					</span>
 				</div>
 			</div>
 
 			<div className="flex items-center gap-4">
+				{/* Zoom Controls */}
+				<div className="flex items-center gap-1 bg-background/50 rounded-lg border p-1">
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={handleZoomOut}
+						disabled={timeline.zoom <= 0.25}
+						className="h-7 w-7 p-0"
+						title="Zoom Out"
+					>
+						<ZoomOut className="w-3.5 h-3.5" />
+					</Button>
+					<span className="text-xs font-mono text-muted-foreground min-w-12 text-center">
+						{Math.round(timeline.zoom * 100)}%
+					</span>
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={handleZoomIn}
+						disabled={timeline.zoom >= 4}
+						className="h-7 w-7 p-0"
+						title="Zoom In"
+					>
+						<ZoomIn className="w-3.5 h-3.5" />
+					</Button>
+				</div>
+
 				<div className="flex items-center gap-2">
 					<span className="text-xs text-muted-foreground">BPM</span>
 					<Input

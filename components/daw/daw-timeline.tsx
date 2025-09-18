@@ -4,6 +4,7 @@ import { useAtom } from "jotai";
 import { DAW_PIXELS_PER_SECOND_AT_ZOOM_1 } from "@/lib/constants";
 import {
 	playbackAtom,
+	projectEndPositionAtom,
 	setCurrentTimeAtom,
 	timelineAtom,
 	timelineWidthAtom,
@@ -15,6 +16,7 @@ export function DAWTimeline() {
 	const [playback] = useAtom(playbackAtom);
 	const [, setCurrentTime] = useAtom(setCurrentTimeAtom);
 	const [timelineWidth] = useAtom(timelineWidthAtom);
+	const [projectEndPosition] = useAtom(projectEndPositionAtom);
 
 	// Calculate time markers based on zoom and BPM
 	const getTimeMarkers = () => {
@@ -111,6 +113,22 @@ export function DAWTimeline() {
 					</span>
 				</div>
 			))}
+
+			{/* Project end marker and buffer zone */}
+			<div
+				className="absolute top-0 bottom-0 w-px bg-yellow-500/70 z-30"
+				style={{ left: projectEndPosition }}
+				title="Project End"
+			/>
+			
+			{/* Buffer/dead space overlay */}
+			<div
+				className="absolute top-0 bottom-0 bg-muted/20 pointer-events-none z-20"
+				style={{ 
+					left: projectEndPosition,
+					right: 0,
+				}}
+			/>
 
 			{/* Snap grid overlay */}
 			{timeline.snapToGrid && (
