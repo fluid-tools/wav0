@@ -27,7 +27,6 @@ import {
 } from "@/lib/state/daw-store";
 import { formatDuration } from "@/lib/storage/opfs";
 
-
 export function DAWTrackList() {
 	const [tracks] = useAtom(tracksAtom);
 	const [selectedTrackId, setSelectedTrackId] = useAtom(selectedTrackIdAtom);
@@ -64,21 +63,22 @@ export function DAWTrackList() {
 								? "bg-muted border-primary"
 								: "bg-background hover:bg-muted/50"
 						}`}
-						style={{ 
+						style={{
 							height: DAW_ROW_HEIGHT,
-							padding: '12px',
-							display: 'flex',
-							flexDirection: 'column',
-							justifyContent: 'space-between'
+							padding: "12px",
+							display: "flex",
+							flexDirection: "column",
+							justifyContent: "space-between",
 						}}
 					>
 						{/* Track Header */}
-						<button
-							type="button"
-							className="flex items-center justify-between cursor-pointer w-full bg-transparent border-none p-0 text-left"
-							onClick={() => setSelectedTrackId(track.id)}
-						>
-							<div className="flex items-center gap-2 flex-1 min-w-0">
+						<div className="flex items-center justify-between">
+							<button
+								type="button"
+								className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer bg-transparent border-none p-0 text-left"
+								onClick={() => setSelectedTrackId(track.id)}
+								onDoubleClick={() => setEditingTrackId(track.id)}
+							>
 								<div
 									className="w-3 h-3 rounded-full flex-shrink-0"
 									style={{ backgroundColor: track.color }}
@@ -100,20 +100,13 @@ export function DAWTrackList() {
 										onClick={(e) => e.stopPropagation()}
 									/>
 								) : (
-									<button
-										type="button"
-										className="text-sm font-medium truncate text-left bg-transparent border-none p-0 cursor-pointer hover:underline"
-										onDoubleClick={(e) => {
-											e.preventDefault();
-											e.stopPropagation();
-											setEditingTrackId(track.id);
-										}}
-										onClick={(e) => e.stopPropagation()}
+									<span
+										className="text-sm font-medium truncate text-left select-none"
 									>
 										{track.name}
-									</button>
+									</span>
 								)}
-							</div>
+							</button>
 
 							<DropdownMenu>
 								<DropdownMenuTrigger asChild>
@@ -121,34 +114,25 @@ export function DAWTrackList() {
 										variant="ghost"
 										size="sm"
 										className="h-6 w-6 p-0 flex-shrink-0"
-										onClick={(e) => e.stopPropagation()}
 									>
 										<MoreVertical className="w-3 h-3" />
 									</Button>
 								</DropdownMenuTrigger>
 								<DropdownMenuContent align="end">
-									<DropdownMenuItem
-										onClick={(e) => {
-											e.stopPropagation();
-											setEditingTrackId(track.id);
-										}}
-									>
+									<DropdownMenuItem onClick={() => setEditingTrackId(track.id)}>
 										<Edit3 className="w-4 h-4 mr-2" />
 										Rename
 									</DropdownMenuItem>
 									<DropdownMenuItem
-										onClick={(e) => {
-											e.stopPropagation();
-											removeTrack(track.id);
-										}}
+										onClick={() => removeTrack(track.id)}
 										className="text-destructive"
 									>
 										<Trash2 className="w-4 h-4 mr-2" />
 										Delete
 									</DropdownMenuItem>
 								</DropdownMenuContent>
-								</DropdownMenu>
-						</button>
+							</DropdownMenu>
+						</div>
 
 						{/* Track Info */}
 						<div className="text-xs text-muted-foreground">
@@ -206,11 +190,13 @@ export function DAWTrackList() {
 							</span>
 						</div>
 					</div>
-					))}
+				))}
 
 				{tracks.length === 0 && (
 					<div className="text-center py-8 text-muted-foreground px-4">
-						<p className="text-sm">No tracks yet. Use the + button above to add tracks.</p>
+						<p className="text-sm">
+							No tracks yet. Use the + button above to add tracks.
+						</p>
 					</div>
 				)}
 			</div>
