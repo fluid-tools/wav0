@@ -1,7 +1,13 @@
+import { Music2, Wrench, Zap } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+
+const ThemeToggleGroup = dynamic(
+	() => import("@/components/theme-toggle").then((mod) => mod.ThemeToggleGroup),
+
+);
 
 export default function Home() {
 	return (
@@ -34,7 +40,6 @@ export default function Home() {
 					</div>
 				</div>
 				<div className="flex items-center gap-3">
-					<ThemeToggle />
 					<Button
 						asChild
 						size="sm"
@@ -103,44 +108,50 @@ export default function Home() {
 						</p>
 					</div>
 
-					<div className="grid md:grid-cols-3 gap-8">
-						<div className="space-y-4 text-center">
-							<div className="size-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto">
-								<span className="font-mono text-xl">⚡</span>
+					<div className="grid md:grid-cols-3 gap-6 md:gap-8">
+						<div className="rounded-lg border bg-card p-6 text-left">
+							<div className="size-12 bg-primary/10 rounded-lg flex items-center justify-center">
+								<Zap className="size-5 text-primary" aria-hidden />
 							</div>
-							<h3 className="font-mono text-sm uppercase tracking-tight font-semibold">
-								Lightning Fast
-							</h3>
-							<p className="text-sm text-muted-foreground">
-								Generate complete tracks in seconds, not hours. AI that actually
-								keeps up with your creativity.
-							</p>
+							<div className="mt-4 space-y-2">
+								<h3 className="font-mono text-sm uppercase tracking-tight font-semibold">
+									Lightning Fast
+								</h3>
+								<p className="text-sm text-muted-foreground">
+									Generate complete tracks in seconds, not hours. AI that
+									actually keeps up with your creativity.
+								</p>
+							</div>
 						</div>
 
-						<div className="space-y-4 text-center">
-							<div className="size-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto">
-								<span className="font-mono text-xl">🎵</span>
+						<div className="rounded-lg border bg-card p-6 text-left">
+							<div className="size-12 bg-primary/10 rounded-lg flex items-center justify-center">
+								<Music2 className="size-5 text-primary" aria-hidden />
 							</div>
-							<h3 className="font-mono text-sm uppercase tracking-tight font-semibold">
-								Any Genre
-							</h3>
-							<p className="text-sm text-muted-foreground">
-								From trap to ambient, house to jazz. Our AI understands every
-								style and nuance.
-							</p>
+							<div className="mt-4 space-y-2">
+								<h3 className="font-mono text-sm uppercase tracking-tight font-semibold">
+									Any Genre
+								</h3>
+								<p className="text-sm text-muted-foreground">
+									From trap to ambient, house to jazz. Our AI understands every
+									style and nuance.
+								</p>
+							</div>
 						</div>
 
-						<div className="space-y-4 text-center">
-							<div className="size-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto">
-								<span className="font-mono text-xl">🔧</span>
+						<div className="rounded-lg border bg-card p-6 text-left">
+							<div className="size-12 bg-primary/10 rounded-lg flex items-center justify-center">
+								<Wrench className="size-5 text-primary" aria-hidden />
 							</div>
-							<h3 className="font-mono text-sm uppercase tracking-tight font-semibold">
-								Producer Grade
-							</h3>
-							<p className="text-sm text-muted-foreground">
-								Professional quality output ready for your DAW. No
-								post-processing needed.
-							</p>
+							<div className="mt-4 space-y-2">
+								<h3 className="font-mono text-sm uppercase tracking-tight font-semibold">
+									Producer Grade
+								</h3>
+								<p className="text-sm text-muted-foreground">
+									Professional quality output ready for your DAW. No
+									post-processing needed.
+								</p>
+							</div>
 						</div>
 					</div>
 				</div>
@@ -180,15 +191,27 @@ export default function Home() {
 						</span>
 					</div>
 					<div className="flex items-center gap-4 text-xs text-muted-foreground font-mono uppercase tracking-tight">
-						<Link href="#" className="hover:text-foreground transition-colors">
-							Privacy
-						</Link>
-						<Link href="#" className="hover:text-foreground transition-colors">
-							Terms
-						</Link>
-						<Link href="#" className="hover:text-foreground transition-colors">
-							Support
-						</Link>
+						<div className="flex items-center gap-4 text-xs text-muted-foreground font-mono uppercase tracking-tight">
+							<Link
+								href="#"
+								className="hover:text-foreground transition-colors"
+							>
+								Privacy
+							</Link>
+							<Link
+								href="#"
+								className="hover:text-foreground transition-colors"
+							>
+								Terms
+							</Link>
+							<Link
+								href="#"
+								className="hover:text-foreground transition-colors"
+							>
+								Support
+							</Link>
+						</div>
+						<ThemeToggleGroup />
 					</div>
 				</div>
 			</footer>
