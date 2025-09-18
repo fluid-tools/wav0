@@ -27,6 +27,7 @@ import {
 } from "@/lib/state/daw-store";
 import { formatDuration } from "@/lib/storage/opfs";
 
+
 export function DAWTrackList() {
 	const [tracks] = useAtom(tracksAtom);
 	const [selectedTrackId, setSelectedTrackId] = useAtom(selectedTrackIdAtom);
@@ -54,31 +55,24 @@ export function DAWTrackList() {
 	return (
 		<div className="w-full">
 			{/* Track List */}
-			<div role="list">
+			<div>
 				{tracks.map((track) => (
-					<div
+					<button
 						key={track.id}
+						type="button"
 						className={`w-full border-b transition-colors cursor-pointer text-left ${
 							selectedTrackId === track.id
 								? "bg-muted border-primary"
 								: "bg-background hover:bg-muted/50"
 						}`}
-						style={{
+						style={{ 
 							height: DAW_ROW_HEIGHT,
-							padding: "12px",
-							display: "flex",
-							flexDirection: "column",
-							justifyContent: "space-between",
+							padding: '12px',
+							display: 'flex',
+							flexDirection: 'column',
+							justifyContent: 'space-between'
 						}}
 						onClick={() => setSelectedTrackId(track.id)}
-						role="listitem"
-						tabIndex={0}
-						onKeyDown={(e) => {
-							if (e.key === "Enter" || e.key === " ") {
-								e.preventDefault();
-								setSelectedTrackId(track.id);
-							}
-						}}
 					>
 						{/* Track Header */}
 						<div className="flex items-center justify-between">
@@ -216,14 +210,12 @@ export function DAWTrackList() {
 								{track.volume}
 							</span>
 						</div>
-					</div>
-				))}
+						</button>
+					))}
 
 				{tracks.length === 0 && (
 					<div className="text-center py-8 text-muted-foreground px-4">
-						<p className="text-sm">
-							No tracks yet. Use the + button above to add tracks.
-						</p>
+						<p className="text-sm">No tracks yet. Use the + button above to add tracks.</p>
 					</div>
 				)}
 			</div>

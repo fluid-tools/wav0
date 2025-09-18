@@ -143,22 +143,3 @@ export const setBpmAtom = atom(null, (get, set, bpm: number) => {
   const clamped = Math.max(30, Math.min(300, Number.isFinite(bpm) ? bpm : 120))
   set(playbackAtom, { ...playback, bpm: clamped })
 })
-
-// Zoom control atoms
-export const zoomInAtom = atom(null, (get, set) => {
-  const timeline = get(timelineAtom)
-  const newZoom = Math.min(timeline.zoom * 1.5, 4) // Max zoom 4x
-  set(timelineAtom, { ...timeline, zoom: newZoom })
-})
-
-export const zoomOutAtom = atom(null, (get, set) => {
-  const timeline = get(timelineAtom)
-  const newZoom = Math.max(timeline.zoom / 1.5, 0.25) // Min zoom 0.25x
-  set(timelineAtom, { ...timeline, zoom: newZoom })
-})
-
-export const setZoomAtom = atom(null, (get, set, zoom: number) => {
-  const timeline = get(timelineAtom)
-  const clampedZoom = Math.max(0.25, Math.min(4, zoom))
-  set(timelineAtom, { ...timeline, zoom: clampedZoom })
-})

@@ -78,12 +78,11 @@ export function DAWPlayhead({ containerRef }: DAWPlayheadProps) {
 	// Update CSS custom properties for global positioning
 	useEffect(() => {
 		document.documentElement.style.setProperty('--playhead-position', `${playheadPosition}px`);
-		const isVisible = viewportPosition >= -10 && viewportPosition <= (typeof window !== 'undefined' ? window.innerWidth : 1200);
-		document.documentElement.style.setProperty('--playhead-visible', isVisible ? 'block' : 'none');
+		document.documentElement.style.setProperty('--playhead-visible', viewportPosition >= -10 && viewportPosition <= window.innerWidth ? 'block' : 'none');
 	}, [playheadPosition, viewportPosition]);
 
-	// Only render if visible in viewport (client-side only)
-	if (typeof window !== 'undefined' && (viewportPosition < -10 || viewportPosition > window.innerWidth)) {
+	// Only render if visible in viewport
+	if (viewportPosition < -10 || viewportPosition > window.innerWidth) {
 		return null;
 	}
 
