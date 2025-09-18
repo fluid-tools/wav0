@@ -7,6 +7,11 @@ export const SOUND_DURATION_DEFAULT = 10;
 export const PROMPT_INFLUENCE_DEFAULT = 0.3;
 export const TITLE_PREVIEW_LENGTH = 50;
 
+// DAW UI constants (keep grid and tracklist aligned)
+export const DAW_ROW_HEIGHT = 88; // px (matches ~h-22 Tailwind)
+export const DAW_TIMELINE_HEADER_HEIGHT = 64; // px (h-16)
+export const DAW_PIXELS_PER_SECOND_AT_ZOOM_1 = 100; // px
+
 // Folder/Project validation constants
 export const FOLDER_NAME_MAX_LENGTH = 255;
 export const PROJECT_NAME_MAX_LENGTH = 255;
