@@ -44,7 +44,9 @@ export function DAWControls() {
 
 	const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const time = parseFloat(e.target.value);
-		setCurrentTime(time);
+		// Clamp to project duration (don't allow past yellow marker)
+		const clampedTime = Math.min(Math.max(0, time), totalDuration);
+		setCurrentTime(clampedTime);
 	};
 
 	const handleBpmChange = (e: React.ChangeEvent<HTMLInputElement>) => {
