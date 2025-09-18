@@ -7,6 +7,7 @@ import {
 	DAW_ROW_HEIGHT,
 } from "@/lib/constants";
 import {
+	projectEndPositionAtom,
 	selectedTrackIdAtom,
 	timelineAtom,
 	tracksAtom,
@@ -19,6 +20,7 @@ export function DAWTrackContent() {
 	const [selectedTrackId, setSelectedTrackId] = useAtom(selectedTrackIdAtom);
 	const [, updateTrack] = useAtom(updateTrackAtom);
 	const [timeline] = useAtom(timelineAtom);
+	const [projectEndPosition] = useAtom(projectEndPositionAtom);
 	const [resizing, setResizing] = useState<{
 		trackId: string;
 		type: "start" | "end";
@@ -211,6 +213,22 @@ export function DAWTrackContent() {
 					</div>
 				);
 			})}
+
+			{/* Project end marker */}
+			<div
+				className="absolute top-0 bottom-0 w-px bg-yellow-500/70 z-40"
+				style={{ left: projectEndPosition }}
+				title="Project End"
+			/>
+			
+			{/* Buffer/dead space overlay */}
+			<div
+				className="absolute top-0 bottom-0 bg-muted/10 pointer-events-none z-30"
+				style={{ 
+					left: projectEndPosition,
+					right: 0,
+				}}
+			/>
 
 			{/* Grid Lines */}
 			<div className="absolute inset-0 pointer-events-none">

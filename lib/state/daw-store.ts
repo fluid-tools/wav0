@@ -81,8 +81,15 @@ export const timelineWidthAtom = atom((get) => {
   const zoom = get(timelineAtom).zoom
   const pxPerMs = (DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * zoom) / 1000
   const durationPx = durationMs * pxPerMs
-  const paddingPx = DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * 10 // 10s tail padding
+  const paddingPx = DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * zoom * 10 // 10s visual buffer (zoom-aware)
   return durationPx + paddingPx
+})
+
+export const projectEndPositionAtom = atom((get) => {
+  const durationMs = get(totalDurationAtom)
+  const zoom = get(timelineAtom).zoom
+  const pxPerMs = (DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * zoom) / 1000
+  return durationMs * pxPerMs
 })
 
 // Action atoms
