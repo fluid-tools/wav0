@@ -6,8 +6,10 @@ import { DAW_PIXELS_PER_SECOND_AT_ZOOM_1 } from "@/lib/constants";
 import {
 	horizontalScrollAtom,
 	playbackAtom,
+	projectEndPositionAtom,
 	setCurrentTimeAtom,
 	timelineAtom,
+	totalDurationAtom,
 } from "@/lib/state/daw-store";
 
 type DAWPlayheadProps = {
@@ -18,6 +20,7 @@ export function DAWPlayhead({ containerRef }: DAWPlayheadProps) {
 	const [playback] = useAtom(playbackAtom);
 	const [timeline] = useAtom(timelineAtom);
 	const [horizontalScroll] = useAtom(horizontalScrollAtom);
+	const [totalDuration] = useAtom(totalDurationAtom);
 	const [, setCurrentTime] = useAtom(setCurrentTimeAtom);
 	const [isDragging, setIsDragging] = useState(false);
 	const playheadRef = useRef<HTMLDivElement>(null);
@@ -50,10 +53,13 @@ export function DAWPlayhead({ containerRef }: DAWPlayheadProps) {
 				snappedSeconds = Math.round(rawSeconds / snapSeconds) * snapSeconds;
 			}
 			
-			const time = Math.max(0, snappedSeconds * 1000);
+			// Clamp to project duration (don't allow past yellow marker)
+			const maxSeconds = totalDuration / 1000;
+			const clampedSeconds = Math.min(Math.max(0, snappedSeconds), maxSeconds);
+			const time = clampedSeconds * 1000;
 			setCurrentTime(time);
 		},
-		[isDragging, containerRef, horizontalScroll, timeline, playback.bpm, setCurrentTime]
+		[isDragging, containerRef, horizontalScroll, timeline, playback.bpm, totalDuration, setCurrentTime]
 	);
 
 	const handleMouseUp = useCallback(() => {
