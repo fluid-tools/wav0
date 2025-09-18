@@ -5,20 +5,29 @@ import type * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+type ScrollAreaProps = React.ComponentProps<typeof ScrollAreaPrimitive.Root> & {
+    viewportRef?: React.Ref<HTMLDivElement>;
+    onViewportScroll?: React.UIEventHandler<HTMLDivElement>;
+};
+
 function ScrollArea({
-	className,
-	children,
-	...props
-}: React.ComponentProps<typeof ScrollAreaPrimitive.Root>) {
+    className,
+    children,
+    viewportRef,
+    onViewportScroll,
+    ...props
+}: ScrollAreaProps) {
 	return (
 		<ScrollAreaPrimitive.Root
 			data-slot="scroll-area"
 			className={cn("relative", className)}
 			{...props}
 		>
-			<ScrollAreaPrimitive.Viewport
+            <ScrollAreaPrimitive.Viewport
 				data-slot="scroll-area-viewport"
-				className="focus-visible:ring-ring/50 size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:outline-1"
+                ref={viewportRef}
+                onScroll={onViewportScroll}
+                className="focus-visible:ring-ring/50 size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:outline-1"
 			>
 				{children}
 			</ScrollAreaPrimitive.Viewport>

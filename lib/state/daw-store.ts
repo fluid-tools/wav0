@@ -2,6 +2,7 @@
 
 import { atom } from "jotai"
 import { atomWithStorage } from "jotai/utils"
+import { DAW_PIXELS_PER_SECOND_AT_ZOOM_1 } from "@/lib/constants"
 
 export type Track = {
   id: string
@@ -70,13 +71,18 @@ export const selectedTrackAtom = atom((get) => {
 
 export const totalDurationAtom = atom((get) => {
   const tracks = get(tracksAtom)
-  return Math.max(...tracks.map(track => track.startTime + track.duration), 0)
+  const tracksDuration = Math.max(...tracks.map(track => track.startTime + track.duration), 0)
+  const minimumDuration = 60 * 1000 // 60 seconds in ms
+  return Math.max(tracksDuration, minimumDuration)
 })
 
 export const timelineWidthAtom = atom((get) => {
-  const duration = get(totalDurationAtom)
+  const durationMs = get(totalDurationAtom)
   const zoom = get(timelineAtom).zoom
-  return Math.max(duration * zoom * 0.1, 800) // 0.1px per ms at zoom 1
+  const pxPerMs = (DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * zoom) / 1000
+  const durationPx = durationMs * pxPerMs
+  const paddingPx = DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * 10 // 10s tail padding
+  return durationPx + paddingPx
 })
 
 // Action atoms
@@ -127,7 +133,32 @@ export const setTimelineScrollAtom = atom(null, (get, set, scrollPosition: numbe
   set(timelineAtom, { ...timeline, scrollPosition })
 })
 
+// Scroll position atoms for unified scroll management
+export const horizontalScrollAtom = atom<number>(0)
+export const verticalScrollAtom = atom<number>(0)
+
+// Mutator for BPM (used by controls)
 export const setBpmAtom = atom(null, (get, set, bpm: number) => {
   const playback = get(playbackAtom)
-  set(playbackAtom, { ...playback, bpm })
+  const clamped = Math.max(30, Math.min(300, Number.isFinite(bpm) ? bpm : 120))
+  set(playbackAtom, { ...playback, bpm: clamped })
+})
+
+// Zoom control atoms
+export const zoomInAtom = atom(null, (get, set) => {
+  const timeline = get(timelineAtom)
+  const newZoom = Math.min(timeline.zoom * 1.5, 4) // Max zoom 4x
+  set(timelineAtom, { ...timeline, zoom: newZoom })
+})
+
+export const zoomOutAtom = atom(null, (get, set) => {
+  const timeline = get(timelineAtom)
+  const newZoom = Math.max(timeline.zoom / 1.5, 0.25) // Min zoom 0.25x
+  set(timelineAtom, { ...timeline, zoom: newZoom })
+})
+
+export const setZoomAtom = atom(null, (get, set, zoom: number) => {
+  const timeline = get(timelineAtom)
+  const clampedZoom = Math.max(0.25, Math.min(4, zoom))
+  set(timelineAtom, { ...timeline, zoom: clampedZoom })
 })

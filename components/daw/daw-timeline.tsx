@@ -1,6 +1,7 @@
 "use client";
 
 import { useAtom } from "jotai";
+import { DAW_PIXELS_PER_SECOND_AT_ZOOM_1 } from "@/lib/constants";
 import {
 	playbackAtom,
 	setCurrentTimeAtom,
@@ -18,7 +19,7 @@ export function DAWTimeline() {
 	// Calculate time markers based on zoom and BPM
 	const getTimeMarkers = () => {
 		const markers = [];
-		const pixelsPerSecond = timeline.zoom * 100; // 100px per second at zoom 1
+		const pixelsPerSecond = timeline.zoom * DAW_PIXELS_PER_SECOND_AT_ZOOM_1; // 100px per second at zoom 1
 		const secondsPerMarker =
 			timeline.zoom < 0.5 ? 10 : timeline.zoom < 1 ? 5 : 1;
 
@@ -41,7 +42,7 @@ export function DAWTimeline() {
 		const markers = [];
 		const beatsPerMinute = playback.bpm;
 		const secondsPerBeat = 60 / beatsPerMinute;
-		const pixelsPerSecond = timeline.zoom * 100;
+		const pixelsPerSecond = timeline.zoom * DAW_PIXELS_PER_SECOND_AT_ZOOM_1;
 		const pixelsPerBeat = secondsPerBeat * pixelsPerSecond;
 
 		for (let beat = 0; beat * pixelsPerBeat < timelineWidth; beat++) {
@@ -60,14 +61,23 @@ export function DAWTimeline() {
 	const handleTimelineClick = (e: React.MouseEvent) => {
 		const rect = e.currentTarget.getBoundingClientRect();
 		const x = e.clientX - rect.left;
-		const pixelsPerSecond = timeline.zoom * 100;
-		const time = (x / pixelsPerSecond) * 1000; // Convert to ms
-		setCurrentTime(time);
+		const pixelsPerSecond = timeline.zoom * DAW_PIXELS_PER_SECOND_AT_ZOOM_1;
+		
+		// Snap-to-grid (quarter note)
+		const secondsPerBeat = 60 / playback.bpm;
+		const snapSeconds = secondsPerBeat / 4; // 16th grid
+		const rawSeconds = x / pixelsPerSecond;
+		const snappedSeconds = timeline.snapToGrid 
+			? Math.round(rawSeconds / snapSeconds) * snapSeconds 
+			: rawSeconds;
+		const time = snappedSeconds * 1000; // ms
+		setCurrentTime(Math.max(0, time));
 	};
+
+	// Playhead position calculation (now handled by DAWPlayhead component)
 
 	const timeMarkers = getTimeMarkers();
 	const beatMarkers = getBeatMarkers();
-	const playheadPosition = (playback.currentTime / 1000) * timeline.zoom * 100;
 
 	return (
 		<button
@@ -101,14 +111,6 @@ export function DAWTimeline() {
 					</span>
 				</div>
 			))}
-
-			{/* Playhead */}
-			<div
-				className="absolute top-0 bottom-0 w-0.5 bg-primary z-10 pointer-events-none"
-				style={{ left: playheadPosition }}
-			>
-				<div className="w-3 h-3 bg-primary -ml-1.5 rounded-sm" />
-			</div>
 
 			{/* Snap grid overlay */}
 			{timeline.snapToGrid && (
