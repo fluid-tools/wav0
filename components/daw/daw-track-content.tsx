@@ -133,7 +133,9 @@ export function DAWTrackContent() {
 				return (
 					<div
 						key={track.id}
-						className="absolute border-b border-border/50"
+						className={`absolute border-b border-border/50 transition-colors ${
+							selectedTrackId === track.id ? "bg-muted/30" : ""
+						}`}
 						style={{
 							top: trackY,
 							height: DAW_ROW_HEIGHT,
@@ -148,6 +150,7 @@ export function DAWTrackContent() {
 							className="absolute inset-0 w-full h-full bg-transparent border-none p-0 cursor-default"
 							onDrop={(e) => handleTrackDrop(track.id, e)}
 							onDragOver={(e) => e.preventDefault()}
+							onClick={() => setSelectedTrackId(track.id)}
 							style={{ padding: '12px' }}
 							aria-label={`Track ${track.name} drop zone`}
 						>
@@ -198,9 +201,9 @@ export function DAWTrackContent() {
 								</button>
 							)}
 
-							{/* Drop Zone Indicator */}
+							{/* Drop Zone Indicator - Only show when no audio */}
 							{track.duration === 0 && (
-								<div className="absolute inset-0 border-2 border-dashed border-muted-foreground/30 rounded-md flex items-center justify-center text-muted-foreground text-sm">
+								<div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
 									Drop audio file here
 								</div>
 							)}
