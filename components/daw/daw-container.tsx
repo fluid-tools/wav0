@@ -23,7 +23,6 @@ import { DAWTimeline } from "./daw-timeline";
 import { DAWToolbar } from "./daw-toolbar";
 import { DAWTrackContent } from "./daw-track-content";
 import { DAWTrackList } from "./daw-track-list";
-import { DAWZoomControls } from "./daw-zoom-controls";
 
 export function DAWContainer() {
 	const [timelineWidth] = useAtom(timelineWidthAtom);
@@ -174,7 +173,7 @@ export function DAWContainer() {
 								<div className="flex-1 overflow-hidden">
 									<div
 										ref={trackListScrollRef}
-										className="h-full overflow-y-auto overflow-x-hidden scrollbar-hidden"
+										className="h-full overflow-y-auto overflow-x-hidden scrollbar-thin"
 										onScroll={onTrackListScroll}
 									>
 										<div style={{ height: contentHeight }}>
@@ -191,22 +190,15 @@ export function DAWContainer() {
 						<ResizablePanel defaultSize={75}>
 							<div className="h-full flex flex-col">
 								{/* Timeline Header */}
-								<div className="h-16 border-b bg-muted/10 relative overflow-hidden flex">
-									<div className="flex-1 relative">
-										<div
-											ref={timelineScrollRef}
-											className="h-full overflow-x-auto overflow-y-hidden scrollbar-none"
-											onScroll={onTimelineScroll}
-										>
-											<div style={{ width: timelineWidth, height: "100%" }}>
-												<DAWTimeline />
-											</div>
+								<div className="h-16 border-b bg-muted/10 relative overflow-hidden">
+									<div
+										ref={timelineScrollRef}
+										className="h-full overflow-x-auto overflow-y-hidden scrollbar-none"
+										onScroll={onTimelineScroll}
+									>
+										<div style={{ width: timelineWidth, height: "100%" }}>
+											<DAWTimeline />
 										</div>
-									</div>
-									
-									{/* Zoom Controls */}
-									<div className="flex items-center px-4 border-l">
-										<DAWZoomControls />
 									</div>
 								</div>
 
