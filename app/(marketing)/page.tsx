@@ -4,9 +4,8 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-const ThemeToggleGroup = dynamic(
-	() => import("@/components/theme-toggle").then((mod) => mod.ThemeToggleGroup),
-
+const ThemeToggleGroup = dynamic(() =>
+	import("@/components/theme-toggle").then((mod) => mod.ThemeToggleGroup),
 );
 
 export default function Home() {

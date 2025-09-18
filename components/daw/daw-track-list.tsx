@@ -57,10 +57,9 @@ export function DAWTrackList() {
 			{/* Track List */}
 			<div>
 				{tracks.map((track) => (
-					<button
+					<div
 						key={track.id}
-						type="button"
-						className={`w-full border-b transition-colors cursor-pointer text-left ${
+						className={`w-full border-b transition-colors ${
 							selectedTrackId === track.id
 								? "bg-muted border-primary"
 								: "bg-background hover:bg-muted/50"
@@ -72,51 +71,47 @@ export function DAWTrackList() {
 							flexDirection: 'column',
 							justifyContent: 'space-between'
 						}}
-						onClick={() => setSelectedTrackId(track.id)}
 					>
 						{/* Track Header */}
-						<div className="flex items-center justify-between">
+						<button
+							type="button"
+							className="flex items-center justify-between cursor-pointer w-full bg-transparent border-none p-0 text-left"
+							onClick={() => setSelectedTrackId(track.id)}
+						>
 							<div className="flex items-center gap-2 flex-1 min-w-0">
+								<div
+									className="w-3 h-3 rounded-full flex-shrink-0"
+									style={{ backgroundColor: track.color }}
+								/>
 								{editingTrackId === track.id ? (
-									<>
-										<div
-											className="w-3 h-3 rounded-full flex-shrink-0"
-											style={{ backgroundColor: track.color }}
-										/>
-										<Input
-											value={track.name}
-											onChange={(e) =>
-												handleTrackNameChange(track.id, e.target.value)
+									<Input
+										value={track.name}
+										onChange={(e) =>
+											handleTrackNameChange(track.id, e.target.value)
+										}
+										onBlur={() => setEditingTrackId(null)}
+										onKeyDown={(e) => {
+											if (e.key === "Enter") {
+												setEditingTrackId(null);
 											}
-											onBlur={() => setEditingTrackId(null)}
-											onKeyDown={(e) => {
-												if (e.key === "Enter") {
-													setEditingTrackId(null);
-												}
-											}}
-											className="h-6 text-sm"
-											autoFocus
-											onClick={(e) => e.stopPropagation()}
-										/>
-									</>
+										}}
+										className="h-6 text-sm"
+										autoFocus
+										onClick={(e) => e.stopPropagation()}
+									/>
 								) : (
-									<>
-										<div
-											className="w-3 h-3 rounded-full flex-shrink-0"
-											style={{ backgroundColor: track.color }}
-										/>
-										<button
-											type="button"
-											className="text-sm font-medium truncate text-left bg-transparent border-none p-0 cursor-pointer"
-											onDoubleClick={(e) => {
-												e.preventDefault();
-												e.stopPropagation();
-												setEditingTrackId(track.id);
-											}}
-										>
-											{track.name}
-										</button>
-									</>
+									<button
+										type="button"
+										className="text-sm font-medium truncate text-left bg-transparent border-none p-0 cursor-pointer hover:underline"
+										onDoubleClick={(e) => {
+											e.preventDefault();
+											e.stopPropagation();
+											setEditingTrackId(track.id);
+										}}
+										onClick={(e) => e.stopPropagation()}
+									>
+										{track.name}
+									</button>
 								)}
 							</div>
 
@@ -152,8 +147,8 @@ export function DAWTrackList() {
 										Delete
 									</DropdownMenuItem>
 								</DropdownMenuContent>
-							</DropdownMenu>
-						</div>
+								</DropdownMenu>
+						</button>
 
 						{/* Track Info */}
 						<div className="text-xs text-muted-foreground">
@@ -210,7 +205,7 @@ export function DAWTrackList() {
 								{track.volume}
 							</span>
 						</div>
-						</button>
+					</div>
 					))}
 
 				{tracks.length === 0 && (

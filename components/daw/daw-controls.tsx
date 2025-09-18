@@ -58,7 +58,11 @@ export function DAWControls() {
 						onClick={togglePlayback}
 						className="w-10 h-10"
 					>
-						{playback.isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+						{playback.isPlaying ? (
+							<Pause className="w-5 h-5" />
+						) : (
+							<Play className="w-5 h-5" />
+						)}
 					</Button>
 					<Button variant="ghost" size="sm" onClick={handleStop}>
 						<Square className="w-4 h-4" />
