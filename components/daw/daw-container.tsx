@@ -173,8 +173,9 @@ export function DAWContainer() {
 								<div className="flex-1 overflow-hidden">
 									<div
 										ref={trackListScrollRef}
-										className="h-full overflow-y-auto overflow-x-hidden scrollbar-thin"
+										className="h-full overflow-y-auto overflow-x-hidden"
 										onScroll={onTrackListScroll}
+										style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
 									>
 										<div style={{ height: contentHeight }}>
 											<DAWTrackList />
@@ -193,8 +194,9 @@ export function DAWContainer() {
 								<div className="h-16 border-b bg-muted/10 relative overflow-hidden">
 									<div
 										ref={timelineScrollRef}
-										className="h-full overflow-x-auto overflow-y-hidden scrollbar-none"
+										className="h-full overflow-x-auto overflow-y-hidden"
 										onScroll={onTimelineScroll}
+										style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
 									>
 										<div style={{ width: timelineWidth, height: "100%" }}>
 											<DAWTimeline />
@@ -209,8 +211,9 @@ export function DAWContainer() {
 								>
 									<div
 										ref={trackGridScrollRef}
-										className="h-full w-full overflow-auto scrollbar-thin"
+										className="h-full w-full overflow-auto"
 										onScroll={onTrackGridScroll}
+										style={{ scrollbarWidth: "thin" }}
 									>
 										<div
 											style={{
