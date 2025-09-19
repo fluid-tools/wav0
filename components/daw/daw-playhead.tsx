@@ -81,14 +81,6 @@ export function DAWPlayhead({ containerRef }: DAWPlayheadProps) {
 		};
 	}, [isDragging, handleMouseMove, handleMouseUp]);
 
-	// Update CSS custom properties for global positioning
-	useEffect(() => {
-		document.documentElement.style.setProperty('--playhead-position', `${playheadPosition}px`);
-		if (typeof window !== 'undefined') {
-			document.documentElement.style.setProperty('--playhead-visible', viewportPosition >= -10 && viewportPosition <= window.innerWidth ? 'block' : 'none');
-		}
-	}, [playheadPosition, viewportPosition]);
-
 	// Only render if visible in viewport (client-side only)
 	if (typeof window !== 'undefined' && (viewportPosition < -10 || viewportPosition > window.innerWidth)) {
 		return null;
@@ -109,7 +101,7 @@ export function DAWPlayhead({ containerRef }: DAWPlayheadProps) {
 			tabIndex={0}
 			aria-label="Playhead position"
 			aria-valuemin={0}
-			aria-valuemax={playback.duration}
+			aria-valuemax={totalDuration}
 			aria-valuenow={playback.currentTime}
 		>
 			{/* Playhead handle */}
@@ -121,11 +113,6 @@ export function DAWPlayhead({ containerRef }: DAWPlayheadProps) {
 					cursor: "ew-resize",
 				}}
 			/>
-			
-			{/* Dragging indicator line */}
-			{isDragging && (
-				<div className="absolute top-0 bottom-0 w-px bg-red-400 opacity-50 pointer-events-none" />
-			)}
 		</div>
 	);
 }

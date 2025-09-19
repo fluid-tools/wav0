@@ -10,10 +10,12 @@ import {
 	ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { DAW_ROW_HEIGHT } from "@/lib/constants";
+import { DAW_COLORS, DAW_HEIGHTS, DAW_ICONS, DAW_SPACING, DAW_TEXT } from "@/lib/constants/daw-design";
 import {
 	addTrackAtom,
 	horizontalScrollAtom,
 	timelineWidthAtom,
+	trackHeightZoomAtom,
 	tracksAtom,
 	verticalScrollAtom,
 } from "@/lib/state/daw-store";
@@ -27,6 +29,7 @@ import { DAWTrackList } from "./daw-track-list";
 export function DAWContainer() {
 	const [timelineWidth] = useAtom(timelineWidthAtom);
 	const [tracks] = useAtom(tracksAtom);
+	const [trackHeightZoom] = useAtom(trackHeightZoomAtom);
 	const [, addTrack] = useAtom(addTrackAtom);
 	const [, setHorizontalScroll] = useAtom(horizontalScrollAtom);
 	const [, setVerticalScroll] = useAtom(verticalScrollAtom);
@@ -36,8 +39,9 @@ export function DAWContainer() {
 	const trackGridScrollRef = useRef<HTMLDivElement>(null);
 	const gridContainerRef = useRef<HTMLDivElement>(null);
 
-	// Calculate content dimensions
-	const contentHeight = Math.max(tracks.length * DAW_ROW_HEIGHT, 400);
+	// Calculate content dimensions with global track height
+	const currentTrackHeight = Math.round(DAW_HEIGHTS.TRACK_ROW * trackHeightZoom);
+	const contentHeight = Math.max(tracks.length * currentTrackHeight, 400);
 
 	// Sync horizontal scroll
 	const handleHorizontalScroll = useCallback(
@@ -132,24 +136,14 @@ export function DAWContainer() {
 						<ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
 							<div className="h-full border-r flex flex-col">
 								{/* Track List Header */}
-								<div className="h-16 border-b bg-muted/10 flex items-center justify-between px-4">
-									<h3 className="text-sm font-medium">Tracks</h3>
+								<div className="border-b flex items-center justify-between" style={{ height: DAW_HEIGHTS.TIMELINE, backgroundColor: 'hsl(var(--muted) / 0.1)', padding: `0 ${DAW_SPACING.SECTION_PADDING}px` }}>
+									<h3 className={DAW_TEXT.SECTION_TITLE}>Tracks</h3>
 									<Button
 										variant="ghost"
 										size="sm"
 										onClick={() => {
 											const trackNumber = tracks.length + 1;
-											const colorIndex = tracks.length % 8;
-											const colors = [
-												"#3b82f6",
-												"#ef4444",
-												"#10b981",
-												"#f59e0b",
-												"#8b5cf6",
-												"#06b6d4",
-												"#f97316",
-												"#84cc16",
-											];
+											const colorIndex = tracks.length % DAW_COLORS.TRACK_COLORS.length;
 
 											addTrack({
 												name: `Track ${trackNumber}`,
@@ -160,12 +154,13 @@ export function DAWContainer() {
 												volume: 75,
 												muted: false,
 												soloed: false,
-												color: colors[colorIndex],
+												color: DAW_COLORS.TRACK_COLORS[colorIndex],
 											});
 										}}
-										className="h-8 w-8 p-0"
+										style={{ height: DAW_HEIGHTS.BUTTON_MD, width: DAW_HEIGHTS.BUTTON_MD }}
+										className="p-0"
 									>
-										<Plus className="w-4 h-4" />
+										<Plus className={DAW_ICONS.MD} />
 									</Button>
 								</div>
 
@@ -191,7 +186,7 @@ export function DAWContainer() {
 						<ResizablePanel defaultSize={75}>
 							<div className="h-full flex flex-col">
 								{/* Timeline Header */}
-								<div className="h-16 border-b bg-muted/10 relative overflow-hidden">
+								<div className="border-b relative overflow-hidden" style={{ height: DAW_HEIGHTS.TIMELINE, backgroundColor: 'hsl(var(--muted) / 0.1)' }}>
 									<div
 										ref={timelineScrollRef}
 										className="h-full overflow-x-auto overflow-y-hidden"

@@ -6,10 +6,12 @@ import {
 	DAW_PIXELS_PER_SECOND_AT_ZOOM_1,
 	DAW_ROW_HEIGHT,
 } from "@/lib/constants";
+import { DAW_HEIGHTS } from "@/lib/constants/daw-design";
 import {
 	projectEndPositionAtom,
 	selectedTrackIdAtom,
 	timelineAtom,
+	trackHeightZoomAtom,
 	tracksAtom,
 	updateTrackAtom,
 } from "@/lib/state/daw-store";
@@ -20,6 +22,7 @@ export function DAWTrackContent() {
 	const [selectedTrackId, setSelectedTrackId] = useAtom(selectedTrackIdAtom);
 	const [, updateTrack] = useAtom(updateTrackAtom);
 	const [timeline] = useAtom(timelineAtom);
+	const [trackHeightZoom] = useAtom(trackHeightZoomAtom);
 	const [projectEndPosition] = useAtom(projectEndPositionAtom);
 	const [resizing, setResizing] = useState<{
 		trackId: string;
@@ -128,7 +131,9 @@ export function DAWTrackContent() {
 	return (
 		<div ref={containerRef} className="relative w-full h-full">
 			{tracks.map((track, index) => {
-				const trackY = index * DAW_ROW_HEIGHT;
+				// Calculate track position using global height
+				const trackHeight = Math.round(DAW_HEIGHTS.TRACK_ROW * trackHeightZoom);
+				const trackY = index * trackHeight;
 				const trackWidth = (track.trimEnd - track.trimStart) * pixelsPerMs;
 				const trackX = (track.startTime + track.trimStart) * pixelsPerMs;
 
@@ -140,7 +145,7 @@ export function DAWTrackContent() {
 						}`}
 						style={{
 							top: trackY,
-							height: DAW_ROW_HEIGHT,
+							height: trackHeight,
 							left: 0,
 							right: 0,
 							padding: '12px',
