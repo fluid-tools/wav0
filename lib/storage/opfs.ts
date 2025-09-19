@@ -113,7 +113,10 @@ export class OPFSManager {
 			const audioDir = await this.opfsRoot.getDirectoryHandle("audio");
 			const files: string[] = [];
 
-			for await (const [name, handle] of audioDir.entries()) {
+			// Type assertion to access File System Access API methods
+			const dirHandle = audioDir as any;
+
+			for await (const [name, handle] of dirHandle.entries()) {
 				if (handle.kind === "file" && name.endsWith(".wav")) {
 					files.push(name.replace(".wav", ""));
 				}

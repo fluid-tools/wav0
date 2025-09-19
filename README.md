@@ -21,20 +21,24 @@
 
 </div>
 
----
+***
 
 ## ✨ Features
 
 ### 🤖 [**WAV0 AI**](https://wav0.app/agent)
+
 Just ask and it turns your idea to sound in seconds. Music Generation powered by [ElevenLabs](https://elevenlabs.io/). Built with [AI SDK](https://ai-sdk.dev/).
 
 ### 🎛️ [**Music Studio**](https://wav0.app/studio)
+
 In-browser AI-Native DAW that works without downloads. Edit audio files, create soundpacks, and export directly to TikTok/YouTube/Discord in one click. Powered by [MediaBunny](https://mediabunny.dev) for superfast processing.
 
 ### 🗄️ [**Music Vault**](https://wav0.app/vault)
+
 Secure flexible storage for your music. Easily store and have control over who has access to your music. Private by default.
 
 ### 📝 **Version Control**
+
 Easily toggle between versions of your audio files in Vault and generations in WAV0 Agent.
 
 ## 🎯 Who It's For
@@ -62,49 +66,55 @@ cp .env.example .env.local
 bun dev
 ```
 
-Visit [http://localhost:3000](http://localhost:3000) to see your local instance running.
+Visit <http://localhost:3000> to see your local instance running.
 
 ## 🎯 What can you ask [WAV0 **Agent**](https://wav0.app/agent)?
 
-- **"Create a hype TikTok transition soundpack"** - Instant custom sounds for your videos
-- **"Generate YouTube intro music for gaming content"** - One-click export to your editor
-- **"Make Twitch alert sounds for donations"** - Custom audio that matches your brand
-- **"Build a soundpack for my podcast episodes"** - Professional audio without the hassle
-- **"Edit this audio file for better Discord quality"** - Quick optimization for online use
+* **"Create a hype TikTok transition soundpack"** - Instant custom sounds for your videos
+* **"Generate YouTube intro music for gaming content"** - One-click export to your editor
+* **"Make Twitch alert sounds for donations"** - Custom audio that matches your brand
+* **"Build a soundpack for my podcast episodes"** - Professional audio without the hassle
+* **"Edit this audio file for better Discord quality"** - Quick optimization for online use
+
+### For Artists & Producers
+
+* **"Make a trap beat with heavy 808s and hi-hats"** - Custom beats for your SoundCloud releases
+* **"Create vocal chops from this sample"** - Remix-ready elements for your next track
+* **"Generate ambient pads for my lo-fi mix"** - Background textures for your productions
+* **"Build a drum kit with custom snares and kicks"** - Professional drum sounds without expensive samples
+* **"Mix this rough demo for SoundCloud upload"** - Quick mastering for indie releases
+* **"Create transition effects between song sections"** - Seamless builds and drops for your tracks
 
 ## 🗺️ Roadmap
 
-- [ ] **Background Generations**
-- [ ] [**WAV0 Community**](https://wav0.app/community) - A library of music and sounds by the wav0 community
+* \[ ] **Background Generations**
+* \[ ] [**WAV0 Community**](https://wav0.app/community) - A library of music and sounds by the wav0 community
 
 ## 🤝 Sponsors & Partners
 
 <table>
   <tr>
     <td align="center">
-      <a href="https://elevenlabs.io/">
-        <img src="https://elevenlabs.io/favicon.ico" width="64" height="64" alt="ElevenLabs" />
-        <br />
-        <strong>ElevenLabs</strong>
-        <p>Startup Grants Partner</p>
-      </a>
+    <a href="https://elevenlabs.io/text-to-speech">
+<img src="https://eleven-public-cdn.elevenlabs.io/payloadcms/cy7rxce8uki-IIElevenLabsGrants%201.webp" alt="Text to Speech" style="width:250px">
+</a> 
     </td>
-   
+ <p>WAV0 x Elevenlabs Startup Grants
   </tr>
 </table>
 
 ## 🙏 OSS Shoutouts
 
-- [MediaBunny](https://mediabunny.dev) - Fast browser-based media processing
-- [AI SDK](https://ai-sdk.dev/) - The TypeScript toolkit for AI apps
+* [MediaBunny](https://mediabunny.dev) - Fast browser-based media processing
+* [AI SDK](https://ai-sdk.dev/) - The TypeScript toolkit for AI apps
 
 ## 📖 Documentation
 
 For detailed documentation, visit our [docs](https://wav0.app/docs) or check out:
 
-- [Getting Started Guide](https://wav0.app/docs/getting-started)
-- [API Reference](https://wav0.app/docs/api)
-- [Examples](https://wav0.app/docs/examples)
+* [Getting Started Guide](https://wav0.app/docs/getting-started)
+* [API Reference](https://wav0.app/docs/api)
+* [Examples](https://wav0.app/docs/examples)
 
 ## 🤝 Contributing
 
@@ -122,7 +132,7 @@ We love contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for 
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
----
+***
 
 <div align="center">
 
