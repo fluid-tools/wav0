@@ -11,7 +11,9 @@
 
 ![WAV0](https://di2lwe4r5jgy9jlt.public.blob.vercel-storage.com/og0image.png)
 
-*Go from idea to sound in seconds. Create reference tracks, soundpacks, samples, beats, and more with the fastest producer, songwriter, and sound designer right in your pocket.*
+*Faster than piracy, faster than stock sites. Go from idea to sound in seconds. Generate custom soundpacks and use them anywhere (YouTube, Twitch, TikTok, Logic Pro, [OpenCut](opencut.app), Final Cut Pro, etc.).*
+
+*No downloads, no DAW commitment—just instant, one-click music creation.*
 
 **Built for creators, by creators at [FLUID.TOOLS](https://fluid.tools)**
 
@@ -27,13 +29,21 @@
 Just ask and it turns your idea to sound in seconds. Music Generation powered by [ElevenLabs](https://elevenlabs.io/). Built with [AI SDK](https://ai-sdk.dev/).
 
 ### 🎛️ [**Music Studio**](https://wav0.app/studio)
-A minimal AI-powered DAW. Bring your own audio files, edit them, and export them (superfast, in your browser with [MediaBunny](https://mediabunny.dev)).
+In-browser AI-Native DAW that works without downloads. Edit audio files, create soundpacks, and export directly to TikTok/YouTube/Discord in one click. Powered by [MediaBunny](https://mediabunny.dev) for superfast processing.
 
 ### 🗄️ [**Music Vault**](https://wav0.app/vault)
 Secure flexible storage for your music. Easily store and have control over who has access to your music. Private by default.
 
 ### 📝 **Version Control**
 Easily toggle between versions of your audio files in Vault and generations in WAV0 Agent.
+
+## 🎯 Who It's For
+
+**YouTube Creators & Channels** - Generate custom background music, sound effects, and intros in seconds. Drop directly into your editor without leaving your workflow.
+
+**Twitch Creators & Channels** - Create instant soundpacks for alerts, transitions, and ambient music. No more digging through free libraries or dealing with copyright claims.
+
+**Internet Producers** - Build beats, loops, and samples faster than traditional methods. Export to any platform with zero friction.
 
 ## 🚀 Quick Start
 
@@ -56,10 +66,11 @@ Visit [http://localhost:3000](http://localhost:3000) to see your local instance 
 
 ## 🎯 What can you ask [WAV0 **Agent**](https://wav0.app/agent)?
 
-- **Edit audio files** for you
-- **Generate and edit songs** for you
-- **Create custom soundpacks/beatpacks** for your project/youtube video/twitch stream/etc
-- **Write lyrics** for you
+- **"Create a hype TikTok transition soundpack"** - Instant custom sounds for your videos
+- **"Generate YouTube intro music for gaming content"** - One-click export to your editor
+- **"Make Twitch alert sounds for donations"** - Custom audio that matches your brand
+- **"Build a soundpack for my podcast episodes"** - Professional audio without the hassle
+- **"Edit this audio file for better Discord quality"** - Quick optimization for online use
 
 ## 🗺️ Roadmap
 
