@@ -27,13 +27,18 @@
 
 ### 🤖 [**WAV0 AI**](https://wav0.app/agent)
 
-Just ask and it turns your idea to sound in seconds. Music Generation powered by [ElevenLabs](https://elevenlabs.io/). Built with [AI SDK](https://ai-sdk.dev/).
+Just ask and it turns your idea to sound in seconds. Use it from WAV0 Playground or WAV0 Studio.
 
-### 🎛️ [**Music Studio**](https://wav0.app/studio)
+### 🎛️ [**Studio**](https://wav0.app/studio)
 
-In-browser AI-Native DAW that works without downloads. Edit audio files, create soundpacks, and export directly to TikTok/YouTube/Discord in one click. Powered by [MediaBunny](https://mediabunny.dev) for superfast processing.
+In-browser AI-Native DAW that works without downloads. Edit audio files, create soundpacks, and export to widely available audio formats.
 
-### 🗄️ [**Music Vault**](https://wav0.app/vault)
+
+### [**Playground**](https://wav0.app/studio)
+
+Quickly experiment with asset generation, song generation, and songwriting with just prompts.
+
+### 🗄️ [**Vault**](https://wav0.app/vault)
 
 Secure flexible storage for your music. Easily store and have control over who has access to your music. Private by default.
 
@@ -99,9 +104,10 @@ Visit <http://localhost:3000> to see your local instance running.
 <img src="https://eleven-public-cdn.elevenlabs.io/payloadcms/cy7rxce8uki-IIElevenLabsGrants%201.webp" alt="Text to Speech" style="width:250px">
 </a> 
     </td>
- <p>WAV0 x Elevenlabs Startup Grants
   </tr>
+  <p>We are glad to have the support of </p>
 </table>
+
 
 ## 🙏 OSS Shoutouts
 

@@ -59,6 +59,8 @@ export const timelineAtom = atom<TimelineState>({
   gridSize: 1000, // 1 second
 })
 
+export const trackHeightZoomAtom = atom(1.0) // Track height zoom level (1.0 = 100px default)
+
 export const selectedTrackIdAtom = atom<string | null>(null)
 export const projectNameAtom = atomWithStorage<string>("daw-project-name", "Untitled Project")
 
@@ -133,6 +135,10 @@ export const setCurrentTimeAtom = atom(null, (get, set, time: number) => {
 export const setTimelineZoomAtom = atom(null, (get, set, zoom: number) => {
   const timeline = get(timelineAtom)
   set(timelineAtom, { ...timeline, zoom })
+})
+
+export const setTrackHeightZoomAtom = atom(null, (get, set, zoom: number) => {
+  set(trackHeightZoomAtom, Math.max(0.6, Math.min(2.0, zoom)))
 })
 
 export const setTimelineScrollAtom = atom(null, (get, set, scrollPosition: number) => {

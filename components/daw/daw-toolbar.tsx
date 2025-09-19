@@ -17,6 +17,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { DAW_HEIGHTS, DAW_ICONS, DAW_TEXT } from "@/lib/constants/daw-design";
 import { projectNameAtom, tracksAtom } from "@/lib/state/daw-store";
 
 export function DAWToolbar() {
@@ -59,18 +60,18 @@ export function DAWToolbar() {
 	};
 
 	return (
-		<div className="h-12 bg-background border-b flex items-center justify-between px-4">
+		<div className="bg-background border-b flex items-center justify-between px-4" style={{ height: DAW_HEIGHTS.TOOLBAR }}>
 			<div className="flex items-center gap-4">
-				<h1 className="text-sm font-mono uppercase tracking-tight font-bold">
+				<h1 className={DAW_TEXT.BRAND}>
 					wav<span className="text-muted-foreground">0</span>
 				</h1>
 
 				<div className="flex items-center gap-2">
 					<Button variant="ghost" size="sm" onClick={() => {}}>
-						<FolderOpen className="w-4 h-4" />
+						<FolderOpen className={DAW_ICONS.MD} />
 					</Button>
 					<Button variant="ghost" size="sm" onClick={() => {}}>
-						<Save className="w-4 h-4" />
+						<Save className={DAW_ICONS.MD} />
 					</Button>
 				</div>
 			</div>
@@ -79,31 +80,32 @@ export function DAWToolbar() {
 				<Input
 					value={projectName}
 					onChange={(e) => setProjectName(e.target.value)}
-					className="w-48 h-8 text-sm"
+					className="w-48 text-sm"
+					style={{ height: DAW_HEIGHTS.BUTTON_MD }}
 					placeholder="Project name"
 				/>
 			</div>
 
 			<div className="flex items-center gap-2">
 				<Button variant="ghost" size="sm" onClick={handleImportAudio}>
-					<Upload className="w-4 h-4" />
+					<Upload className={DAW_ICONS.MD} />
 					<span className="ml-1 text-xs">Import</span>
 				</Button>
 
 				<Button variant="ghost" size="sm" onClick={handleExportProject}>
-					<Download className="w-4 h-4" />
+					<Download className={DAW_ICONS.MD} />
 					<span className="ml-1 text-xs">Export</span>
 				</Button>
 
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<Button variant="ghost" size="sm">
-							<MoreHorizontal className="w-4 h-4" />
+							<MoreHorizontal className={DAW_ICONS.MD} />
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="end">
 						<DropdownMenuItem>
-							<Settings className="w-4 h-4 mr-2" />
+							<Settings className={`${DAW_ICONS.MD} mr-2`} />
 							Settings
 						</DropdownMenuItem>
 						<DropdownMenuItem>Clear Project</DropdownMenuItem>

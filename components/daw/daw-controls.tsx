@@ -2,6 +2,7 @@
 
 import { useAtom } from "jotai";
 import {
+	ChevronsUpDown,
 	Pause,
 	Play,
 	Repeat,
@@ -14,25 +15,29 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DAW_PIXELS_PER_SECOND_AT_ZOOM_1 } from "@/lib/constants";
+import { DAW_BUTTONS, DAW_HEIGHTS, DAW_ICONS, DAW_TEXT } from "@/lib/constants/daw-design";
 import {
 	playbackAtom,
 	setBpmAtom,
 	setCurrentTimeAtom,
 	setTimelineZoomAtom,
+	setTrackHeightZoomAtom,
 	timelineAtom,
 	togglePlaybackAtom,
 	totalDurationAtom,
+	trackHeightZoomAtom,
 } from "@/lib/state/daw-store";
 import { formatDuration } from "@/lib/storage/opfs";
 
 export function DAWControls() {
 	const [playback] = useAtom(playbackAtom);
 	const [timeline] = useAtom(timelineAtom);
+	const [trackHeightZoom] = useAtom(trackHeightZoomAtom);
 	const [, togglePlayback] = useAtom(togglePlaybackAtom);
 	const [, setCurrentTime] = useAtom(setCurrentTimeAtom);
 	const [, setBpm] = useAtom(setBpmAtom);
 	const [, setTimelineZoom] = useAtom(setTimelineZoomAtom);
+	const [, setTrackHeightZoom] = useAtom(setTrackHeightZoomAtom);
 	const [totalDuration] = useAtom(totalDurationAtom);
 
 	const handleStop = () => {
@@ -62,35 +67,43 @@ export function DAWControls() {
 		setTimelineZoom(Math.max(timeline.zoom / 1.5, 0.25));
 	};
 
+	const handleTrackHeightZoomIn = () => {
+		setTrackHeightZoom(Math.min(trackHeightZoom + 0.2, 2.0));
+	};
+
+	const handleTrackHeightZoomOut = () => {
+		setTrackHeightZoom(Math.max(trackHeightZoom - 0.2, 0.6));
+	};
+
 	return (
-		<div className="h-14 bg-muted/30 border-b flex items-center justify-between px-4">
+		<div className="bg-muted/30 border-b flex items-center justify-between px-4" style={{ height: DAW_HEIGHTS.CONTROLS }}>
 			<div className="flex items-center gap-3">
 				<div className="flex items-center gap-2">
 					<Button variant="ghost" size="sm">
-						<SkipBack className="w-4 h-4" />
+						<SkipBack className={DAW_ICONS.MD} />
 					</Button>
 					<Button
 						variant="default"
 						size="sm"
 						onClick={togglePlayback}
-						className="w-10 h-10"
+						style={{ width: DAW_HEIGHTS.BUTTON_LG, height: DAW_HEIGHTS.BUTTON_LG }}
 					>
 						{playback.isPlaying ? (
-							<Pause className="w-5 h-5" />
+							<Pause className={DAW_ICONS.LG} />
 						) : (
-							<Play className="w-5 h-5" />
+							<Play className={DAW_ICONS.LG} />
 						)}
 					</Button>
 					<Button variant="ghost" size="sm" onClick={handleStop}>
-						<Square className="w-4 h-4" />
+						<Square className={DAW_ICONS.MD} />
 					</Button>
 					<Button variant="ghost" size="sm">
-						<SkipForward className="w-4 h-4" />
+						<SkipForward className={DAW_ICONS.MD} />
 					</Button>
 				</div>
 
-				<div className="flex items-center gap-3 bg-background/50 rounded-lg px-3 py-1.5 border">
-					<span className="text-xs font-mono text-muted-foreground min-w-14 tabular-nums">
+				<div className={`flex items-center gap-3 ${DAW_BUTTONS.PANEL} px-3 py-1.5`}>
+					<span className={`${DAW_TEXT.MONO_TIME} min-w-14`}>
 						{formatDuration(playback.currentTime / 1000)}
 					</span>
 					<div className="relative flex-1">
@@ -110,26 +123,27 @@ export function DAWControls() {
 							}}
 						/>
 					</div>
-					<span className="text-xs font-mono text-muted-foreground min-w-14 tabular-nums">
+					<span className={`${DAW_TEXT.MONO_TIME} min-w-14`}>
 						{formatDuration(totalDuration / 1000)}
 					</span>
 				</div>
 			</div>
 
 			<div className="flex items-center gap-4">
-				{/* Zoom Controls */}
-				<div className="flex items-center gap-1 bg-background/50 rounded-lg border p-1">
+				{/* Horizontal Zoom Controls */}
+				<div className={DAW_BUTTONS.CONTROL_GROUP}>
 					<Button
 						variant="ghost"
 						size="sm"
 						onClick={handleZoomOut}
 						disabled={timeline.zoom <= 0.25}
-						className="h-7 w-7 p-0"
-						title="Zoom Out"
+						style={{ height: DAW_HEIGHTS.BUTTON_SM, width: DAW_HEIGHTS.BUTTON_SM }}
+						className="p-0"
+						title="Zoom Out Horizontally"
 					>
-						<ZoomOut className="w-3.5 h-3.5" />
+						<ZoomOut className={DAW_ICONS.SM} />
 					</Button>
-					<span className="text-xs font-mono text-muted-foreground min-w-12 text-center">
+					<span className={`${DAW_TEXT.MONO_TIME} min-w-12 text-center`}>
 						{Math.round(timeline.zoom * 100)}%
 					</span>
 					<Button
@@ -137,10 +151,40 @@ export function DAWControls() {
 						size="sm"
 						onClick={handleZoomIn}
 						disabled={timeline.zoom >= 4}
-						className="h-7 w-7 p-0"
-						title="Zoom In"
+						style={{ height: DAW_HEIGHTS.BUTTON_SM, width: DAW_HEIGHTS.BUTTON_SM }}
+						className="p-0"
+						title="Zoom In Horizontally"
 					>
-						<ZoomIn className="w-3.5 h-3.5" />
+						<ZoomIn className={DAW_ICONS.SM} />
+					</Button>
+				</div>
+
+				{/* Vertical Zoom Controls (Track Height) */}
+				<div className={DAW_BUTTONS.CONTROL_GROUP}>
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={handleTrackHeightZoomOut}
+						disabled={trackHeightZoom <= 0.6}
+						style={{ height: DAW_HEIGHTS.BUTTON_SM, width: DAW_HEIGHTS.BUTTON_SM }}
+						className="p-0"
+						title="Decrease Track Height"
+					>
+						<ChevronsUpDown className={`${DAW_ICONS.SM} scale-75`} />
+					</Button>
+					<span className={`${DAW_TEXT.MONO_TIME} min-w-12 text-center`}>
+						{Math.round(trackHeightZoom * 100)}%
+					</span>
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={handleTrackHeightZoomIn}
+						disabled={trackHeightZoom >= 2.0}
+						style={{ height: DAW_HEIGHTS.BUTTON_SM, width: DAW_HEIGHTS.BUTTON_SM }}
+						className="p-0"
+						title="Increase Track Height"
+					>
+						<ChevronsUpDown className={DAW_ICONS.SM} />
 					</Button>
 				</div>
 
@@ -150,16 +194,17 @@ export function DAWControls() {
 						type="number"
 						value={playback.bpm}
 						onChange={handleBpmChange}
-						className="w-16 h-8 text-sm"
+						className="w-16 text-sm"
+						style={{ height: DAW_HEIGHTS.BUTTON_MD }}
 						min={60}
 						max={200}
 					/>
 				</div>
 				<Button variant={playback.looping ? "default" : "ghost"} size="sm">
-					<Repeat className="w-4 h-4" />
+					<Repeat className={DAW_ICONS.MD} />
 				</Button>
 				<div className="flex items-center gap-2">
-					<Volume2 className="w-4 h-4 text-muted-foreground" />
+					<Volume2 className={`${DAW_ICONS.MD} text-muted-foreground`} />
 					<input
 						type="range"
 						min={0}

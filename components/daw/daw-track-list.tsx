@@ -3,13 +3,14 @@
 import { useAtom } from "jotai";
 import {
 	Edit3,
+	GripHorizontal,
 	Headphones,
 	MoreVertical,
 	Trash2,
 	Volume2,
 	VolumeX,
 } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -19,9 +20,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { DAW_ROW_HEIGHT } from "@/lib/constants";
+import { DAW_BUTTONS, DAW_COLORS, DAW_HEIGHTS, DAW_ICONS, DAW_SPACING, DAW_TEXT } from "@/lib/constants/daw-design";
 import {
 	removeTrackAtom,
 	selectedTrackIdAtom,
+	setTrackHeightZoomAtom,
+	trackHeightZoomAtom,
 	tracksAtom,
 	updateTrackAtom,
 } from "@/lib/state/daw-store";
@@ -30,9 +34,15 @@ import { formatDuration } from "@/lib/storage/opfs";
 export function DAWTrackList() {
 	const [tracks] = useAtom(tracksAtom);
 	const [selectedTrackId, setSelectedTrackId] = useAtom(selectedTrackIdAtom);
+	const [trackHeightZoom] = useAtom(trackHeightZoomAtom);
+	const [, setTrackHeightZoom] = useAtom(setTrackHeightZoomAtom);
 	const [, removeTrack] = useAtom(removeTrackAtom);
 	const [, updateTrack] = useAtom(updateTrackAtom);
 	const [editingTrackId, setEditingTrackId] = useState<string | null>(null);
+	const [resizingTrack, setResizingTrack] = useState<{
+		startY: number;
+		startZoom: number;
+	} | null>(null);
 
 	const handleTrackNameChange = (trackId: string, name: string) => {
 		updateTrack(trackId, { name });
@@ -51,21 +61,63 @@ export function DAWTrackList() {
 		updateTrack(trackId, { soloed: !currentSoloed });
 	};
 
+	const handleResizeStart = useCallback((e: React.MouseEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+		
+		setResizingTrack({
+			startY: e.clientY,
+			startZoom: trackHeightZoom,
+		});
+	}, [trackHeightZoom]);
+
+	const handleResizeMove = useCallback((e: MouseEvent) => {
+		if (!resizingTrack) return;
+		
+		const deltaY = e.clientY - resizingTrack.startY;
+		const deltaZoom = deltaY / DAW_HEIGHTS.TRACK_ROW; // Convert pixels to zoom multiplier
+		const newZoom = resizingTrack.startZoom + deltaZoom;
+		
+		setTrackHeightZoom(newZoom);
+	}, [resizingTrack, setTrackHeightZoom]);
+
+	const handleResizeEnd = useCallback(() => {
+		setResizingTrack(null);
+	}, []);
+
+	// Attach global mouse events for resizing
+	useEffect(() => {
+		if (resizingTrack) {
+			document.addEventListener('mousemove', handleResizeMove);
+			document.addEventListener('mouseup', handleResizeEnd);
+			document.body.style.cursor = 'ns-resize';
+		}
+		
+		return () => {
+			document.removeEventListener('mousemove', handleResizeMove);
+			document.removeEventListener('mouseup', handleResizeEnd);
+			document.body.style.cursor = '';
+		};
+	}, [resizingTrack, handleResizeMove, handleResizeEnd]);
+
 	return (
 		<div className="w-full">
 			{/* Track List */}
 			<div>
-				{tracks.map((track) => (
+				{tracks.map((track) => {
+					const trackHeight = Math.round(DAW_HEIGHTS.TRACK_ROW * trackHeightZoom);
+					
+					return (
 					<div
 						key={track.id}
-						className={`w-full border-b border-border/50 transition-colors ${
+						className={`w-full transition-colors ${DAW_COLORS.BORDER_DEFAULT} border-b ${
 							selectedTrackId === track.id
-								? "bg-muted/30"
-								: "bg-background hover:bg-muted/20"
-						}`}
+								? DAW_COLORS.SELECTED_BG
+								: `bg-background hover:${DAW_COLORS.HOVER_BG}`
+						} relative`}
 						style={{
-							height: DAW_ROW_HEIGHT,
-							padding: "12px",
+							height: trackHeight,
+							padding: `${DAW_SPACING.TRACK_PADDING}px`,
 							display: "flex",
 							flexDirection: "column",
 							justifyContent: "space-between",
@@ -75,12 +127,12 @@ export function DAWTrackList() {
 						<div className="flex items-center justify-between">
 							<button
 								type="button"
-								className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer bg-transparent border-none p-0 text-left"
+								className={`flex items-center gap-2 flex-1 min-w-0 cursor-pointer ${DAW_BUTTONS.TRANSPARENT} text-left`}
 								onClick={() => setSelectedTrackId(track.id)}
 								onDoubleClick={() => setEditingTrackId(track.id)}
 							>
 								<div
-									className="w-3 h-3 rounded-full flex-shrink-0"
+									className={`${DAW_ICONS.XS} rounded-full flex-shrink-0`}
 									style={{ backgroundColor: track.color }}
 								/>
 								{editingTrackId === track.id ? (
@@ -100,9 +152,7 @@ export function DAWTrackList() {
 										onClick={(e) => e.stopPropagation()}
 									/>
 								) : (
-									<span
-										className="text-sm font-medium truncate text-left select-none"
-									>
+									<span className={`${DAW_TEXT.TRACK_NAME} select-none`}>
 										{track.name}
 									</span>
 								)}
@@ -115,19 +165,19 @@ export function DAWTrackList() {
 										size="sm"
 										className="h-6 w-6 p-0 flex-shrink-0 opacity-60 hover:opacity-100"
 									>
-										<MoreVertical className="w-3 h-3" />
+										<MoreVertical className={DAW_ICONS.XS} />
 									</Button>
 								</DropdownMenuTrigger>
 								<DropdownMenuContent align="end">
 									<DropdownMenuItem onClick={() => setEditingTrackId(track.id)}>
-										<Edit3 className="w-4 h-4 mr-2" />
+										<Edit3 className={`${DAW_ICONS.MD} mr-2`} />
 										Rename
 									</DropdownMenuItem>
 									<DropdownMenuItem
 										onClick={() => removeTrack(track.id)}
 										className="text-destructive"
 									>
-										<Trash2 className="w-4 h-4 mr-2" />
+										<Trash2 className={`${DAW_ICONS.MD} mr-2`} />
 										Delete
 									</DropdownMenuItem>
 								</DropdownMenuContent>
@@ -153,9 +203,9 @@ export function DAWTrackList() {
 								}}
 							>
 								{track.muted ? (
-									<VolumeX className="w-3 h-3" />
+									<VolumeX className={DAW_ICONS.XS} />
 								) : (
-									<Volume2 className="w-3 h-3" />
+									<Volume2 className={DAW_ICONS.XS} />
 								)}
 							</Button>
 
@@ -168,7 +218,7 @@ export function DAWTrackList() {
 									toggleSolo(track.id, track.soloed);
 								}}
 							>
-								<Headphones className="w-3 h-3" />
+								<Headphones className={DAW_ICONS.XS} />
 							</Button>
 
 							<div className="flex-1 min-w-0">
@@ -189,8 +239,20 @@ export function DAWTrackList() {
 								{track.volume}
 							</span>
 						</div>
+
+						{/* Resize Handle - adjusts global zoom */}
+						<div
+							className="absolute bottom-0 left-0 right-0 h-1 cursor-ns-resize hover:bg-primary/50 opacity-0 hover:opacity-100 transition-opacity"
+							onMouseDown={handleResizeStart}
+							title="Resize all tracks height"
+						>
+							<div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-8 h-1 bg-border rounded-t">
+								<GripHorizontal className="w-3 h-3 mx-auto -mt-1 text-muted-foreground" />
+							</div>
+						</div>
 					</div>
-				))}
+					);
+				})}
 
 				{tracks.length === 0 && (
 					<div className="text-center py-8 text-muted-foreground px-4">
