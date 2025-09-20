@@ -64,11 +64,26 @@ export function AudioTestPanel() {
 		}
 
 		try {
-			const audioBuffer = await audioManager.getAudioBuffer(track.opfsFileId);
-			if (audioBuffer) {
-				await audioManager.playAudioBuffer(audioBuffer, 0, undefined, 0.5);
-				console.log("Direct audio playback started");
+			// Use the AudioBufferSink to fetch a small slice and play via Web Audio API
+			const sink = audioManager.getAudioBufferSink(track.opfsFileId);
+			if (!sink) {
+				console.log("No sink available for track");
+				return;
 			}
+			const audioContext = await audioManager.getAudioContext();
+			const baseTime = audioContext.currentTime + 0.05; // slight delay to avoid immediate start drift
+			// Play the first ~1s as a sanity test
+			for await (const { buffer, timestamp } of sink.buffers(
+				0,
+				Math.min(track.trimEnd ?? track.duration, 1000) / 1000,
+			)) {
+				const source = audioContext.createBufferSource();
+				source.buffer = buffer;
+				source.connect(audioContext.destination);
+				// schedule relative to baseTime + timestamp
+				source.start(baseTime + (timestamp || 0));
+			}
+			console.log("Direct audio buffer scheduling started");
 		} catch (error) {
 			console.error("Direct playback failed:", error);
 		}
