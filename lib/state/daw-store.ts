@@ -62,6 +62,8 @@ export type TimelineState = {
 	gridSize: number; // in milliseconds
 };
 
+export type Tool = "pointer" | "trim" | "razor";
+
 export type DAWState = {
 	projectName: string;
 	tracks: Track[];
@@ -90,10 +92,107 @@ export const timelineAtom = atom<TimelineState>({
 export const trackHeightZoomAtom = atom(1.0); // Track height zoom level (1.0 = 100px default)
 
 export const selectedTrackIdAtom = atom<string | null>(null);
+export const selectedClipIdAtom = atom<string | null>(null);
+export const activeToolAtom = atom<Tool>("pointer");
 export const projectNameAtom = atomWithStorage<string>(
 	"daw-project-name",
 	"Untitled Project",
 );
+
+// Clip operations
+export const updateClipAtom = atom(
+	null,
+	async (get, set, trackId: string, clipId: string, updates: Partial<Clip>) => {
+		const tracks = get(tracksAtom);
+		const playback = get(playbackAtom);
+		const updatedTracks = tracks.map((t) => {
+			if (t.id !== trackId) return t;
+			if (!t.clips) return t;
+			return {
+				...t,
+				clips: t.clips.map((c) => (c.id === clipId ? { ...c, ...updates } : c)),
+			};
+		});
+		set(tracksAtom, updatedTracks);
+
+		const updatedTrack = updatedTracks.find((t) => t.id === trackId);
+		if (!updatedTrack) return;
+
+		// If playing and timing changed, reschedule for immediate correctness
+		if (
+			playback.isPlaying &&
+			(updates.startTime !== undefined ||
+				updates.trimStart !== undefined ||
+				updates.trimEnd !== undefined)
+		) {
+			try {
+				await playbackEngine.rescheduleTrack(updatedTrack);
+			} catch (e) {
+				console.error(
+					"Failed to reschedule track after clip update",
+					trackId,
+					clipId,
+					e,
+				);
+			}
+		}
+	},
+);
+
+export const splitClipAtPlayheadAtom = atom(null, async (get, set) => {
+	const tracks = get(tracksAtom);
+	const selectedTrackId = get(selectedTrackIdAtom);
+	const selectedClipId = get(selectedClipIdAtom);
+	const playback = get(playbackAtom);
+	if (!selectedTrackId || !selectedClipId) return;
+	const track = tracks.find((t) => t.id === selectedTrackId);
+	if (!track || !track.clips) return;
+	const clip = track.clips.find((c) => c.id === selectedClipId);
+	if (!clip) return;
+
+	const splitTimeMs = playback.currentTime; // already ms
+	// Validate split within clip window
+	const clipStartMs = clip.startTime;
+	const clipEndMs = clip.startTime + (clip.trimEnd - clip.trimStart);
+	if (splitTimeMs <= clipStartMs || splitTimeMs >= clipEndMs) return;
+
+	const offsetInClip = splitTimeMs - clip.startTime; // ms into clip
+	const newLeft: Clip = {
+		...clip,
+		id: crypto.randomUUID(),
+		trimEnd: clip.trimStart + offsetInClip,
+	};
+	const newRight: Clip = {
+		...clip,
+		id: crypto.randomUUID(),
+		startTime: splitTimeMs,
+		trimStart: clip.trimStart + offsetInClip,
+	};
+	// Optional small default crossfade
+	newLeft.fadeOut = newLeft.fadeOut ?? 15;
+	newRight.fadeIn = newRight.fadeIn ?? 15;
+
+	const updatedClips = track.clips
+		.map((c) => (c.id === clip.id ? [newLeft, newRight] : c))
+		.flat() as Clip[];
+
+	const updatedTrack: Track = { ...track, clips: updatedClips };
+	const updatedTracks = tracks.map((t) =>
+		t.id === track.id ? updatedTrack : t,
+	);
+	set(tracksAtom, updatedTracks);
+
+	// select the right clip after split
+	set(selectedClipIdAtom, newRight.id);
+
+	if (playback.isPlaying) {
+		try {
+			await playbackEngine.rescheduleTrack(updatedTrack);
+		} catch (e) {
+			console.error("Failed to reschedule after split", track.id, e);
+		}
+	}
+});
 
 // Derived atoms
 export const selectedTrackAtom = atom((get) => {
@@ -307,6 +406,21 @@ export const loadAudioFileAtom = atom(
 						tracksAtom,
 						tracks.map((t) => (t.id === existingTrackId ? updatedTrack : t)),
 					);
+
+					// If we are playing, immediately reschedule this track to reflect the new clip
+					const playback = get(playbackAtom);
+					if (playback.isPlaying) {
+						try {
+							await playbackEngine.rescheduleTrack(updatedTrack);
+						} catch (e) {
+							console.error(
+								"Failed to reschedule after adding clip",
+								existingTrackId,
+								e,
+							);
+						}
+					}
+
 					return updatedTrack;
 				}
 			}
@@ -344,6 +458,21 @@ export const loadAudioFileAtom = atom(
 
 			const tracks2 = get(tracksAtom);
 			set(tracksAtom, [...tracks2, newTrack]);
+
+			// If playing, reschedule this new track so it joins playback immediately
+			const playback = get(playbackAtom);
+			if (playback.isPlaying) {
+				try {
+					await playbackEngine.rescheduleTrack(newTrack);
+				} catch (e) {
+					console.error(
+						"Failed to reschedule after creating track",
+						newTrackId,
+						e,
+					);
+				}
+			}
+
 			return newTrack;
 		} catch (error) {
 			console.error("Failed to load audio file:", error);

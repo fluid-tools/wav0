@@ -1,27 +1,32 @@
 "use client";
 
-import type { Track } from "@/lib/state/daw-store";
+import type { Track, Clip } from "@/lib/state/daw-store";
 import { audioManager } from "./audio-manager";
 
 export interface PlaybackOptions {
-	startTime?: number;
-	onTimeUpdate?: (time: number) => void;
+	startTime?: number; // seconds
+	onTimeUpdate?: (time: number) => void; // seconds
 	onPlaybackEnd?: () => void;
 }
 
-type TrackPlaybackState = {
+type ClipPlaybackState = {
 	iterator: AsyncIterableIterator<{
 		buffer: AudioBuffer;
 		timestamp: number;
 	}> | null;
-	audioSources: AudioBufferSourceNode[];
 	gainNode: GainNode | null;
+	audioSources: AudioBufferSourceNode[];
+};
+
+type TrackPlaybackState = {
+	clipStates: Map<string, ClipPlaybackState>;
+	gainNode: GainNode | null; // track-level gain (volume/solo/mute)
 	isPlaying: boolean;
 };
 
 /**
  * PlaybackEngine based on MediaBunny player implementation pattern
- * Key insight: Use the global AudioBufferSink instances and proper timing
+ * Updated: per-clip scheduling so multiple clips per track play correctly
  */
 export class PlaybackEngine {
 	private static instance: PlaybackEngine;
@@ -29,8 +34,8 @@ export class PlaybackEngine {
 	private masterGainNode: GainNode | null = null;
 	private tracks = new Map<string, TrackPlaybackState>();
 	private isPlaying = false;
-	private startTime = 0;
-	private playbackTimeAtStart = 0;
+	private startTime = 0; // AudioContext.currentTime when play() called
+	private playbackTimeAtStart = 0; // seconds
 	private options: PlaybackOptions = {};
 	private animationFrameId: number | null = null;
 	private queuedAudioNodes = new Set<AudioBufferSourceNode>();
@@ -53,9 +58,7 @@ export class PlaybackEngine {
 		return this.audioContext;
 	}
 
-	/**
-	 * Get current playback time like MediaBunny player
-	 */
+	// Current playback time (seconds)
 	private getPlaybackTime(): number {
 		if (this.isPlaying && this.audioContext) {
 			return (
@@ -68,47 +71,29 @@ export class PlaybackEngine {
 		}
 	}
 
-	/**
-	 * Initialize playback engine with tracks
-	 */
+	// Initialize track state if it has any loaded audio (clip or legacy)
 	async initializeWithTracks(tracks: Track[]): Promise<void> {
 		await this.getAudioContext();
-
-		console.log("Initializing playback engine with tracks:", tracks.length);
-
-		// Clear existing tracks
 		this.tracks.clear();
 
-		// Initialize each track that has audio
 		for (const track of tracks) {
-			if (track.opfsFileId && audioManager.isTrackLoaded(track.opfsFileId)) {
-				console.log(
-					"Initializing track:",
-					track.name,
-					"with opfsFileId:",
-					track.opfsFileId,
-				);
+			const hasLoadedClip = (track.clips ?? []).some((c) =>
+				c.opfsFileId ? audioManager.isTrackLoaded(c.opfsFileId) : false,
+			);
+			const hasLoadedLegacy = track.opfsFileId
+				? audioManager.isTrackLoaded(track.opfsFileId)
+				: false;
+			if (hasLoadedClip || hasLoadedLegacy) {
 				this.tracks.set(track.id, {
-					iterator: null,
-					audioSources: [],
+					clipStates: new Map(),
 					gainNode: null,
 					isPlaying: false,
 				});
-			} else {
-				console.log("Skipping track without loaded audio:", track.name);
 			}
 		}
-
-		console.log(
-			"Playback engine initialized with",
-			this.tracks.size,
-			"audio tracks",
-		);
 	}
 
-	/**
-	 * Start playback from specified time - based on MediaBunny player pattern
-	 */
+	// Start playback from a specific time (seconds)
 	async play(tracks: Track[], options: PlaybackOptions = {}): Promise<void> {
 		this.options = options;
 
@@ -121,195 +106,171 @@ export class PlaybackEngine {
 			throw new Error("AudioContext not initialized");
 		}
 
-		// Set playback time like MediaBunny player
 		this.playbackTimeAtStart = options.startTime || 0;
 		this.startTime = this.audioContext.currentTime;
 		this.isPlaying = true;
 
-		console.log("Starting playback from time:", this.playbackTimeAtStart);
+		const hasAnyTracksInSolo = tracks.some((t) => t.soloed);
 
-		// Start each track
 		for (const track of tracks) {
-			if (!track.opfsFileId || track.muted) {
-				continue;
-			}
-
+			if (track.muted) continue;
 			const trackState = this.tracks.get(track.id);
-			if (!trackState) {
-				continue;
+			if (!trackState) continue;
+
+			// Create/update track gain
+			if (!trackState.gainNode) {
+				trackState.gainNode = this.audioContext.createGain();
+				trackState.gainNode.connect(this.masterGainNode);
 			}
+			const baseVolume = track.volume / 100;
+			trackState.gainNode.gain.value = hasAnyTracksInSolo
+				? track.soloed
+					? baseVolume
+					: 0
+				: baseVolume;
 
-			try {
-				// Get the AudioBufferSink from AudioManager
-				const sink = audioManager.getAudioBufferSink(track.opfsFileId);
-				if (!sink) {
-					console.log("No AudioBufferSink found for track:", track.name);
-					continue;
-				}
+			trackState.isPlaying = true;
 
-				// Create gain node for this track
-				const gainNode = this.audioContext.createGain();
+			const clips =
+				track.clips && track.clips.length > 0
+					? track.clips
+					: track.opfsFileId
+						? [
+								{
+									id: track.id,
+									name: track.name,
+									opfsFileId: track.opfsFileId,
+									startTime: track.startTime,
+									trimStart: track.trimStart,
+									trimEnd: track.trimEnd,
+									color: track.color,
+								} as Clip,
+							]
+						: [];
 
-				// Set track volume (handle solo logic)
-				const hasAnyTracksInSolo = tracks.some((t) => t.soloed);
-				let volume = track.volume / 100;
+			for (const clip of clips) {
+				if (!clip.opfsFileId) continue;
+				const sink = audioManager.getAudioBufferSink(clip.opfsFileId);
+				if (!sink) continue;
 
-				if (hasAnyTracksInSolo) {
-					volume = track.soloed ? volume : 0;
-				}
+				const clipStartSec = clip.startTime / 1000;
+				const clipTrimStartSec = clip.trimStart / 1000;
+				const clipTrimEndSec = clip.trimEnd / 1000;
+				const clipDurationSec = clipTrimEndSec - clipTrimStartSec;
+				const clipEndSec = clipStartSec + clipDurationSec;
 
-				gainNode.gain.value = volume;
-				gainNode.connect(this.masterGainNode);
-				trackState.gainNode = gainNode;
+				// Skip if playback starts after this clip
+				if (this.playbackTimeAtStart >= clipEndSec) continue;
 
-				// Track timing calculations
-				const trackStartTime = track.startTime / 1000; // Track position in timeline (seconds)
-				const trimStart = track.trimStart / 1000; // Start of trimmed section in original file (seconds)
-				const trimEnd = track.trimEnd / 1000; // End of trimmed section in original file (seconds)
-
-				// Calculate track's end time in timeline
-				const trackEndTime = trackStartTime + (trimEnd - trimStart);
-
-				// Only skip if playback starts after the track has fully ended
-				if (this.playbackTimeAtStart >= trackEndTime) {
-					console.log(
-						"Track is completely past playback start, skipping:",
-						track.name,
-						{
-							playbackTime: this.playbackTimeAtStart,
-							trackStart: trackStartTime,
-							trackEnd: trackEndTime,
-						},
-					);
-					continue;
-				}
-
-				// Calculate where to start reading in the original audio file
-				// If playback starts before the track, begin at the start of the trimmed audio
-				const timeIntoTrackRaw = this.playbackTimeAtStart - trackStartTime; // may be negative
-				const timeIntoTrack = Math.max(0, timeIntoTrackRaw); // clamp to 0 for future-starting tracks
-				const audioFileReadStart = trimStart + timeIntoTrack; // Corresponding position in original file
-
-				// Don't read past the trim end
-				if (audioFileReadStart >= trimEnd) {
-					console.log("Audio read start past trim end:", track.name);
-					continue;
-				}
-
-				console.log("Starting MediaBunny iteration for track:", track.name, {
-					trackStartTime,
-					trimStart,
-					trimEnd,
-					timeIntoTrack,
-					audioFileReadStart,
-					playbackTime: this.playbackTimeAtStart,
-				});
-
-				// MediaBunny: buffers(start, end) reads from original file timestamps
-				const iterator = sink.buffers(audioFileReadStart, trimEnd);
-				trackState.iterator = iterator;
-				trackState.isPlaying = true;
-
-				// Start the audio iterator for this track
-				this.runTrackAudioIterator(
-					track,
-					trackState,
-					trackStartTime,
-					trimStart,
+				const timeIntoClip = Math.max(
+					0,
+					this.playbackTimeAtStart - clipStartSec,
 				);
-			} catch (error) {
-				console.error(`Failed to start playback for track ${track.id}:`, error);
+				const audioFileReadStart = clipTrimStartSec + timeIntoClip;
+				if (audioFileReadStart >= clipTrimEndSec) continue;
+
+				// Prepare clip playback state
+				let cps = trackState.clipStates.get(clip.id);
+				if (!cps) {
+					cps = {
+						iterator: null,
+						gainNode: this.audioContext.createGain(),
+						audioSources: [],
+					};
+					cps.gainNode!.connect(trackState.gainNode!);
+					trackState.clipStates.set(clip.id, cps);
+				}
+
+				// Configure clip fades (basic linear ramps)
+				try {
+					const clipGain = cps.gainNode!;
+					clipGain.gain.cancelScheduledValues(0);
+					clipGain.gain.setValueAtTime(1, 0);
+					const clipStartAC =
+						this.startTime + clipStartSec - this.playbackTimeAtStart;
+					const clipEndAC =
+						this.startTime + clipEndSec - this.playbackTimeAtStart;
+					if (clip.fadeIn && clip.fadeIn > 0) {
+						clipGain.gain.setValueAtTime(0, Math.max(0, clipStartAC));
+						clipGain.gain.linearRampToValueAtTime(
+							1,
+							Math.max(0, clipStartAC + clip.fadeIn / 1000),
+						);
+					}
+					if (clip.fadeOut && clip.fadeOut > 0) {
+						clipGain.gain.setValueAtTime(
+							1,
+							Math.max(0, clipEndAC - clip.fadeOut / 1000),
+						);
+						clipGain.gain.linearRampToValueAtTime(0, Math.max(0, clipEndAC));
+					}
+				} catch (e) {
+					console.warn("Failed to schedule clip fades", e);
+				}
+
+				// Start buffers iterator for this clip
+				cps.iterator = sink.buffers(audioFileReadStart, clipTrimEndSec);
+				// Fire-and-forget so multiple clips run concurrently
+				this.runClipAudioIterator(
+					track,
+					clip,
+					cps,
+					clipStartSec,
+					clipTrimStartSec,
+				);
 			}
 		}
 
-		// Start time update loop
 		this.startTimeUpdateLoop();
 	}
 
-	/**
-	 * Run audio iterator for a track - properly map original file timestamps to timeline
-	 */
-	private async runTrackAudioIterator(
+	private async runClipAudioIterator(
 		track: Track,
-		trackState: TrackPlaybackState,
-		trackStartTime: number,
-		trimStart: number,
+		clip: Clip,
+		cps: ClipPlaybackState,
+		clipStartSec: number,
+		clipTrimStartSec: number,
 	): Promise<void> {
-		if (!trackState.iterator || !trackState.gainNode || !this.audioContext)
-			return;
-
+		if (!cps.iterator || !this.audioContext) return;
+		const clipGain = cps.gainNode;
 		try {
-			for await (const { buffer, timestamp } of trackState.iterator) {
-				if (!this.isPlaying || !trackState.isPlaying) {
-					break;
-				}
-
-				console.log("Playing audio buffer for track:", track.name, {
-					originalFileTimestamp: timestamp,
-					duration: buffer.duration,
-					trimStart,
-					trackStartTime,
-				});
-
-				// Create audio source
+			for await (const { buffer, timestamp } of cps.iterator) {
+				if (!this.isPlaying) break;
+				// Create node per buffer
 				const node = this.audioContext.createBufferSource();
 				node.buffer = buffer;
-				node.connect(trackState.gainNode);
+				node.connect(clipGain ?? this.masterGainNode!);
 
-				// Map original file timestamp to timeline position
-				// timestamp is from the original file, we need to convert to timeline
-				const timeInTrimmedAudio = timestamp - trimStart; // How far into the trimmed section
-				const timelinePosition = trackStartTime + timeInTrimmedAudio; // Where this should play in timeline
-				const audioContextStartTime =
-					this.startTime + timelinePosition - this.playbackTimeAtStart;
+				// timeline position mapping
+				const timeInTrimmed = timestamp - clipTrimStartSec;
+				const timelinePos = clipStartSec + timeInTrimmed;
+				const startAt = this.startTime + timelinePos - this.playbackTimeAtStart;
 
-				console.log("Audio timing calculation:", {
-					originalFileTimestamp: timestamp,
-					timeInTrimmedAudio,
-					timelinePosition,
-					audioContextStartTime,
-					currentAudioTime: this.audioContext.currentTime,
-				});
-
-				if (audioContextStartTime >= this.audioContext.currentTime) {
-					node.start(audioContextStartTime);
+				if (startAt >= this.audioContext.currentTime) {
+					node.start(startAt);
 				} else {
-					// We're late, start immediately with offset
-					const offset = this.audioContext.currentTime - audioContextStartTime;
+					const offset = this.audioContext.currentTime - startAt;
 					if (offset < buffer.duration) {
 						node.start(this.audioContext.currentTime, offset);
 					} else {
-						// Skip this buffer - we're too late
-						console.log(
-							"Skipping buffer - too late:",
-							offset,
-							"vs",
-							buffer.duration,
-						);
-						continue;
+						continue; // too late
 					}
 				}
 
-				trackState.audioSources.push(node);
+				cps.audioSources.push(node);
 				this.queuedAudioNodes.add(node);
-
 				node.onended = () => {
-					const index = trackState.audioSources.indexOf(node);
-					if (index > -1) {
-						trackState.audioSources.splice(index, 1);
-					}
+					const idx = cps.audioSources.indexOf(node);
+					if (idx > -1) cps.audioSources.splice(idx, 1);
 					this.queuedAudioNodes.delete(node);
 				};
 
-				// Buffer ahead control based on timeline position
-				const currentTimelineTime = this.getPlaybackTime();
-				if (timelinePosition - currentTimelineTime >= 1) {
+				// Throttle scheduling when far ahead
+				const currentTimeline = this.getPlaybackTime();
+				if (timelinePos - currentTimeline >= 1) {
 					await new Promise((resolve) => {
 						const id = setInterval(() => {
-							if (
-								timelinePosition - this.getPlaybackTime() < 1 ||
-								!this.isPlaying
-							) {
+							if (timelinePos - this.getPlaybackTime() < 1 || !this.isPlaying) {
 								clearInterval(id);
 								resolve(undefined);
 							}
@@ -317,180 +278,187 @@ export class PlaybackEngine {
 					});
 				}
 			}
-		} catch (iteratorError) {
-			console.error(
-				"Error in track audio iterator:",
-				track.name,
-				iteratorError,
-			);
+		} catch (e) {
+			console.error("Error in clip audio iterator:", track.name, clip.name, e);
 		}
 	}
 
-	/**
-	 * Pause playback - like MediaBunny player
-	 */
 	async pause(): Promise<void> {
 		this.playbackTimeAtStart = this.getPlaybackTime();
 		this.isPlaying = false;
 
-		// Stop all iterators
+		// Stop all iterators and nodes
 		for (const trackState of this.tracks.values()) {
 			trackState.isPlaying = false;
-			if (trackState.iterator) {
-				await trackState.iterator.return?.(undefined);
-				trackState.iterator = null;
+			for (const cps of trackState.clipStates.values()) {
+				await cps.iterator?.return?.(undefined);
+				cps.iterator = null;
+				for (const node of [...cps.audioSources]) {
+					try {
+						node.stop();
+					} catch {}
+				}
+				cps.audioSources = [];
 			}
 		}
 
-		// Stop all audio sources
 		for (const node of this.queuedAudioNodes) {
 			try {
 				node.stop();
-			} catch (error) {
-				// Node may already be stopped
-			}
+			} catch {}
 		}
 		this.queuedAudioNodes.clear();
 
 		this.stopTimeUpdateLoop();
 	}
 
-	/**
-	 * Stop playback and reset to beginning
-	 */
 	async stop(): Promise<void> {
 		await this.pause();
 		this.playbackTimeAtStart = 0;
-
-		if (this.options.onTimeUpdate) {
-			this.options.onTimeUpdate(0);
-		}
+		this.options.onTimeUpdate?.(0);
 	}
 
-	/**
-	 * Seek to specific time - restart playback from new position
-	 */
 	async seek(time: number): Promise<void> {
 		const wasPlaying = this.isPlaying;
-
-		if (wasPlaying) {
-			await this.pause();
-		}
-
+		if (wasPlaying) await this.pause();
 		this.playbackTimeAtStart = time;
-
-		if (this.options.onTimeUpdate) {
-			this.options.onTimeUpdate(time);
-		}
-
-		// If was playing, restart from new position
-		if (wasPlaying) {
-			// We need to restart with the current tracks
-			// For now, just update the time - the calling code should handle restart
-		}
+		this.options.onTimeUpdate?.(time);
 	}
 
-	/**
-	 * Reschedule a single track during playback after edits (trim/move)
-	 */
+	// Reschedule given track (rebuild all clip iterators) during playback
 	async rescheduleTrack(updatedTrack: Track): Promise<void> {
 		if (!this.isPlaying) return;
 		await this.getAudioContext();
 		if (!this.audioContext) return;
+		let trackState = this.tracks.get(updatedTrack.id);
+		if (!trackState) {
+			trackState = { clipStates: new Map(), gainNode: null, isPlaying: true };
+			this.tracks.set(updatedTrack.id, trackState);
+		}
 
-		const trackState = this.tracks.get(updatedTrack.id);
-		if (!trackState) return;
-
-		try {
-			// Stop existing iterator and sources for this track
-			trackState.isPlaying = false;
-			if (trackState.iterator) {
-				await trackState.iterator.return?.(undefined);
-				trackState.iterator = null;
-			}
-			for (const node of [...trackState.audioSources]) {
+		// Stop all existing clip iterators/nodes
+		trackState.isPlaying = false;
+		for (const cps of trackState.clipStates.values()) {
+			await cps.iterator?.return?.(undefined);
+			cps.iterator = null;
+			for (const node of [...cps.audioSources]) {
 				try {
 					node.stop();
 				} catch {}
 			}
-			trackState.audioSources = [];
+			cps.audioSources = [];
+		}
 
-			// Ensure gain node exists
-			if (!trackState.gainNode) {
-				const gainNode = this.audioContext.createGain();
-				gainNode.connect(this.masterGainNode!);
-				trackState.gainNode = gainNode;
+		// Ensure track gain exists
+		if (!trackState.gainNode) {
+			trackState.gainNode = this.audioContext.createGain();
+			trackState.gainNode.connect(this.masterGainNode!);
+		}
+
+		trackState.isPlaying = true;
+
+		// Rebuild clip states and schedule again
+		const hasClips = updatedTrack.clips && updatedTrack.clips.length > 0;
+		const clips: Clip[] = hasClips
+			? (updatedTrack.clips as Clip[])
+			: updatedTrack.opfsFileId
+				? [
+						{
+							id: updatedTrack.id,
+							name: updatedTrack.name,
+							opfsFileId: updatedTrack.opfsFileId,
+							startTime: updatedTrack.startTime,
+							trimStart: updatedTrack.trimStart,
+							trimEnd: updatedTrack.trimEnd,
+							color: updatedTrack.color,
+						} as Clip,
+					]
+				: [];
+
+		for (const clip of clips) {
+			if (!clip.opfsFileId) continue;
+			const sink = audioManager.getAudioBufferSink(clip.opfsFileId);
+			if (!sink) continue;
+
+			const clipStartSec = clip.startTime / 1000;
+			const clipTrimStartSec = clip.trimStart / 1000;
+			const clipTrimEndSec = clip.trimEnd / 1000;
+			const clipEndSec = clipStartSec + (clipTrimEndSec - clipTrimStartSec);
+			const now = this.getPlaybackTime();
+			if (now >= clipEndSec) continue;
+
+			const timeIntoClip = Math.max(0, now - clipStartSec);
+			const audioFileReadStart = Math.min(
+				clipTrimEndSec,
+				clipTrimStartSec + timeIntoClip,
+			);
+			if (audioFileReadStart >= clipTrimEndSec) continue;
+
+			let cps = trackState.clipStates.get(clip.id);
+			if (!cps) {
+				cps = {
+					iterator: null,
+					gainNode: this.audioContext.createGain(),
+					audioSources: [],
+				};
+				cps.gainNode!.connect(trackState.gainNode!);
+				trackState.clipStates.set(clip.id, cps);
 			}
 
-			// Compute new timing
-			const trackStartTime = updatedTrack.startTime / 1000;
-			const trimStart = updatedTrack.trimStart / 1000;
-			const trimEnd = updatedTrack.trimEnd / 1000;
-			const trackEndTime = trackStartTime + (trimEnd - trimStart);
-			const now = this.getPlaybackTime();
+			// Reapply fades
+			try {
+				const clipGain = cps.gainNode!;
+				clipGain.gain.cancelScheduledValues(0);
+				clipGain.gain.setValueAtTime(1, 0);
+				const clipStartAC =
+					this.startTime + clipStartSec - this.playbackTimeAtStart;
+				const clipEndAC =
+					this.startTime + clipEndSec - this.playbackTimeAtStart;
+				if (clip.fadeIn && clip.fadeIn > 0) {
+					clipGain.gain.setValueAtTime(0, Math.max(0, clipStartAC));
+					clipGain.gain.linearRampToValueAtTime(
+						1,
+						Math.max(0, clipStartAC + clip.fadeIn / 1000),
+					);
+				}
+				if (clip.fadeOut && clip.fadeOut > 0) {
+					clipGain.gain.setValueAtTime(
+						1,
+						Math.max(0, clipEndAC - clip.fadeOut / 1000),
+					);
+					clipGain.gain.linearRampToValueAtTime(0, Math.max(0, clipEndAC));
+				}
+			} catch {}
 
-			// If the whole track is now behind, nothing to play
-			if (now >= trackEndTime) return;
-
-			// Determine where to start reading in the file
-			const timeIntoTrack = Math.max(0, now - trackStartTime);
-			const audioFileReadStart = Math.min(trimEnd, trimStart + timeIntoTrack);
-
-			// Get sink and start new iterator
-			if (!updatedTrack.opfsFileId) return;
-			const sink = audioManager.getAudioBufferSink(updatedTrack.opfsFileId);
-			if (!sink) return;
-			trackState.iterator = sink.buffers(audioFileReadStart, trimEnd);
-			trackState.isPlaying = true;
-
-			// Start iterator with updated mapping
-			this.runTrackAudioIterator(
+			cps.iterator = sink.buffers(audioFileReadStart, clipTrimEndSec);
+			this.runClipAudioIterator(
 				updatedTrack,
-				trackState,
-				trackStartTime,
-				trimStart,
+				clip,
+				cps,
+				clipStartSec,
+				clipTrimStartSec,
 			);
-		} catch (e) {
-			console.error("Failed to reschedule track", updatedTrack.id, e);
 		}
 	}
 
-	/**
-	 * Get current playback time
-	 */
 	getCurrentTime(): number {
 		return this.getPlaybackTime();
 	}
 
-	/**
-	 * Check if currently playing
-	 */
 	getIsPlaying(): boolean {
 		return this.isPlaying;
 	}
 
-	/**
-	 * Start time update loop
-	 */
 	private startTimeUpdateLoop(): void {
 		const updateTime = () => {
 			if (!this.isPlaying) return;
-
 			const currentTime = this.getPlaybackTime();
-
-			if (this.options.onTimeUpdate) {
-				this.options.onTimeUpdate(currentTime);
-			}
-
+			this.options.onTimeUpdate?.(currentTime);
 			this.animationFrameId = requestAnimationFrame(updateTime);
 		};
-
 		updateTime();
 	}
 
-	/**
-	 * Stop time update loop
-	 */
 	private stopTimeUpdateLoop(): void {
 		if (this.animationFrameId) {
 			cancelAnimationFrame(this.animationFrameId);
@@ -498,9 +466,6 @@ export class PlaybackEngine {
 		}
 	}
 
-	/**
-	 * Update track volume in real-time
-	 */
 	updateTrackVolume(trackId: string, volume: number): void {
 		const trackState = this.tracks.get(trackId);
 		if (trackState?.gainNode) {
@@ -508,9 +473,6 @@ export class PlaybackEngine {
 		}
 	}
 
-	/**
-	 * Update track mute state
-	 */
 	updateTrackMute(trackId: string, muted: boolean): void {
 		const trackState = this.tracks.get(trackId);
 		if (trackState?.gainNode) {
@@ -518,22 +480,15 @@ export class PlaybackEngine {
 		}
 	}
 
-	/**
-	 * Update master volume
-	 */
 	updateMasterVolume(volume: number): void {
 		if (this.masterGainNode) {
 			this.masterGainNode.gain.value = volume / 100;
 		}
 	}
 
-	/**
-	 * Clean up all resources
-	 */
 	cleanup(): void {
 		this.stop();
 		this.tracks.clear();
-
 		if (this.audioContext) {
 			this.audioContext.close();
 			this.audioContext = null;
