@@ -1,8 +1,16 @@
+<<<<<<< HEAD:app/page.tsx
 import Image from "next/image";
+=======
+import { Music2, Wrench, Zap } from "lucide-react";
+import dynamic from "next/dynamic";
+>>>>>>> refs/remotes/origin/feat/agent:app/(marketing)/page.tsx
 import Link from "next/link";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+
+const ThemeToggleGroup = dynamic(() =>
+	import("@/components/theme-toggle").then((mod) => mod.ThemeToggleGroup),
+);
 
 export default function Home() {
 	return (
@@ -38,7 +46,6 @@ export default function Home() {
 					</div>
 				</div>
 				<div className="flex items-center gap-3">
-					<ThemeToggle />
 					<Button
 						asChild
 						size="sm"
@@ -95,6 +102,7 @@ export default function Home() {
 						<h2 className="text-3xl md:text-4xl font-bold tracking-tight">Everything you need to create</h2>
 						<p className="text-muted-foreground max-w-2xl mx-auto">Clean tools, predictable results, zero friction.</p>
 					</div>
+<<<<<<< HEAD:app/page.tsx
 					<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 						{/* WAV0 AI */}
 						<div className="group rounded-2xl border p-6 bg-card/50 hover:bg-card transition-colors">
@@ -163,6 +171,52 @@ export default function Home() {
 									<h3 className="text-lg font-semibold tracking-tight">Version Control</h3>
 									<p className="text-sm text-muted-foreground">Branch, compare, and revert your generations.</p>
 								</div>
+=======
+
+					<div className="grid md:grid-cols-3 gap-6 md:gap-8">
+						<div className="rounded-lg border bg-card p-6 text-left">
+							<div className="size-12 bg-primary/10 rounded-lg flex items-center justify-center">
+								<Zap className="size-5 text-primary" aria-hidden />
+							</div>
+							<div className="mt-4 space-y-2">
+								<h3 className="font-mono text-sm uppercase tracking-tight font-semibold">
+									Lightning Fast
+								</h3>
+								<p className="text-sm text-muted-foreground">
+									Generate complete tracks in seconds, not hours. AI that
+									actually keeps up with your creativity.
+								</p>
+							</div>
+						</div>
+
+						<div className="rounded-lg border bg-card p-6 text-left">
+							<div className="size-12 bg-primary/10 rounded-lg flex items-center justify-center">
+								<Music2 className="size-5 text-primary" aria-hidden />
+							</div>
+							<div className="mt-4 space-y-2">
+								<h3 className="font-mono text-sm uppercase tracking-tight font-semibold">
+									Any Genre
+								</h3>
+								<p className="text-sm text-muted-foreground">
+									From trap to ambient, house to jazz. Our AI understands every
+									style and nuance.
+								</p>
+							</div>
+						</div>
+
+						<div className="rounded-lg border bg-card p-6 text-left">
+							<div className="size-12 bg-primary/10 rounded-lg flex items-center justify-center">
+								<Wrench className="size-5 text-primary" aria-hidden />
+							</div>
+							<div className="mt-4 space-y-2">
+								<h3 className="font-mono text-sm uppercase tracking-tight font-semibold">
+									Producer Grade
+								</h3>
+								<p className="text-sm text-muted-foreground">
+									Professional quality output ready for your DAW. No
+									post-processing needed.
+								</p>
+>>>>>>> refs/remotes/origin/feat/agent:app/(marketing)/page.tsx
 							</div>
 						</div>
 					</div>
@@ -203,15 +257,27 @@ export default function Home() {
 						</span>
 					</div>
 					<div className="flex items-center gap-4 text-xs text-muted-foreground font-mono uppercase tracking-tight">
-						<Link href="#" className="hover:text-foreground transition-colors">
-							Privacy
-						</Link>
-						<Link href="#" className="hover:text-foreground transition-colors">
-							Terms
-						</Link>
-						<Link href="#" className="hover:text-foreground transition-colors">
-							Support
-						</Link>
+						<div className="flex items-center gap-4 text-xs text-muted-foreground font-mono uppercase tracking-tight">
+							<Link
+								href="#"
+								className="hover:text-foreground transition-colors"
+							>
+								Privacy
+							</Link>
+							<Link
+								href="#"
+								className="hover:text-foreground transition-colors"
+							>
+								Terms
+							</Link>
+							<Link
+								href="#"
+								className="hover:text-foreground transition-colors"
+							>
+								Support
+							</Link>
+						</div>
+						<ThemeToggleGroup />
 					</div>
 				</div>
 			</footer>
