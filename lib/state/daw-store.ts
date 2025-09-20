@@ -135,14 +135,25 @@ export const removeTrackAtom = atom(null, (get, set, trackId: string) => {
 
 export const updateTrackAtom = atom(
 	null,
-	(get, set, trackId: string, updates: Partial<Track>) => {
+	async (get, set, trackId: string, updates: Partial<Track>) => {
 		const tracks = get(tracksAtom);
-		set(
-			tracksAtom,
-			tracks.map((track) =>
-				track.id === trackId ? { ...track, ...updates } : track,
-			),
+		const playback = get(playbackAtom);
+		const updatedTracks = tracks.map((track) =>
+			track.id === trackId ? { ...track, ...updates } : track,
 		);
+		set(tracksAtom, updatedTracks);
+
+		// If playing, reschedule just the edited track for immediate audio correctness
+		if (playback.isPlaying) {
+			const updatedTrack = updatedTracks.find((t) => t.id === trackId);
+			if (updatedTrack) {
+				try {
+					await playbackEngine.rescheduleTrack(updatedTrack);
+				} catch (e) {
+					console.error("Failed to reschedule track after update", trackId, e);
+				}
+			}
+		}
 	},
 );
 
@@ -151,14 +162,14 @@ export const updateTrackAtom = atom(
 export const setCurrentTimeAtom = atom(null, async (get, set, time: number) => {
 	const playback = get(playbackAtom);
 	const tracks = get(tracksAtom);
-	
+
 	// Update the time first
 	set(playbackAtom, { ...playback, currentTime: time });
-	
+
 	if (playback.isPlaying) {
 		// Pause current playback
 		await playbackEngine.pause();
-		
+
 		// Restart playback from new position
 		await playbackEngine.play(tracks, {
 			startTime: time / 1000,
@@ -186,16 +197,24 @@ export const setTrackHeightZoomAtom = atom(null, (_get, set, zoom: number) => {
 // Initialize audio files from OPFS on app startup
 export const initializeAudioFromOPFSAtom = atom(null, async (get, _set) => {
 	const tracks = get(tracksAtom);
-	console.log('Initializing audio from OPFS for', tracks.length, 'tracks');
-	
+	console.log("Initializing audio from OPFS for", tracks.length, "tracks");
+
 	for (const track of tracks) {
 		if (track.opfsFileId && track.audioFileName) {
 			try {
-				console.log('Loading track from OPFS:', track.name, 'opfsFileId:', track.opfsFileId);
-				await audioManager.loadTrackFromOPFS(track.opfsFileId, track.audioFileName);
-				console.log('Successfully loaded track from OPFS:', track.name);
+				console.log(
+					"Loading track from OPFS:",
+					track.name,
+					"opfsFileId:",
+					track.opfsFileId,
+				);
+				await audioManager.loadTrackFromOPFS(
+					track.opfsFileId,
+					track.audioFileName,
+				);
+				console.log("Successfully loaded track from OPFS:", track.name);
 			} catch (error) {
-				console.error('Failed to load track from OPFS:', track.name, error);
+				console.error("Failed to load track from OPFS:", track.name, error);
 			}
 		}
 	}
@@ -208,8 +227,8 @@ export const loadAudioFileAtom = atom(
 		try {
 			// Always generate a unique ID for OPFS storage
 			const opfsFileId = generateTrackId();
-			
-			console.log('loadAudioFileAtom called:', { existingTrackId, opfsFileId });
+
+			console.log("loadAudioFileAtom called:", { existingTrackId, opfsFileId });
 
 			// Load audio file through MediaBunny
 			const audioInfo = await audioManager.loadAudioFile(file, opfsFileId);
@@ -217,8 +236,8 @@ export const loadAudioFileAtom = atom(
 			if (existingTrackId) {
 				// Update existing track with audio data
 				const tracks = get(tracksAtom);
-				const existingTrack = tracks.find(t => t.id === existingTrackId);
-				
+				const existingTrack = tracks.find((t) => t.id === existingTrackId);
+
 				if (existingTrack) {
 					// Update the existing track
 					const updatedTrack: Track = {
@@ -232,8 +251,16 @@ export const loadAudioFileAtom = atom(
 						audioFileType: audioInfo.fileType,
 					};
 
-					console.log('Updated existing track:', updatedTrack.id, 'with opfsFileId:', updatedTrack.opfsFileId);
-					set(tracksAtom, tracks.map(t => t.id === existingTrackId ? updatedTrack : t));
+					console.log(
+						"Updated existing track:",
+						updatedTrack.id,
+						"with opfsFileId:",
+						updatedTrack.opfsFileId,
+					);
+					set(
+						tracksAtom,
+						tracks.map((t) => (t.id === existingTrackId ? updatedTrack : t)),
+					);
 					return updatedTrack;
 				}
 			}
@@ -256,7 +283,12 @@ export const loadAudioFileAtom = atom(
 				audioFileType: audioInfo.fileType,
 			};
 
-			console.log('Created new track:', newTrackId, 'with opfsFileId:', opfsFileId);
+			console.log(
+				"Created new track:",
+				newTrackId,
+				"with opfsFileId:",
+				opfsFileId,
+			);
 
 			// Add track to state
 			const tracks = get(tracksAtom);
@@ -275,24 +307,30 @@ export const togglePlaybackAtom = atom(null, async (get, set) => {
 	const playback = get(playbackAtom);
 	const tracks = get(tracksAtom);
 
-	console.log('Toggle playback called:', { isPlaying: playback.isPlaying, tracksCount: tracks.length });
+	console.log("Toggle playback called:", {
+		isPlaying: playback.isPlaying,
+		tracksCount: tracks.length,
+	});
 
 	if (playback.isPlaying) {
 		// Pause playback
 		await playbackEngine.pause();
 		set(playbackAtom, { ...playback, isPlaying: false });
-		console.log('Playback paused');
+		console.log("Playback paused");
 	} else {
 		// Start/resume playback from current position
 		const currentTime = playback.currentTime / 1000; // Convert to seconds
-		
-		console.log('Starting playback with tracks:', tracks.map(t => ({ 
-			id: t.id, 
-			name: t.name, 
-			hasOpfsFile: !!t.opfsFileId,
-			duration: t.duration,
-			muted: t.muted 
-		})));
+
+		console.log(
+			"Starting playback with tracks:",
+			tracks.map((t) => ({
+				id: t.id,
+				name: t.name,
+				hasOpfsFile: !!t.opfsFileId,
+				duration: t.duration,
+				muted: t.muted,
+			})),
+		);
 
 		// Initialize engine with current tracks
 		await playbackEngine.initializeWithTracks(tracks);
@@ -307,12 +345,12 @@ export const togglePlaybackAtom = atom(null, async (get, set) => {
 			onPlaybackEnd: () => {
 				const endPlayback = get(playbackAtom);
 				set(playbackAtom, { ...endPlayback, isPlaying: false });
-				console.log('Playback ended');
+				console.log("Playback ended");
 			},
 		});
 
 		set(playbackAtom, { ...playback, isPlaying: true });
-		console.log('Playback started');
+		console.log("Playback started");
 	}
 });
 
