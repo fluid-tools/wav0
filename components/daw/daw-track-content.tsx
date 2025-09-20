@@ -4,10 +4,10 @@ import { useAtom } from "jotai";
 import { useEffect, useRef, useState } from "react";
 import {
 	DAW_PIXELS_PER_SECOND_AT_ZOOM_1,
-	DAW_ROW_HEIGHT,
 } from "@/lib/constants";
 import { DAW_HEIGHTS } from "@/lib/constants/daw-design";
 import {
+	loadAudioFileAtom,
 	projectEndPositionAtom,
 	selectedTrackIdAtom,
 	timelineAtom,
@@ -21,6 +21,7 @@ export function DAWTrackContent() {
 	const [tracks] = useAtom(tracksAtom);
 	const [selectedTrackId, setSelectedTrackId] = useAtom(selectedTrackIdAtom);
 	const [, updateTrack] = useAtom(updateTrackAtom);
+	const [, loadAudioFile] = useAtom(loadAudioFileAtom);
 	const [timeline] = useAtom(timelineAtom);
 	const [trackHeightZoom] = useAtom(trackHeightZoomAtom);
 	const [projectEndPosition] = useAtom(projectEndPositionAtom);
@@ -32,11 +33,13 @@ export function DAWTrackContent() {
 	} | null>(null);
 
 	const containerRef = useRef<HTMLDivElement>(null);
+	const [dragOverTrackId, setDragOverTrackId] = useState<string | null>(null);
 
 	const pixelsPerMs = (DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * timeline.zoom) / 1000; // px/ms
 
 	const handleTrackDrop = async (trackId: string, e: React.DragEvent) => {
 		e.preventDefault();
+		setDragOverTrackId(null);
 
 		const files = Array.from(e.dataTransfer.files).filter((file) =>
 			file.type.startsWith("audio/"),
@@ -45,33 +48,24 @@ export function DAWTrackContent() {
 		if (files.length === 0) return;
 
 		const file = files[0];
-		const arrayBuffer = await file.arrayBuffer();
 
 		// Calculate drop position
 		const rect = e.currentTarget.getBoundingClientRect();
 		const x = e.clientX - rect.left;
 		const startTime = x / pixelsPerMs;
 
-		// Create a basic audio context to get duration
-		const audioContext = new AudioContext();
 		try {
-			const audioBuffer = await audioContext.decodeAudioData(
-				arrayBuffer.slice(0),
-			);
-			const duration = audioBuffer.duration * 1000; // Convert to ms
-
+			// Use MediaBunny integration to load audio file into existing track
+			const updatedTrack = await loadAudioFile(file, trackId);
+			
+			// Update the track position based on drop location
 			updateTrack(trackId, {
-				audioBuffer: arrayBuffer,
-				duration,
 				startTime,
-				trimStart: 0,
-				trimEnd: duration,
-				name: file.name.replace(/\.[^/.]+$/, ""), // Remove extension
 			});
+			
+			console.log('Audio file loaded successfully into track:', updatedTrack.name);
 		} catch (error) {
 			console.error("Error loading audio file:", error);
-		} finally {
-			audioContext.close();
 		}
 	};
 
@@ -154,17 +148,31 @@ export function DAWTrackContent() {
 						{/* Track Drop Zone */}
 						<button
 							type="button"
-							className="absolute inset-0 w-full h-full bg-transparent border-none p-0 cursor-default"
+							className={`absolute inset-0 w-full h-full border-none p-0 cursor-default transition-colors ${
+								dragOverTrackId === track.id 
+									? "bg-primary/10 border-2 border-primary border-dashed" 
+									: "bg-transparent"
+							}`}
 							onDrop={(e) => handleTrackDrop(track.id, e)}
 							onDragOver={(e) => e.preventDefault()}
+							onDragEnter={() => setDragOverTrackId(track.id)}
+							onDragLeave={(e) => {
+								// Only clear if leaving the entire track area
+								const rect = e.currentTarget.getBoundingClientRect();
+								const x = e.clientX;
+								const y = e.clientY;
+								if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+									setDragOverTrackId(null);
+								}
+							}}
 							onClick={() => setSelectedTrackId(track.id)}
 							style={{ padding: '12px' }}
 							aria-label={`Track ${track.name} drop zone`}
 						>
 							{/* Track Audio Clip */}
 							{track.duration > 0 && (
-								<button
-									type="button"
+								// biome-ignore lint/a11y/useSemanticElements: Avoiding nested button hydration error
+								<div
 									className={`absolute top-0 bottom-0 rounded-md border-2 transition-all cursor-pointer select-none ${
 										selectedTrackId === track.id
 											? "border-primary bg-primary/20"
@@ -177,24 +185,35 @@ export function DAWTrackContent() {
 										borderColor: track.color,
 									}}
 									onClick={() => setSelectedTrackId(track.id)}
+									role="button"
+									tabIndex={0}
+									onKeyDown={(e) => {
+										if (e.key === 'Enter' || e.key === ' ') {
+											setSelectedTrackId(track.id);
+										}
+									}}
 									aria-label={`Select audio clip: ${track.name}`}
 								>
 									{/* Resize Handles */}
-									<button
-										className="absolute left-0 top-0 bottom-0 w-2 cursor-w-resize bg-primary/50 opacity-0 hover:opacity-100 border-none p-0"
+									{/* biome-ignore lint/a11y/useSemanticElements: Avoiding nested button hydration error */}
+									<div
+										className="absolute left-0 top-0 bottom-0 w-2 cursor-w-resize bg-primary/50 opacity-0 hover:opacity-100"
 										onMouseDown={(e) => handleResizeStart(track.id, "start", e)}
-										type="button"
+										role="button"
+										tabIndex={0}
 										aria-label="Resize track start"
 									/>
-									<button
-										className="absolute right-0 top-0 bottom-0 w-2 cursor-e-resize bg-primary/50 opacity-0 hover:opacity-100 border-none p-0"
+									{/* biome-ignore lint/a11y/useSemanticElements: Avoiding nested button hydration error */}
+									<div
+										className="absolute right-0 top-0 bottom-0 w-2 cursor-e-resize bg-primary/50 opacity-0 hover:opacity-100"
 										onMouseDown={(e) => handleResizeStart(track.id, "end", e)}
-										type="button"
+										role="button"
+										tabIndex={0}
 										aria-label="Resize track end"
 									/>
 
 								{/* Track Label */}
-								<div className="absolute inset-2 flex flex-col justify-center">
+								<div className="absolute inset-2 flex flex-col justify-center pointer-events-none">
 									<div className="text-xs font-medium truncate text-left">
 										{track.name}
 									</div>
@@ -204,8 +223,8 @@ export function DAWTrackContent() {
 								</div>
 
 									{/* Waveform placeholder */}
-									<div className="absolute bottom-1 left-2 right-2 h-4 bg-current opacity-20 rounded-sm" />
-								</button>
+									<div className="absolute bottom-1 left-2 right-2 h-4 bg-current opacity-20 rounded-sm pointer-events-none" />
+								</div>
 							)}
 
 							{/* Drop Zone Indicator - Only show when no audio */}

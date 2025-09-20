@@ -57,6 +57,7 @@
 		"idb-keyval": "^6.2.2",
 		"jotai": "^2.14.0",
 		"lucide-react": "^0.544.0",
+		"mediabunny": "^1.17.3",
 		"motion": "^12.23.14",
 		"nanoid": "^5.1.5",
 		"next": "15.5.3",
