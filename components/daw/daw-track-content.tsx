@@ -8,30 +8,41 @@ import {
 	loadAudioFileAtom,
 	projectEndPositionAtom,
 	selectedTrackIdAtom,
+	selectedClipIdAtom,
+	activeToolAtom,
 	timelineAtom,
 	trackHeightZoomAtom,
 	tracksAtom,
 	updateTrackAtom,
+	updateClipAtom,
 } from "@/lib/state/daw-store";
 import { formatDuration } from "@/lib/storage/opfs";
 
 export function DAWTrackContent() {
 	const [tracks] = useAtom(tracksAtom);
 	const [selectedTrackId, setSelectedTrackId] = useAtom(selectedTrackIdAtom);
+	const [selectedClipId, setSelectedClipId] = useAtom(selectedClipIdAtom);
+	const [activeTool] = useAtom(activeToolAtom);
 	const [, updateTrack] = useAtom(updateTrackAtom);
+	const [, updateClip] = useAtom(updateClipAtom);
 	const [, loadAudioFile] = useAtom(loadAudioFileAtom);
 	const [timeline] = useAtom(timelineAtom);
 	const [trackHeightZoom] = useAtom(trackHeightZoomAtom);
 	const [projectEndPosition] = useAtom(projectEndPositionAtom);
-	const [resizing, setResizing] = useState<{
+
+	const [resizingClip, setResizingClip] = useState<{
 		trackId: string;
+		clipId: string;
 		type: "start" | "end";
 		startX: number;
-		startValue: number;
+		startTrimStart: number;
+		startTrimEnd: number;
+		startClipStartTime: number;
 	} | null>(null);
 
-	const [dragging, setDragging] = useState<{
+	const [draggingClip, setDraggingClip] = useState<{
 		trackId: string;
+		clipId: string;
 		startX: number;
 		startTime: number;
 	} | null>(null);
@@ -59,96 +70,66 @@ export function DAWTrackContent() {
 		const startTime = x / pixelsPerMs;
 
 		try {
-			// Use MediaBunny integration to load audio file into existing track at drop time
-			const updatedTrack = await loadAudioFile(file, trackId, {
-				startTimeMs: startTime,
-			});
-			console.log(
-				"Audio file loaded successfully into track:",
-				updatedTrack.name,
-			);
+			await loadAudioFile(file, trackId, { startTimeMs: startTime });
 		} catch (error) {
 			console.error("Error loading audio file:", error);
 		}
 	};
 
-	const handleResizeStart = (
-		trackId: string,
-		type: "start" | "end",
-		e: React.MouseEvent,
-	) => {
-		e.preventDefault();
-		e.stopPropagation();
-
-		const track = tracks.find((t) => t.id === trackId);
-		if (!track) return;
-
-		setResizing({
-			trackId,
-			type,
-			startX: e.clientX,
-			startValue: type === "start" ? track.trimStart : track.trimEnd,
-		});
-	};
-
-	const handleClipDragStart = (trackId: string, e: React.MouseEvent) => {
-		e.preventDefault();
-		e.stopPropagation();
-
-		const track = tracks.find((t) => t.id === trackId);
-		if (!track) return;
-
-		setDragging({
-			trackId,
-			startX: e.clientX,
-			startTime: track.startTime,
-		});
-	};
-
 	// Attach document-level pointer listeners while resizing or dragging
 	useEffect(() => {
-		if (!resizing && !dragging) return;
+		if (!resizingClip && !draggingClip) return;
 
 		const onMove = (e: MouseEvent) => {
-			if (resizing) {
-				const deltaX = e.clientX - resizing.startX;
+			if (resizingClip) {
+				const deltaX = e.clientX - resizingClip.startX;
 				const deltaTime = deltaX / pixelsPerMs;
-
-				const track = tracks.find((t) => t.id === resizing.trackId);
-				if (!track) return;
-
-				if (resizing.type === "start") {
+				if (resizingClip.type === "start") {
+					// Left trim: move trimStart forward, and shift clip.startTime by same delta
 					const newTrimStart = Math.max(
 						0,
-						Math.min(resizing.startValue + deltaTime, track.trimEnd - 50), // 50ms minimum
+						Math.min(
+							resizingClip.startTrimStart + deltaTime,
+							resizingClip.startTrimEnd - 50,
+						),
 					);
-					// When trimming from the start, move the clip right so the right edge stays visually stable
-					const delta = newTrimStart - track.trimStart;
-					const newStartTime = Math.max(0, track.startTime + delta);
-					updateTrack(resizing.trackId, {
+					const trimDelta = newTrimStart - resizingClip.startTrimStart;
+					const newClipStartTime = Math.max(
+						0,
+						resizingClip.startClipStartTime + trimDelta,
+					);
+					updateClip(resizingClip.trackId, resizingClip.clipId, {
 						trimStart: newTrimStart,
-						startTime: newStartTime,
+						startTime: newClipStartTime,
 					});
 				} else {
-					const newTrimEnd = Math.min(
-						track.duration,
-						Math.max(resizing.startValue + deltaTime, track.trimStart + 50), // 50ms minimum
+					// Right trim: adjust trimEnd only
+					const newTrimEnd = Math.max(
+						resizingClip.startTrimStart + 50,
+						Math.min(
+							resizingClip.startTrimEnd + deltaTime,
+							Number.MAX_SAFE_INTEGER,
+						),
 					);
-					updateTrack(resizing.trackId, { trimEnd: newTrimEnd });
+					updateClip(resizingClip.trackId, resizingClip.clipId, {
+						trimEnd: newTrimEnd,
+					});
 				}
 			}
 
-			if (dragging) {
-				const deltaX = e.clientX - dragging.startX;
+			if (draggingClip) {
+				const deltaX = e.clientX - draggingClip.startX;
 				const deltaTime = deltaX / pixelsPerMs;
-				const newStartTime = Math.max(0, dragging.startTime + deltaTime);
-				updateTrack(dragging.trackId, { startTime: newStartTime });
+				const newStartTime = Math.max(0, draggingClip.startTime + deltaTime);
+				updateClip(draggingClip.trackId, draggingClip.clipId, {
+					startTime: newStartTime,
+				});
 			}
 		};
 
 		const onUp = () => {
-			setResizing(null);
-			setDragging(null);
+			setResizingClip(null);
+			setDraggingClip(null);
 		};
 
 		window.addEventListener("mousemove", onMove);
@@ -157,18 +138,16 @@ export function DAWTrackContent() {
 			window.removeEventListener("mousemove", onMove);
 			window.removeEventListener("mouseup", onUp);
 		};
-	}, [resizing, dragging, pixelsPerMs, tracks, updateTrack]);
+	}, [resizingClip, draggingClip, pixelsPerMs, updateClip]);
 
 	return (
 		<div ref={containerRef} className="relative w-full h-full">
 			{tracks.map((track, index) => {
-				// Calculate track position using global height
+				// Track row layout
 				const trackHeight = Math.round(DAW_HEIGHTS.TRACK_ROW * trackHeightZoom);
 				const trackY = index * trackHeight;
-				const trackWidth = (track.trimEnd - track.trimStart) * pixelsPerMs;
-				const trackX = track.startTime * pixelsPerMs;
 
-				// Compute clips for rendering (fallback to legacy single-clip)
+				// Fallback legacy clip if no clips array yet
 				const clips =
 					track.clips && track.clips.length > 0
 						? track.clips
@@ -212,7 +191,6 @@ export function DAWTrackContent() {
 							onDragOver={(e) => e.preventDefault()}
 							onDragEnter={() => setDragOverTrackId(track.id)}
 							onDragLeave={(e) => {
-								// Only clear if leaving the entire track area
 								const rect = e.currentTarget.getBoundingClientRect();
 								const x = e.clientX;
 								const y = e.clientY;
@@ -229,87 +207,115 @@ export function DAWTrackContent() {
 							style={{ padding: "12px" }}
 							aria-label={`Track ${track.name} drop zone`}
 						>
-							{/* Track Audio Clip */}
-							{track.duration > 0 && (
-								// biome-ignore lint/a11y/useSemanticElements: Avoiding nested button hydration error
-								<div
-									className={`absolute top-0 bottom-0 rounded-md border-2 transition-all cursor-move select-none ${
-										selectedTrackId === track.id
-											? "border-primary bg-primary/20"
-											: "border-border bg-muted/50 hover:bg-muted/70"
-									} ${track.muted ? "opacity-50" : ""} ${
-										dragging?.trackId === track.id ? "opacity-80" : ""
-									}`}
-									style={{
-										left: trackX,
-										width: Math.max(trackWidth, 20),
-										backgroundColor: `${track.color}20`,
-										borderColor: track.color,
-									}}
-									onClick={() => {
-										if (!dragging) setSelectedTrackId(track.id);
-									}}
-									onMouseDown={(e) => {
-										// Only start drag if clicking on the main body, not resize handles
-										const rect = e.currentTarget.getBoundingClientRect();
-										const x = e.clientX - rect.left;
-										const isNearLeftEdge = x < 8;
-										const isNearRightEdge = x > rect.width - 8;
-
-										if (!isNearLeftEdge && !isNearRightEdge) {
-											handleClipDragStart(track.id, e);
-										} else {
-											setSelectedTrackId(track.id);
-										}
-									}}
-									role="button"
-									tabIndex={0}
-									onKeyDown={(e) => {
-										if (e.key === "Enter" || e.key === " ") {
-											setSelectedTrackId(track.id);
-										}
-									}}
-									aria-label={`Select audio clip: ${track.name}`}
-								>
-									{/* Resize Handles */}
-									{/* biome-ignore lint/a11y/useSemanticElements: Avoiding nested button hydration error */}
+							{/* Render clips */}
+							{clips.map((clip) => {
+								const clipX = clip.startTime * pixelsPerMs;
+								const clipWidth = Math.max(
+									(clip.trimEnd - clip.trimStart) * pixelsPerMs,
+									20,
+								);
+								const isSelected =
+									selectedTrackId === track.id && selectedClipId === clip.id;
+								return (
 									<div
-										className="absolute left-0 top-0 bottom-0 w-2 cursor-w-resize bg-primary/50 opacity-0 hover:opacity-100"
-										onMouseDown={(e) => handleResizeStart(track.id, "start", e)}
+										key={clip.id}
+										className={`absolute top-0 bottom-0 rounded-md border-2 transition-all ${
+											isSelected
+												? "border-primary bg-primary/20"
+												: "border-border bg-muted/50 hover:bg-muted/70"
+										} ${track.muted ? "opacity-50" : ""}`}
+										style={{
+											left: clipX,
+											width: clipWidth,
+											backgroundColor: `${clip.color ?? track.color}20`,
+											borderColor: clip.color ?? track.color,
+										}}
 										role="button"
 										tabIndex={0}
-										aria-label="Resize track start"
-									/>
-									{/* biome-ignore lint/a11y/useSemanticElements: Avoiding nested button hydration error */}
-									<div
-										className="absolute right-0 top-0 bottom-0 w-2 cursor-e-resize bg-primary/50 opacity-0 hover:opacity-100"
-										onMouseDown={(e) => handleResizeStart(track.id, "end", e)}
-										role="button"
-										tabIndex={0}
-										aria-label="Resize track end"
-									/>
+										aria-label={`Select audio clip: ${clip.name}`}
+										onMouseDown={(e) => {
+											// Drag body if click is not near edges
+											const rect = (
+												e.currentTarget as HTMLDivElement
+											).getBoundingClientRect();
+											const localX = e.clientX - rect.left;
+											const nearLeft = localX < 8;
+											const nearRight = localX > rect.width - 8;
+											setSelectedTrackId(track.id);
+											setSelectedClipId(clip.id);
+											if (!nearLeft && !nearRight) {
+												setDraggingClip({
+													trackId: track.id,
+													clipId: clip.id,
+													startX: e.clientX,
+													startTime: clip.startTime,
+												});
+											}
+										}}
+									>
+										{/* Left resize handle */}
+										<div
+											className="absolute left-0 top-0 bottom-0 w-2 cursor-w-resize bg-primary/50 opacity-0 hover:opacity-100"
+											onMouseDown={(e) => {
+												e.stopPropagation();
+												setSelectedTrackId(track.id);
+												setSelectedClipId(clip.id);
+												setResizingClip({
+													trackId: track.id,
+													clipId: clip.id,
+													type: "start",
+													startX: e.clientX,
+													startTrimStart: clip.trimStart,
+													startTrimEnd: clip.trimEnd,
+													startClipStartTime: clip.startTime,
+												});
+											}}
+											role="button"
+											tabIndex={0}
+											aria-label="Resize clip start"
+										/>
+										{/* Right resize handle */}
+										<div
+											className="absolute right-0 top-0 bottom-0 w-2 cursor-e-resize bg-primary/50 opacity-0 hover:opacity-100"
+											onMouseDown={(e) => {
+												e.stopPropagation();
+												setSelectedTrackId(track.id);
+												setSelectedClipId(clip.id);
+												setResizingClip({
+													trackId: track.id,
+													clipId: clip.id,
+													type: "end",
+													startX: e.clientX,
+													startTrimStart: clip.trimStart,
+													startTrimEnd: clip.trimEnd,
+													startClipStartTime: clip.startTime,
+												});
+											}}
+											role="button"
+											tabIndex={0}
+											aria-label="Resize clip end"
+										/>
 
-									{/* Track Label */}
-									<div className="absolute inset-2 flex flex-col justify-center pointer-events-none">
-										<div className="text-xs font-medium truncate text-left">
-											{track.name}
-										</div>
-										<div className="text-xs text-muted-foreground text-left">
-											{formatDuration((track.trimEnd - track.trimStart) / 1000)}
+										{/* Clip label */}
+										<div className="absolute inset-2 flex flex-col justify-center pointer-events-none">
+											<div className="text-xs font-medium truncate text-left">
+												{clip.name}
+											</div>
+											<div className="text-xs text-muted-foreground text-left">
+												{formatDuration((clip.trimEnd - clip.trimStart) / 1000)}
+											</div>
 										</div>
 									</div>
-
-									{/* Waveform placeholder */}
-									<div className="absolute bottom-1 left-2 right-2 h-4 bg-current opacity-20 rounded-sm pointer-events-none" />
-								</div>
-							)}
+								);
+							})}
 
 							{/* Drop Zone Indicator - Only show when no audio */}
-							{track.duration === 0 && (
-								<div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
-									Drop audio file here
-								</div>
-							)}
+							{(!track.clips || track.clips.length === 0) &&
+								track.duration === 0 && (
+									<div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
+										Drop audio file here
+									</div>
+								)}
 						</button>
 					</div>
 				);
@@ -325,10 +331,7 @@ export function DAWTrackContent() {
 			{/* Buffer/dead space overlay */}
 			<div
 				className="absolute top-0 bottom-0 bg-muted/10 pointer-events-none z-30"
-				style={{
-					left: projectEndPosition,
-					right: 0,
-				}}
+				style={{ left: projectEndPosition, right: 0 }}
 			/>
 
 			{/* Grid Lines */}
