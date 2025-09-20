@@ -22,6 +22,7 @@ import {
 	setCurrentTimeAtom,
 	setTimelineZoomAtom,
 	setTrackHeightZoomAtom,
+	stopPlaybackAtom,
 	timelineAtom,
 	togglePlaybackAtom,
 	totalDurationAtom,
@@ -34,16 +35,18 @@ export function DAWControls() {
 	const [timeline] = useAtom(timelineAtom);
 	const [trackHeightZoom] = useAtom(trackHeightZoomAtom);
 	const [, togglePlayback] = useAtom(togglePlaybackAtom);
+	const [, stopPlayback] = useAtom(stopPlaybackAtom);
 	const [, setCurrentTime] = useAtom(setCurrentTimeAtom);
 	const [, setBpm] = useAtom(setBpmAtom);
 	const [, setTimelineZoom] = useAtom(setTimelineZoomAtom);
 	const [, setTrackHeightZoom] = useAtom(setTrackHeightZoomAtom);
 	const [totalDuration] = useAtom(totalDurationAtom);
 
-	const handleStop = () => {
-		setCurrentTime(0);
-		if (playback.isPlaying) {
-			togglePlayback();
+	const handleStop = async () => {
+		try {
+			await stopPlayback();
+		} catch (error) {
+			console.error('Failed to stop playback:', error);
 		}
 	};
 
@@ -85,7 +88,13 @@ export function DAWControls() {
 					<Button
 						variant="default"
 						size="sm"
-						onClick={togglePlayback}
+						onClick={async () => {
+							try {
+								await togglePlayback();
+							} catch (error) {
+								console.error('Failed to toggle playback:', error);
+							}
+						}}
 						style={{ width: DAW_HEIGHTS.BUTTON_LG, height: DAW_HEIGHTS.BUTTON_LG }}
 					>
 						{playback.isPlaying ? (
