@@ -5,38 +5,32 @@ import { audioManager } from "./audio-manager";
 
 export interface PlaybackOptions {
 	startTime?: number;
-	looping?: boolean;
-	onTimeUpdate?: (currentTime: number) => void;
+	onTimeUpdate?: (time: number) => void;
 	onPlaybackEnd?: () => void;
 }
 
-export interface TrackPlaybackState {
-	source: AudioBufferSourceNode | null;
+type TrackPlaybackState = {
+	iterator: AsyncIterator<unknown> | null;
+	audioSources: AudioBufferSourceNode[];
 	gainNode: GainNode | null;
 	isPlaying: boolean;
-	startedAt: number;
-	pausedAt: number;
-	offset: number;
-}
+};
 
 /**
- * PlaybackEngine handles synchronized multi-track audio playback
- * Integrates with DAW timeline and controls
+ * PlaybackEngine based on MediaBunny player implementation pattern
+ * Key insight: Use the global AudioBufferSink instances and proper timing
  */
 export class PlaybackEngine {
 	private static instance: PlaybackEngine;
-
 	private audioContext: AudioContext | null = null;
 	private masterGainNode: GainNode | null = null;
+	private tracks = new Map<string, TrackPlaybackState>();
 	private isPlaying = false;
 	private startTime = 0;
-	private pausedTime = 0;
-	private currentTime = 0;
-	private tracks = new Map<string, TrackPlaybackState>();
-	private animationFrameId: number | null = null;
-
-	// Playback options
+	private playbackTimeAtStart = 0;
 	private options: PlaybackOptions = {};
+	private animationFrameId: number | null = null;
+	private queuedAudioNodes = new Set<AudioBufferSourceNode>();
 
 	private constructor() {}
 
@@ -49,18 +43,22 @@ export class PlaybackEngine {
 
 	private async getAudioContext(): Promise<AudioContext> {
 		if (!this.audioContext) {
-			this.audioContext = new AudioContext();
-
-			// Create master gain node for overall volume control
+			this.audioContext = await audioManager.getAudioContext();
 			this.masterGainNode = this.audioContext.createGain();
 			this.masterGainNode.connect(this.audioContext.destination);
-
-			// Resume context if suspended
-			if (this.audioContext.state === "suspended") {
-				await this.audioContext.resume();
-			}
 		}
 		return this.audioContext;
+	}
+
+	/**
+	 * Get current playback time like MediaBunny player
+	 */
+	private getPlaybackTime(): number {
+		if (this.isPlaying && this.audioContext) {
+			return this.audioContext.currentTime - this.startTime + this.playbackTimeAtStart;
+		} else {
+			return this.playbackTimeAtStart;
+		}
 	}
 
 	/**
@@ -76,18 +74,16 @@ export class PlaybackEngine {
 
 		// Initialize each track that has audio
 		for (const track of tracks) {
-			if (track.opfsFileId) {
+			if (track.opfsFileId && audioManager.isTrackLoaded(track.opfsFileId)) {
 				console.log('Initializing track:', track.name, 'with opfsFileId:', track.opfsFileId);
 				this.tracks.set(track.id, {
-					source: null,
+					iterator: null,
+					audioSources: [],
 					gainNode: null,
 					isPlaying: false,
-					startedAt: 0,
-					pausedAt: 0,
-					offset: 0,
 				});
 			} else {
-				console.log('Skipping track without audio:', track.name);
+				console.log('Skipping track without loaded audio:', track.name);
 			}
 		}
 
@@ -95,124 +91,106 @@ export class PlaybackEngine {
 	}
 
 	/**
-	 * Start playback from specified time
+	 * Start playback from specified time - based on MediaBunny player pattern
 	 */
 	async play(tracks: Track[], options: PlaybackOptions = {}): Promise<void> {
 		this.options = options;
 
 		if (this.isPlaying) {
-			await this.stop();
+			await this.pause();
 		}
 
 		await this.getAudioContext();
 		if (!this.audioContext || !this.masterGainNode) {
 			throw new Error("AudioContext not initialized");
 		}
-		const audioContext = this.audioContext;
-		const masterGain = this.masterGainNode;
 
-		// Calculate start time
-		const startOffset = options.startTime || this.pausedTime;
-		this.startTime = audioContext.currentTime;
-		this.pausedTime = 0;
+		// Set playback time like MediaBunny player
+		this.playbackTimeAtStart = options.startTime || 0;
+		this.startTime = this.audioContext.currentTime;
 		this.isPlaying = true;
+
+		console.log('Starting playback from time:', this.playbackTimeAtStart);
 
 		// Start each track
 		for (const track of tracks) {
-			console.log('Processing track for playback:', {
-				name: track.name,
-				hasOpfsFileId: !!track.opfsFileId,
-				muted: track.muted,
-				volume: track.volume
-			});
-
 			if (!track.opfsFileId || track.muted) {
-				console.log('Skipping track:', track.name, 'opfsFileId:', !!track.opfsFileId, 'muted:', track.muted);
 				continue;
 			}
 
 			const trackState = this.tracks.get(track.id);
 			if (!trackState) {
-				console.log('No track state found for:', track.name);
 				continue;
 			}
 
 			try {
-				// Get audio buffer for the track
-				console.log('Getting audio buffer for track:', track.name, 'opfsFileId:', track.opfsFileId);
-				const audioBuffer = await audioManager.getAudioBuffer(track.opfsFileId);
-				if (!audioBuffer) {
-					console.log('No audio buffer returned for track:', track.name);
+				// Get the AudioBufferSink from AudioManager
+				const sink = audioManager.getAudioBufferSink(track.opfsFileId);
+				if (!sink) {
+					console.log('No AudioBufferSink found for track:', track.name);
 					continue;
 				}
+
+				// Create gain node for this track
+				const gainNode = this.audioContext.createGain();
 				
-				console.log('Audio buffer loaded for track:', track.name, 'duration:', audioBuffer.duration, 'channels:', audioBuffer.numberOfChannels);
-
-				// Create audio source and gain for this track
-				const source = audioContext.createBufferSource();
-				const gainNode = audioContext.createGain();
-
-				source.buffer = audioBuffer;
-
-				// Set track volume (0-100 to 0-1, with additional scaling if soloed)
-				const hasAnyTracksInSolo = tracks.some((t) => t.soloed);
+				// Set track volume (handle solo logic)
+				const hasAnyTracksInSolo = tracks.some(t => t.soloed);
 				let volume = track.volume / 100;
-
+				
 				if (hasAnyTracksInSolo) {
-					volume = track.soloed ? volume : 0; // Mute non-soloed tracks when any track is soloed
+					volume = track.soloed ? volume : 0;
 				}
-
+				
 				gainNode.gain.value = volume;
+				gainNode.connect(this.masterGainNode);
+				trackState.gainNode = gainNode;
 
-				// Connect audio graph: source -> track gain -> master gain -> destination
-				source.connect(gainNode);
-				gainNode.connect(masterGain);
-
-				// Calculate timing based on track position in timeline
-				const trackStartTime = track.startTime / 1000; // Convert ms to seconds
-				const trackTrimStart = track.trimStart / 1000;
-				const audioOffset =
-					Math.max(0, startOffset - trackStartTime) + trackTrimStart;
-				const playStartTime = Math.max(
-					this.startTime,
-					this.startTime + (trackStartTime - startOffset),
-				);
-
-				// Only play if the track should be audible at the start time
-				if (startOffset < trackStartTime + track.duration / 1000) {
-					const playDuration = (track.trimEnd - track.trimStart) / 1000;
-					
-					console.log('Starting audio source for track:', track.name, {
-						playStartTime,
-						audioOffset,
-						playDuration,
-						startOffset,
-						trackStartTime
+				// Track timing calculations
+				const trackStartTime = track.startTime / 1000; // Track position in timeline (seconds)
+				const trimStart = track.trimStart / 1000; // Start of trimmed section in original file (seconds)
+				const trimEnd = track.trimEnd / 1000; // End of trimmed section in original file (seconds)
+				
+				// Calculate track's end time in timeline
+				const trackEndTime = trackStartTime + (trimEnd - trimStart);
+				
+				// Skip if playback time is outside track's timeline range
+				if (this.playbackTimeAtStart < trackStartTime || this.playbackTimeAtStart >= trackEndTime) {
+					console.log('Track not in playback range:', track.name, {
+						playbackTime: this.playbackTimeAtStart,
+						trackStart: trackStartTime,
+						trackEnd: trackEndTime
 					});
-					
-					source.start(playStartTime, audioOffset, playDuration);
-
-					// Store track state
-					trackState.source = source;
-					trackState.gainNode = gainNode;
-					trackState.isPlaying = true;
-					trackState.startedAt = playStartTime;
-					trackState.offset = audioOffset;
-
-					console.log('Audio source started successfully for track:', track.name);
-
-					// Handle track end
-					source.onended = () => {
-						console.log('Audio source ended for track:', track.name);
-						if (trackState.source === source) {
-							trackState.isPlaying = false;
-							trackState.source = null;
-							trackState.gainNode = null;
-						}
-					};
-				} else {
-					console.log('Track not audible at start time:', track.name, 'startOffset:', startOffset, 'trackEnd:', trackStartTime + track.duration / 1000);
+					continue;
 				}
+
+				// Calculate where to start reading in the original audio file
+				const timeIntoTrack = this.playbackTimeAtStart - trackStartTime; // How far into the track we are
+				const audioFileReadStart = trimStart + timeIntoTrack; // Corresponding position in original file
+				
+				// Don't read past the trim end
+				if (audioFileReadStart >= trimEnd) {
+					console.log('Audio read start past trim end:', track.name);
+					continue;
+				}
+
+				console.log('Starting MediaBunny iteration for track:', track.name, {
+					trackStartTime,
+					trimStart,
+					trimEnd,
+					timeIntoTrack,
+					audioFileReadStart,
+					playbackTime: this.playbackTimeAtStart
+				});
+
+				// MediaBunny: buffers(start, end) reads from original file timestamps
+				const iterator = sink.buffers(audioFileReadStart, trimEnd);
+				trackState.iterator = iterator;
+				trackState.isPlaying = true;
+
+				// Start the audio iterator for this track
+				this.runTrackAudioIterator(track, trackState, trackStartTime, trimStart);
+
 			} catch (error) {
 				console.error(`Failed to start playback for track ${track.id}:`, error);
 			}
@@ -223,33 +201,118 @@ export class PlaybackEngine {
 	}
 
 	/**
-	 * Pause playback
+	 * Run audio iterator for a track - properly map original file timestamps to timeline
+	 */
+	private async runTrackAudioIterator(
+		track: Track, 
+		trackState: TrackPlaybackState,
+		trackStartTime: number,
+		trimStart: number
+	): Promise<void> {
+		if (!trackState.iterator || !trackState.gainNode || !this.audioContext) return;
+
+		try {
+			for await (const { buffer, timestamp } of trackState.iterator) {
+				if (!this.isPlaying || !trackState.isPlaying) {
+					break;
+				}
+
+				console.log('Playing audio buffer for track:', track.name, {
+					originalFileTimestamp: timestamp,
+					duration: buffer.duration,
+					trimStart,
+					trackStartTime
+				});
+
+				// Create audio source
+				const node = this.audioContext.createBufferSource();
+				node.buffer = buffer;
+				node.connect(trackState.gainNode);
+
+				// Map original file timestamp to timeline position
+				// timestamp is from the original file, we need to convert to timeline
+				const timeInTrimmedAudio = timestamp - trimStart; // How far into the trimmed section
+				const timelinePosition = trackStartTime + timeInTrimmedAudio; // Where this should play in timeline
+				const audioContextStartTime = this.startTime + timelinePosition - this.playbackTimeAtStart;
+
+				console.log('Audio timing calculation:', {
+					originalFileTimestamp: timestamp,
+					timeInTrimmedAudio,
+					timelinePosition,
+					audioContextStartTime,
+					currentAudioTime: this.audioContext.currentTime
+				});
+
+				if (audioContextStartTime >= this.audioContext.currentTime) {
+					node.start(audioContextStartTime);
+				} else {
+					// We're late, start immediately with offset
+					const offset = this.audioContext.currentTime - audioContextStartTime;
+					if (offset < buffer.duration) {
+						node.start(this.audioContext.currentTime, offset);
+					} else {
+						// Skip this buffer - we're too late
+						console.log('Skipping buffer - too late:', offset, 'vs', buffer.duration);
+						continue;
+					}
+				}
+
+				trackState.audioSources.push(node);
+				this.queuedAudioNodes.add(node);
+
+				node.onended = () => {
+					const index = trackState.audioSources.indexOf(node);
+					if (index > -1) {
+						trackState.audioSources.splice(index, 1);
+					}
+					this.queuedAudioNodes.delete(node);
+				};
+
+				// Buffer ahead control based on timeline position
+				const currentTimelineTime = this.getPlaybackTime();
+				if (timelinePosition - currentTimelineTime >= 1) {
+					await new Promise(resolve => {
+						const id = setInterval(() => {
+							if (timelinePosition - this.getPlaybackTime() < 1 || !this.isPlaying) {
+								clearInterval(id);
+								resolve(undefined);
+							}
+						}, 100);
+					});
+				}
+			}
+		} catch (iteratorError) {
+			console.error('Error in track audio iterator:', track.name, iteratorError);
+		}
+	}
+
+	/**
+	 * Pause playback - like MediaBunny player
 	 */
 	async pause(): Promise<void> {
-		if (!this.isPlaying) return;
-
+		this.playbackTimeAtStart = this.getPlaybackTime();
 		this.isPlaying = false;
-		this.pausedTime = this.getCurrentTime();
 
-		// Stop all tracks
+		// Stop all iterators
 		for (const trackState of this.tracks.values()) {
-			if (trackState.source) {
-				try {
-					trackState.source.stop();
-				} catch {
-					// Source might already be stopped
-				}
-				trackState.source = null;
-				trackState.gainNode = null;
-				trackState.isPlaying = false;
+			trackState.isPlaying = false;
+			if (trackState.iterator) {
+				await trackState.iterator.return?.(undefined);
+				trackState.iterator = null;
 			}
 		}
 
-		// Stop time update loop
-		if (this.animationFrameId) {
-			cancelAnimationFrame(this.animationFrameId);
-			this.animationFrameId = null;
+		// Stop all audio sources
+		for (const node of this.queuedAudioNodes) {
+			try {
+				node.stop();
+			} catch (error) {
+				// Node may already be stopped
+			}
 		}
+		this.queuedAudioNodes.clear();
+
+		this.stopTimeUpdateLoop();
 	}
 
 	/**
@@ -257,8 +320,7 @@ export class PlaybackEngine {
 	 */
 	async stop(): Promise<void> {
 		await this.pause();
-		this.pausedTime = 0;
-		this.currentTime = 0;
+		this.playbackTimeAtStart = 0;
 
 		if (this.options.onTimeUpdate) {
 			this.options.onTimeUpdate(0);
@@ -266,56 +328,25 @@ export class PlaybackEngine {
 	}
 
 	/**
-	 * Seek to specific time
+	 * Seek to specific time - restart playback from new position
 	 */
 	async seek(time: number): Promise<void> {
 		const wasPlaying = this.isPlaying;
-
+		
 		if (wasPlaying) {
 			await this.pause();
 		}
 
-		this.pausedTime = time;
-		this.currentTime = time;
+		this.playbackTimeAtStart = time;
 
 		if (this.options.onTimeUpdate) {
 			this.options.onTimeUpdate(time);
 		}
 
-		// If was playing, resume from new position
+		// If was playing, restart from new position
 		if (wasPlaying) {
-			// We need the current tracks to restart playback
-			// This requires the calling code to pass tracks again
-			// For now, we'll just update the time
-		}
-	}
-
-	/**
-	 * Update track volume in real-time
-	 */
-	updateTrackVolume(trackId: string, volume: number): void {
-		const trackState = this.tracks.get(trackId);
-		if (trackState?.gainNode) {
-			trackState.gainNode.gain.value = volume / 100;
-		}
-	}
-
-	/**
-	 * Update track mute state in real-time
-	 */
-	updateTrackMute(trackId: string, muted: boolean): void {
-		const trackState = this.tracks.get(trackId);
-		if (trackState?.gainNode) {
-			trackState.gainNode.gain.value = muted ? 0 : 1; // Simple mute implementation
-		}
-	}
-
-	/**
-	 * Update master volume
-	 */
-	updateMasterVolume(volume: number): void {
-		if (this.masterGainNode) {
-			this.masterGainNode.gain.value = volume / 100;
+			// We need to restart with the current tracks
+			// For now, just update the time - the calling code should handle restart
 		}
 	}
 
@@ -323,15 +354,7 @@ export class PlaybackEngine {
 	 * Get current playback time
 	 */
 	getCurrentTime(): number {
-		if (!this.isPlaying) {
-			return this.pausedTime;
-		}
-
-		if (!this.audioContext) {
-			return 0;
-		}
-
-		return this.pausedTime + (this.audioContext.currentTime - this.startTime);
+		return this.getPlaybackTime();
 	}
 
 	/**
@@ -348,10 +371,10 @@ export class PlaybackEngine {
 		const updateTime = () => {
 			if (!this.isPlaying) return;
 
-			this.currentTime = this.getCurrentTime();
+			const currentTime = this.getPlaybackTime();
 
 			if (this.options.onTimeUpdate) {
-				this.options.onTimeUpdate(this.currentTime);
+				this.options.onTimeUpdate(currentTime);
 			}
 
 			this.animationFrameId = requestAnimationFrame(updateTime);
@@ -361,20 +384,57 @@ export class PlaybackEngine {
 	}
 
 	/**
-	 * Clean up resources
+	 * Stop time update loop
 	 */
-	async cleanup(): Promise<void> {
-		await this.stop();
+	private stopTimeUpdateLoop(): void {
+		if (this.animationFrameId) {
+			cancelAnimationFrame(this.animationFrameId);
+			this.animationFrameId = null;
+		}
+	}
 
+	/**
+	 * Update track volume in real-time
+	 */
+	updateTrackVolume(trackId: string, volume: number): void {
+		const trackState = this.tracks.get(trackId);
+		if (trackState?.gainNode) {
+			trackState.gainNode.gain.value = volume / 100;
+		}
+	}
+
+	/**
+	 * Update track mute state
+	 */
+	updateTrackMute(trackId: string, muted: boolean): void {
+		const trackState = this.tracks.get(trackId);
+		if (trackState?.gainNode) {
+			trackState.gainNode.gain.value = muted ? 0 : 1;
+		}
+	}
+
+	/**
+	 * Update master volume
+	 */
+	updateMasterVolume(volume: number): void {
+		if (this.masterGainNode) {
+			this.masterGainNode.gain.value = volume / 100;
+		}
+	}
+
+	/**
+	 * Clean up all resources
+	 */
+	cleanup(): void {
+		this.stop();
+		this.tracks.clear();
+		
 		if (this.audioContext) {
-			await this.audioContext.close();
+			this.audioContext.close();
 			this.audioContext = null;
 			this.masterGainNode = null;
 		}
-
-		this.tracks.clear();
 	}
 }
 
-// Export singleton instance
 export const playbackEngine = PlaybackEngine.getInstance();
