@@ -15,7 +15,13 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DAW_BUTTONS, DAW_HEIGHTS, DAW_ICONS, DAW_TEXT } from "@/lib/constants/daw-design";
+// import { DAW_PIXELS_PER_SECOND_AT_ZOOM_1 } from "@/lib/constants";
+import {
+	DAW_BUTTONS,
+	DAW_HEIGHTS,
+	DAW_ICONS,
+	DAW_TEXT,
+} from "@/lib/constants/daw-design";
 import {
 	playbackAtom,
 	setBpmAtom,
@@ -46,7 +52,7 @@ export function DAWControls() {
 		try {
 			await stopPlayback();
 		} catch (error) {
-			console.error('Failed to stop playback:', error);
+			console.error("Failed to stop playback:", error);
 		}
 	};
 
@@ -79,7 +85,10 @@ export function DAWControls() {
 	};
 
 	return (
-		<div className="bg-muted/30 border-b flex items-center justify-between px-4" style={{ height: DAW_HEIGHTS.CONTROLS }}>
+		<div
+			className="bg-muted/30 border-b flex items-center justify-between px-4"
+			style={{ height: DAW_HEIGHTS.CONTROLS }}
+		>
 			<div className="flex items-center gap-3">
 				<div className="flex items-center gap-2">
 					<Button variant="ghost" size="sm">
@@ -92,10 +101,13 @@ export function DAWControls() {
 							try {
 								await togglePlayback();
 							} catch (error) {
-								console.error('Failed to toggle playback:', error);
+								console.error("Failed to toggle playback:", error);
 							}
 						}}
-						style={{ width: DAW_HEIGHTS.BUTTON_LG, height: DAW_HEIGHTS.BUTTON_LG }}
+						style={{
+							width: DAW_HEIGHTS.BUTTON_LG,
+							height: DAW_HEIGHTS.BUTTON_LG,
+						}}
 					>
 						{playback.isPlaying ? (
 							<Pause className={DAW_ICONS.LG} />
@@ -111,7 +123,9 @@ export function DAWControls() {
 					</Button>
 				</div>
 
-				<div className={`flex items-center gap-3 ${DAW_BUTTONS.PANEL} px-3 py-1.5`}>
+				<div
+					className={`flex items-center gap-3 ${DAW_BUTTONS.PANEL} px-3 py-1.5`}
+				>
 					<span className={`${DAW_TEXT.MONO_TIME} min-w-14`}>
 						{formatDuration(playback.currentTime / 1000)}
 					</span>
@@ -146,7 +160,10 @@ export function DAWControls() {
 						size="sm"
 						onClick={handleZoomOut}
 						disabled={timeline.zoom <= 0.25}
-						style={{ height: DAW_HEIGHTS.BUTTON_SM, width: DAW_HEIGHTS.BUTTON_SM }}
+						style={{
+							height: DAW_HEIGHTS.BUTTON_SM,
+							width: DAW_HEIGHTS.BUTTON_SM,
+						}}
 						className="p-0"
 						title="Zoom Out Horizontally"
 					>
@@ -160,7 +177,10 @@ export function DAWControls() {
 						size="sm"
 						onClick={handleZoomIn}
 						disabled={timeline.zoom >= 4}
-						style={{ height: DAW_HEIGHTS.BUTTON_SM, width: DAW_HEIGHTS.BUTTON_SM }}
+						style={{
+							height: DAW_HEIGHTS.BUTTON_SM,
+							width: DAW_HEIGHTS.BUTTON_SM,
+						}}
 						className="p-0"
 						title="Zoom In Horizontally"
 					>
@@ -175,7 +195,10 @@ export function DAWControls() {
 						size="sm"
 						onClick={handleTrackHeightZoomOut}
 						disabled={trackHeightZoom <= 0.6}
-						style={{ height: DAW_HEIGHTS.BUTTON_SM, width: DAW_HEIGHTS.BUTTON_SM }}
+						style={{
+							height: DAW_HEIGHTS.BUTTON_SM,
+							width: DAW_HEIGHTS.BUTTON_SM,
+						}}
 						className="p-0"
 						title="Decrease Track Height"
 					>
@@ -189,7 +212,10 @@ export function DAWControls() {
 						size="sm"
 						onClick={handleTrackHeightZoomIn}
 						disabled={trackHeightZoom >= 2.0}
-						style={{ height: DAW_HEIGHTS.BUTTON_SM, width: DAW_HEIGHTS.BUTTON_SM }}
+						style={{
+							height: DAW_HEIGHTS.BUTTON_SM,
+							width: DAW_HEIGHTS.BUTTON_SM,
+						}}
 						className="p-0"
 						title="Increase Track Height"
 					>

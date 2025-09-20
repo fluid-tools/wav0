@@ -80,56 +80,73 @@ export function DAWTrackContent() {
 	useEffect(() => {
 		if (!resizingClip && !draggingClip) return;
 
+		let raf = 0;
+		let lastX = 0;
+		const schedule = (cb: () => void) => {
+			if (raf) return;
+			raf = requestAnimationFrame(() => {
+				raf = 0;
+				cb();
+			});
+		};
+
 		const onMove = (e: MouseEvent) => {
-			if (resizingClip) {
-				const deltaX = e.clientX - resizingClip.startX;
-				const deltaTime = deltaX / pixelsPerMs;
-				if (resizingClip.type === "start") {
-					// Left trim: move trimStart forward, and shift clip.startTime by same delta
-					const newTrimStart = Math.max(
-						0,
-						Math.min(
-							resizingClip.startTrimStart + deltaTime,
-							resizingClip.startTrimEnd - 50,
-						),
-					);
-					const trimDelta = newTrimStart - resizingClip.startTrimStart;
-					const newClipStartTime = Math.max(
-						0,
-						resizingClip.startClipStartTime + trimDelta,
-					);
-					updateClip(resizingClip.trackId, resizingClip.clipId, {
-						trimStart: newTrimStart,
-						startTime: newClipStartTime,
-					});
-				} else {
-					// Right trim: adjust trimEnd only
-					const newTrimEnd = Math.max(
-						resizingClip.startTrimStart + 50,
-						Math.min(
-							resizingClip.startTrimEnd + deltaTime,
-							Number.MAX_SAFE_INTEGER,
-						),
-					);
-					updateClip(resizingClip.trackId, resizingClip.clipId, {
-						trimEnd: newTrimEnd,
+			lastX = e.clientX;
+			schedule(() => {
+				if (resizingClip) {
+					const deltaX = lastX - resizingClip.startX;
+					const deltaTime = deltaX / pixelsPerMs;
+					if (resizingClip.type === "start") {
+						// Left trim: move trimStart forward, and shift clip.startTime by same delta
+						const newTrimStart = Math.max(
+							0,
+							Math.min(
+								resizingClip.startTrimStart + deltaTime,
+								resizingClip.startTrimEnd - 50,
+							),
+						);
+						const trimDelta = newTrimStart - resizingClip.startTrimStart;
+						const newClipStartTime = Math.max(
+							0,
+							resizingClip.startClipStartTime + trimDelta,
+						);
+						updateClip(resizingClip.trackId, resizingClip.clipId, {
+							trimStart: newTrimStart,
+							startTime: newClipStartTime,
+						});
+					} else {
+						// Right trim: adjust trimEnd only, clamp to source duration
+						const track = tracks.find((t) => t.id === resizingClip.trackId);
+						const clip = track?.clips?.find(
+							(c) => c.id === resizingClip.clipId,
+						);
+						const maxTrimEnd =
+							clip?.sourceDurationMs ?? Number.MAX_SAFE_INTEGER;
+						const newTrimEnd = Math.max(
+							resizingClip.startTrimStart + 50,
+							Math.min(resizingClip.startTrimEnd + deltaTime, maxTrimEnd),
+						);
+						updateClip(resizingClip.trackId, resizingClip.clipId, {
+							trimEnd: newTrimEnd,
+						});
+					}
+				}
+
+				if (draggingClip) {
+					const deltaX = lastX - draggingClip.startX;
+					const deltaTime = deltaX / pixelsPerMs;
+					const newStartTime = Math.max(0, draggingClip.startTime + deltaTime);
+					updateClip(draggingClip.trackId, draggingClip.clipId, {
+						startTime: newStartTime,
 					});
 				}
-			}
-
-			if (draggingClip) {
-				const deltaX = e.clientX - draggingClip.startX;
-				const deltaTime = deltaX / pixelsPerMs;
-				const newStartTime = Math.max(0, draggingClip.startTime + deltaTime);
-				updateClip(draggingClip.trackId, draggingClip.clipId, {
-					startTime: newStartTime,
-				});
-			}
+			});
 		};
 
 		const onUp = () => {
 			setResizingClip(null);
 			setDraggingClip(null);
+			if (raf) cancelAnimationFrame(raf);
 		};
 
 		window.addEventListener("mousemove", onMove);
@@ -137,6 +154,7 @@ export function DAWTrackContent() {
 		return () => {
 			window.removeEventListener("mousemove", onMove);
 			window.removeEventListener("mouseup", onUp);
+			if (raf) cancelAnimationFrame(raf);
 		};
 	}, [resizingClip, draggingClip, pixelsPerMs, updateClip]);
 

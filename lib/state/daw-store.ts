@@ -18,9 +18,15 @@ export type Clip = {
 	// File region in ms
 	trimStart: number;
 	trimEnd: number;
+	// Original source duration in ms (for clamping)
+	sourceDurationMs: number;
 	// Optional fade envelopes (ms)
 	fadeIn?: number;
 	fadeOut?: number;
+	// Loop clip content continuously (seamless). When true, clip repeats.
+	loop?: boolean;
+	// Optional loop end time in ms (timeline absolute). If unset, no visual extension.
+	loopEnd?: number;
 	color?: string;
 };
 
@@ -83,10 +89,10 @@ export const playbackAtom = atom<PlaybackState>({
 });
 
 export const timelineAtom = atom<TimelineState>({
-	zoom: 1,
+	zoom: 0.5, // start wider view by default
 	scrollPosition: 0,
 	snapToGrid: true,
-	gridSize: 1000, // 1 second
+	gridSize: 500, // 0.5s grid for better granularity
 });
 
 export const trackHeightZoomAtom = atom(1.0); // Track height zoom level (1.0 = 100px default)
@@ -203,11 +209,20 @@ export const selectedTrackAtom = atom((get) => {
 
 export const totalDurationAtom = atom((get) => {
 	const tracks = get(tracksAtom);
-	const tracksDuration = Math.max(
-		...tracks.map((track) => track.startTime + track.duration),
-		0,
-	);
-	const minimumDuration = 60 * 1000; // 60 seconds in ms
+	// Compute from clips if present, fallback to legacy fields
+	const perTrackEnds = tracks.map((track) => {
+		if (track.clips && track.clips.length > 0) {
+			return Math.max(
+				...track.clips.map(
+					(c) => c.startTime + Math.max(0, c.trimEnd - c.trimStart),
+				),
+				0,
+			);
+		}
+		return track.startTime + track.duration;
+	});
+	const tracksDuration = Math.max(...perTrackEnds, 0);
+	const minimumDuration = 3 * 60 * 1000; // 3 minutes default canvas
 	return Math.max(tracksDuration, minimumDuration);
 });
 
@@ -378,7 +393,7 @@ export const loadAudioFileAtom = atom(
 				if (existingTrack) {
 					// Update the existing track (legacy fields) AND append a new clip
 					const clipId = crypto.randomUUID();
-					const clip = {
+					const clip: Clip = {
 						id: clipId,
 						name: file.name.replace(/\.[^/.]+$/, ""),
 						opfsFileId,
@@ -387,8 +402,9 @@ export const loadAudioFileAtom = atom(
 						startTime: opts?.startTimeMs ?? existingTrack.startTime,
 						trimStart: 0,
 						trimEnd: audioInfo.duration * 1000,
+						sourceDurationMs: audioInfo.duration * 1000,
 						color: existingTrack.color,
-					} satisfies Clip;
+					};
 
 					const updatedTrack: Track = {
 						...existingTrack,
@@ -399,7 +415,10 @@ export const loadAudioFileAtom = atom(
 						opfsFileId,
 						audioFileName: audioInfo.fileName,
 						audioFileType: audioInfo.fileType,
-						clips: [...(existingTrack.clips ?? []), clip],
+						clips: [
+							...(existingTrack.clips ?? []),
+							{ ...clip, sourceDurationMs: audioInfo.duration * 1000 },
+						],
 					};
 
 					set(
@@ -437,6 +456,7 @@ export const loadAudioFileAtom = atom(
 				startTime: opts?.startTimeMs ?? 0,
 				trimStart: 0,
 				trimEnd: audioInfo.duration * 1000,
+				sourceDurationMs: audioInfo.duration * 1000,
 				color: "#3b82f6",
 			};
 			const newTrack: Track = {

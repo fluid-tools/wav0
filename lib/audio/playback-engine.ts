@@ -156,16 +156,33 @@ export class PlaybackEngine {
 				const clipStartSec = clip.startTime / 1000;
 				const clipTrimStartSec = clip.trimStart / 1000;
 				const clipTrimEndSec = clip.trimEnd / 1000;
-				const clipDurationSec = clipTrimEndSec - clipTrimStartSec;
-				const clipEndSec = clipStartSec + clipDurationSec;
+				const clipDurationSec = Math.max(0, clipTrimEndSec - clipTrimStartSec);
+				const clipOneShotEndSec = clipStartSec + clipDurationSec;
+				const loopUntilSec = clip.loop
+					? clip.loopEnd
+						? clip.loopEnd / 1000
+						: Number.POSITIVE_INFINITY
+					: clipOneShotEndSec;
 
-				// Skip if playback starts after this clip
-				if (this.playbackTimeAtStart >= clipEndSec) continue;
+				// If playback starts after the loop/clip window, skip
+				if (this.playbackTimeAtStart >= loopUntilSec) continue;
 
-				const timeIntoClip = Math.max(
-					0,
-					this.playbackTimeAtStart - clipStartSec,
-				);
+				let cycleOffsetSec = 0;
+				let timeIntoClip = 0;
+				if (clip.loop) {
+					if (this.playbackTimeAtStart <= clipStartSec) {
+						timeIntoClip = 0;
+						cycleOffsetSec = 0;
+					} else {
+						const elapsed = this.playbackTimeAtStart - clipStartSec;
+						const cycleIndex =
+							clipDurationSec > 0 ? Math.floor(elapsed / clipDurationSec) : 0;
+						cycleOffsetSec = cycleIndex * clipDurationSec;
+						timeIntoClip = clipDurationSec > 0 ? elapsed - cycleOffsetSec : 0;
+					}
+				} else {
+					timeIntoClip = Math.max(0, this.playbackTimeAtStart - clipStartSec);
+				}
 				const audioFileReadStart = clipTrimStartSec + timeIntoClip;
 				if (audioFileReadStart >= clipTrimEndSec) continue;
 
@@ -181,15 +198,16 @@ export class PlaybackEngine {
 					trackState.clipStates.set(clip.id, cps);
 				}
 
-				// Configure clip fades (basic linear ramps)
+				// Configure clip fades (basic linear ramps) — apply to one-shot segment only
 				try {
 					const clipGain = cps.gainNode!;
 					clipGain.gain.cancelScheduledValues(0);
 					clipGain.gain.setValueAtTime(1, 0);
 					const clipStartAC =
 						this.startTime + clipStartSec - this.playbackTimeAtStart;
+					const clipEndForFadeSec = clipOneShotEndSec;
 					const clipEndAC =
-						this.startTime + clipEndSec - this.playbackTimeAtStart;
+						this.startTime + clipEndForFadeSec - this.playbackTimeAtStart;
 					if (clip.fadeIn && clip.fadeIn > 0) {
 						clipGain.gain.setValueAtTime(0, Math.max(0, clipStartAC));
 						clipGain.gain.linearRampToValueAtTime(
@@ -217,6 +235,8 @@ export class PlaybackEngine {
 					cps,
 					clipStartSec,
 					clipTrimStartSec,
+					cycleOffsetSec,
+					loopUntilSec,
 				);
 			}
 		}
@@ -230,9 +250,13 @@ export class PlaybackEngine {
 		cps: ClipPlaybackState,
 		clipStartSec: number,
 		clipTrimStartSec: number,
+		cycleOffsetSec: number = 0,
+		loopUntilSec: number = Number.POSITIVE_INFINITY,
 	): Promise<void> {
 		if (!cps.iterator || !this.audioContext) return;
 		const clipGain = cps.gainNode;
+		const clipTrimEndSec = clip.trimEnd / 1000;
+		const clipDurationSec = clipTrimEndSec - clipTrimStartSec;
 		try {
 			for await (const { buffer, timestamp } of cps.iterator) {
 				if (!this.isPlaying) break;
@@ -243,7 +267,10 @@ export class PlaybackEngine {
 
 				// timeline position mapping
 				const timeInTrimmed = timestamp - clipTrimStartSec;
-				const timelinePos = clipStartSec + timeInTrimmed;
+				const timelinePos = clipStartSec + cycleOffsetSec + timeInTrimmed;
+				if (timelinePos > loopUntilSec) {
+					break; // don't schedule past loop end
+				}
 				const startAt = this.startTime + timelinePos - this.playbackTimeAtStart;
 
 				if (startAt >= this.audioContext.currentTime) {
@@ -276,6 +303,29 @@ export class PlaybackEngine {
 							}
 						}, 100);
 					});
+				}
+			}
+			// If clip loops, restart iterator for the next cycle within loopUntilSec
+			if (this.isPlaying && clip.loop) {
+				const sink = clip.opfsFileId
+					? audioManager.getAudioBufferSink(clip.opfsFileId)
+					: null;
+				if (sink) {
+					const nextCycleStart =
+						cycleOffsetSec + clipDurationSec + clipStartSec;
+					if (nextCycleStart < loopUntilSec) {
+						cps.iterator = sink.buffers(clipTrimStartSec, clipTrimEndSec);
+						// Fire-and-forget next cycle
+						this.runClipAudioIterator(
+							track,
+							clip,
+							cps,
+							clipStartSec,
+							clipTrimStartSec,
+							cycleOffsetSec + clipDurationSec,
+							loopUntilSec,
+						);
+					}
 				}
 			}
 		} catch (e) {
@@ -383,9 +433,15 @@ export class PlaybackEngine {
 			const clipStartSec = clip.startTime / 1000;
 			const clipTrimStartSec = clip.trimStart / 1000;
 			const clipTrimEndSec = clip.trimEnd / 1000;
-			const clipEndSec = clipStartSec + (clipTrimEndSec - clipTrimStartSec);
+			const clipDurationSec = Math.max(0, clipTrimEndSec - clipTrimStartSec);
+			const clipOneShotEndSec = clipStartSec + clipDurationSec;
 			const now = this.getPlaybackTime();
-			if (now >= clipEndSec) continue;
+			const loopUntilSec = clip.loop
+				? clip.loopEnd
+					? clip.loopEnd / 1000
+					: Number.POSITIVE_INFINITY
+				: clipOneShotEndSec;
+			if (now >= loopUntilSec) continue;
 
 			const timeIntoClip = Math.max(0, now - clipStartSec);
 			const audioFileReadStart = Math.min(
@@ -413,7 +469,7 @@ export class PlaybackEngine {
 				const clipStartAC =
 					this.startTime + clipStartSec - this.playbackTimeAtStart;
 				const clipEndAC =
-					this.startTime + clipEndSec - this.playbackTimeAtStart;
+					this.startTime + clipOneShotEndSec - this.playbackTimeAtStart;
 				if (clip.fadeIn && clip.fadeIn > 0) {
 					clipGain.gain.setValueAtTime(0, Math.max(0, clipStartAC));
 					clipGain.gain.linearRampToValueAtTime(
