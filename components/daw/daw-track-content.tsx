@@ -123,13 +123,13 @@ export function DAWTrackContent() {
 				if (resizing.type === "start") {
 					const newTrimStart = Math.max(
 						0,
-						Math.min(resizing.startValue + deltaTime, track.trimEnd - 100),
+						Math.min(resizing.startValue + deltaTime, track.trimEnd - 50), // 50ms minimum
 					);
 					updateTrack(resizing.trackId, { trimStart: newTrimStart });
 				} else {
 					const newTrimEnd = Math.min(
 						track.duration,
-						Math.max(resizing.startValue + deltaTime, track.trimStart + 100),
+						Math.max(resizing.startValue + deltaTime, track.trimStart + 50), // 50ms minimum
 					);
 					updateTrack(resizing.trackId, { trimEnd: newTrimEnd });
 				}

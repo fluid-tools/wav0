@@ -146,18 +146,31 @@ export class PlaybackEngine {
 				gainNode.connect(this.masterGainNode);
 				trackState.gainNode = gainNode;
 
-				// Calculate track timing relative to global playback time
-				const trackStartTime = track.startTime / 1000; // Convert ms to seconds
-				const trimStart = track.trimStart / 1000; // Convert ms to seconds  
-				const trimEnd = track.trimEnd / 1000; // Convert ms to seconds
+				// Track timing calculations
+				const trackStartTime = track.startTime / 1000; // Track position in timeline (seconds)
+				const trimStart = track.trimStart / 1000; // Start of trimmed section in original file (seconds)
+				const trimEnd = track.trimEnd / 1000; // End of trimmed section in original file (seconds)
 				
-				// Calculate effective start time for this track
-				const effectiveStartTime = Math.max(0, this.playbackTimeAtStart - trackStartTime);
-				const trimmedStartTime = trimStart + effectiveStartTime;
+				// Calculate track's end time in timeline
+				const trackEndTime = trackStartTime + (trimEnd - trimStart);
 				
-				// Only play if we're within the trimmed range
-				if (trimmedStartTime >= trimEnd) {
-					console.log('Track starts after trim end:', track.name);
+				// Skip if playback time is outside track's timeline range
+				if (this.playbackTimeAtStart < trackStartTime || this.playbackTimeAtStart >= trackEndTime) {
+					console.log('Track not in playback range:', track.name, {
+						playbackTime: this.playbackTimeAtStart,
+						trackStart: trackStartTime,
+						trackEnd: trackEndTime
+					});
+					continue;
+				}
+
+				// Calculate where to start reading in the original audio file
+				const timeIntoTrack = this.playbackTimeAtStart - trackStartTime; // How far into the track we are
+				const audioFileReadStart = trimStart + timeIntoTrack; // Corresponding position in original file
+				
+				// Don't read past the trim end
+				if (audioFileReadStart >= trimEnd) {
+					console.log('Audio read start past trim end:', track.name);
 					continue;
 				}
 
@@ -165,13 +178,13 @@ export class PlaybackEngine {
 					trackStartTime,
 					trimStart,
 					trimEnd,
-					effectiveStartTime,
-					trimmedStartTime,
-					globalPlaybackTime: this.playbackTimeAtStart
+					timeIntoTrack,
+					audioFileReadStart,
+					playbackTime: this.playbackTimeAtStart
 				});
 
-				// Use MediaBunny pattern: start from the calculated time
-				const iterator = sink.buffers(trimmedStartTime);
+				// MediaBunny: buffers(start, end) reads from original file timestamps
+				const iterator = sink.buffers(audioFileReadStart, trimEnd);
 				trackState.iterator = iterator;
 				trackState.isPlaying = true;
 
@@ -188,7 +201,7 @@ export class PlaybackEngine {
 	}
 
 	/**
-	 * Run audio iterator for a track - based on MediaBunny player runAudioIterator
+	 * Run audio iterator for a track - properly map original file timestamps to timeline
 	 */
 	private async runTrackAudioIterator(
 		track: Track, 
@@ -205,9 +218,10 @@ export class PlaybackEngine {
 				}
 
 				console.log('Playing audio buffer for track:', track.name, {
-					timestamp,
+					originalFileTimestamp: timestamp,
 					duration: buffer.duration,
-					globalPlaybackTime: this.getPlaybackTime()
+					trimStart,
+					trackStartTime
 				});
 
 				// Create audio source
@@ -215,18 +229,31 @@ export class PlaybackEngine {
 				node.buffer = buffer;
 				node.connect(trackState.gainNode);
 
-				// Calculate when to start this buffer relative to global timeline
-				// timestamp is relative to the trim start, so we need to adjust
-				const globalTimestamp = trackStartTime + (timestamp - trimStart);
-				const startTimestamp = this.startTime + globalTimestamp - this.playbackTimeAtStart;
+				// Map original file timestamp to timeline position
+				// timestamp is from the original file, we need to convert to timeline
+				const timeInTrimmedAudio = timestamp - trimStart; // How far into the trimmed section
+				const timelinePosition = trackStartTime + timeInTrimmedAudio; // Where this should play in timeline
+				const audioContextStartTime = this.startTime + timelinePosition - this.playbackTimeAtStart;
 
-				if (startTimestamp >= this.audioContext.currentTime) {
-					node.start(startTimestamp);
+				console.log('Audio timing calculation:', {
+					originalFileTimestamp: timestamp,
+					timeInTrimmedAudio,
+					timelinePosition,
+					audioContextStartTime,
+					currentAudioTime: this.audioContext.currentTime
+				});
+
+				if (audioContextStartTime >= this.audioContext.currentTime) {
+					node.start(audioContextStartTime);
 				} else {
 					// We're late, start immediately with offset
-					const offset = this.audioContext.currentTime - startTimestamp;
+					const offset = this.audioContext.currentTime - audioContextStartTime;
 					if (offset < buffer.duration) {
 						node.start(this.audioContext.currentTime, offset);
+					} else {
+						// Skip this buffer - we're too late
+						console.log('Skipping buffer - too late:', offset, 'vs', buffer.duration);
+						continue;
 					}
 				}
 
@@ -241,11 +268,12 @@ export class PlaybackEngine {
 					this.queuedAudioNodes.delete(node);
 				};
 
-				// Buffer ahead like MediaBunny player
-				if (timestamp - this.getPlaybackTime() >= 1) {
+				// Buffer ahead control based on timeline position
+				const currentTimelineTime = this.getPlaybackTime();
+				if (timelinePosition - currentTimelineTime >= 1) {
 					await new Promise(resolve => {
 						const id = setInterval(() => {
-							if (timestamp - this.getPlaybackTime() < 1 || !this.isPlaying) {
+							if (timelinePosition - this.getPlaybackTime() < 1 || !this.isPlaying) {
 								clearInterval(id);
 								resolve(undefined);
 							}
