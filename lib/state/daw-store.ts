@@ -148,9 +148,30 @@ export const updateTrackAtom = atom(
 
 // Removed - replaced with audio-enabled version below
 
-export const setCurrentTimeAtom = atom(null, (get, set, time: number) => {
+export const setCurrentTimeAtom = atom(null, async (get, set, time: number) => {
 	const playback = get(playbackAtom);
+	const tracks = get(tracksAtom);
+	
+	// Update the time first
 	set(playbackAtom, { ...playback, currentTime: time });
+	
+	if (playback.isPlaying) {
+		// Pause current playback
+		await playbackEngine.pause();
+		
+		// Restart playback from new position
+		await playbackEngine.play(tracks, {
+			startTime: time / 1000,
+			onTimeUpdate: (currentTime) => {
+				const newPlayback = get(playbackAtom);
+				set(playbackAtom, { ...newPlayback, currentTime: currentTime * 1000 });
+			},
+			onPlaybackEnd: () => {
+				const endPlayback = get(playbackAtom);
+				set(playbackAtom, { ...endPlayback, isPlaying: false });
+			},
+		});
+	}
 });
 
 export const setTimelineZoomAtom = atom(null, (get, set, zoom: number) => {
@@ -262,7 +283,7 @@ export const togglePlaybackAtom = atom(null, async (get, set) => {
 		set(playbackAtom, { ...playback, isPlaying: false });
 		console.log('Playback paused');
 	} else {
-		// Start/resume playback
+		// Start/resume playback from current position
 		const currentTime = playback.currentTime / 1000; // Convert to seconds
 		
 		console.log('Starting playback with tracks:', tracks.map(t => ({ 
@@ -279,11 +300,9 @@ export const togglePlaybackAtom = atom(null, async (get, set) => {
 		await playbackEngine.play(tracks, {
 			startTime: currentTime,
 			onTimeUpdate: (time) => {
-				const newPlayback = get(playbackAtom);
-				set(playbackAtom, {
-					...newPlayback,
-					currentTime: time * 1000, // Convert back to ms
-				});
+				// Update time without triggering seek
+				const playback = get(playbackAtom);
+				set(playbackAtom, { ...playback, currentTime: time * 1000 });
 			},
 			onPlaybackEnd: () => {
 				const endPlayback = get(playbackAtom);
@@ -303,7 +322,7 @@ export const stopPlaybackAtom = atom(null, async (get, set) => {
 	set(playbackAtom, {
 		...playback,
 		isPlaying: false,
-		currentTime: 0,
+		// Keep current time where it is - don't reset to 0
 	});
 });
 

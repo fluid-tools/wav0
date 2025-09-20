@@ -32,6 +32,12 @@ export function DAWTrackContent() {
 		startValue: number;
 	} | null>(null);
 
+	const [dragging, setDragging] = useState<{
+		trackId: string;
+		startX: number;
+		startTime: number;
+	} | null>(null);
+
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [dragOverTrackId, setDragOverTrackId] = useState<string | null>(null);
 
@@ -88,31 +94,59 @@ export function DAWTrackContent() {
 		});
 	};
 
-	// Attach document-level pointer listeners while resizing
+	const handleClipDragStart = (trackId: string, e: React.MouseEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+
+		const track = tracks.find((t) => t.id === trackId);
+		if (!track) return;
+
+		setDragging({
+			trackId,
+			startX: e.clientX,
+			startTime: track.startTime,
+		});
+	};
+
+	// Attach document-level pointer listeners while resizing or dragging
 	useEffect(() => {
-		if (!resizing) return;
+		if (!resizing && !dragging) return;
+
 		const onMove = (e: MouseEvent) => {
-			const deltaX = e.clientX - resizing.startX;
-			const deltaTime = deltaX / pixelsPerMs;
+			if (resizing) {
+				const deltaX = e.clientX - resizing.startX;
+				const deltaTime = deltaX / pixelsPerMs;
 
-			const track = tracks.find((t) => t.id === resizing.trackId);
-			if (!track) return;
+				const track = tracks.find((t) => t.id === resizing.trackId);
+				if (!track) return;
 
-			if (resizing.type === "start") {
-				const newTrimStart = Math.max(
-					0,
-					Math.min(resizing.startValue + deltaTime, track.trimEnd - 100),
-				);
-				updateTrack(resizing.trackId, { trimStart: newTrimStart });
-			} else {
-				const newTrimEnd = Math.min(
-					track.duration,
-					Math.max(resizing.startValue + deltaTime, track.trimStart + 100),
-				);
-				updateTrack(resizing.trackId, { trimEnd: newTrimEnd });
+				if (resizing.type === "start") {
+					const newTrimStart = Math.max(
+						0,
+						Math.min(resizing.startValue + deltaTime, track.trimEnd - 100),
+					);
+					updateTrack(resizing.trackId, { trimStart: newTrimStart });
+				} else {
+					const newTrimEnd = Math.min(
+						track.duration,
+						Math.max(resizing.startValue + deltaTime, track.trimStart + 100),
+					);
+					updateTrack(resizing.trackId, { trimEnd: newTrimEnd });
+				}
+			}
+
+			if (dragging) {
+				const deltaX = e.clientX - dragging.startX;
+				const deltaTime = deltaX / pixelsPerMs;
+				const newStartTime = Math.max(0, dragging.startTime + deltaTime);
+				updateTrack(dragging.trackId, { startTime: newStartTime });
 			}
 		};
-		const onUp = () => setResizing(null);
+
+		const onUp = () => {
+			setResizing(null);
+			setDragging(null);
+		};
 
 		window.addEventListener("mousemove", onMove);
 		window.addEventListener("mouseup", onUp);
@@ -120,7 +154,7 @@ export function DAWTrackContent() {
 			window.removeEventListener("mousemove", onMove);
 			window.removeEventListener("mouseup", onUp);
 		};
-	}, [resizing, pixelsPerMs, tracks, updateTrack]);
+	}, [resizing, dragging, pixelsPerMs, tracks, updateTrack]);
 
 	return (
 		<div ref={containerRef} className="relative w-full h-full">
@@ -129,7 +163,7 @@ export function DAWTrackContent() {
 				const trackHeight = Math.round(DAW_HEIGHTS.TRACK_ROW * trackHeightZoom);
 				const trackY = index * trackHeight;
 				const trackWidth = (track.trimEnd - track.trimStart) * pixelsPerMs;
-				const trackX = (track.startTime + track.trimStart) * pixelsPerMs;
+				const trackX = track.startTime * pixelsPerMs;
 
 				return (
 					<div
@@ -173,18 +207,35 @@ export function DAWTrackContent() {
 							{track.duration > 0 && (
 								// biome-ignore lint/a11y/useSemanticElements: Avoiding nested button hydration error
 								<div
-									className={`absolute top-0 bottom-0 rounded-md border-2 transition-all cursor-pointer select-none ${
+									className={`absolute top-0 bottom-0 rounded-md border-2 transition-all cursor-move select-none ${
 										selectedTrackId === track.id
 											? "border-primary bg-primary/20"
 											: "border-border bg-muted/50 hover:bg-muted/70"
-									} ${track.muted ? "opacity-50" : ""}`}
+									} ${track.muted ? "opacity-50" : ""} ${
+										dragging?.trackId === track.id ? "opacity-80" : ""
+									}`}
 									style={{
 										left: trackX,
 										width: Math.max(trackWidth, 20),
 										backgroundColor: `${track.color}20`,
 										borderColor: track.color,
 									}}
-									onClick={() => setSelectedTrackId(track.id)}
+									onClick={() => {
+										if (!dragging) setSelectedTrackId(track.id);
+									}}
+									onMouseDown={(e) => {
+										// Only start drag if clicking on the main body, not resize handles
+										const rect = e.currentTarget.getBoundingClientRect();
+										const x = e.clientX - rect.left;
+										const isNearLeftEdge = x < 8;
+										const isNearRightEdge = x > rect.width - 8;
+										
+										if (!isNearLeftEdge && !isNearRightEdge) {
+											handleClipDragStart(track.id, e);
+										} else {
+											setSelectedTrackId(track.id);
+										}
+									}}
 									role="button"
 									tabIndex={0}
 									onKeyDown={(e) => {
