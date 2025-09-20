@@ -2,9 +2,7 @@
 
 import { useAtom } from "jotai";
 import { useEffect, useRef, useState } from "react";
-import {
-	DAW_PIXELS_PER_SECOND_AT_ZOOM_1,
-} from "@/lib/constants";
+import { DAW_PIXELS_PER_SECOND_AT_ZOOM_1 } from "@/lib/constants";
 import { DAW_HEIGHTS } from "@/lib/constants/daw-design";
 import {
 	loadAudioFileAtom,
@@ -63,13 +61,16 @@ export function DAWTrackContent() {
 		try {
 			// Use MediaBunny integration to load audio file into existing track
 			const updatedTrack = await loadAudioFile(file, trackId);
-			
+
 			// Update the track position based on drop location
 			updateTrack(trackId, {
 				startTime,
 			});
-			
-			console.log('Audio file loaded successfully into track:', updatedTrack.name);
+
+			console.log(
+				"Audio file loaded successfully into track:",
+				updatedTrack.name,
+			);
 		} catch (error) {
 			console.error("Error loading audio file:", error);
 		}
@@ -125,7 +126,13 @@ export function DAWTrackContent() {
 						0,
 						Math.min(resizing.startValue + deltaTime, track.trimEnd - 50), // 50ms minimum
 					);
-					updateTrack(resizing.trackId, { trimStart: newTrimStart });
+					// When trimming from the start, move the clip right so the right edge stays visually stable
+					const delta = newTrimStart - track.trimStart;
+					const newStartTime = Math.max(0, track.startTime + delta);
+					updateTrack(resizing.trackId, {
+						trimStart: newTrimStart,
+						startTime: newStartTime,
+					});
 				} else {
 					const newTrimEnd = Math.min(
 						track.duration,
@@ -176,15 +183,15 @@ export function DAWTrackContent() {
 							height: trackHeight,
 							left: 0,
 							right: 0,
-							padding: '12px',
+							padding: "12px",
 						}}
 					>
 						{/* Track Drop Zone */}
 						<button
 							type="button"
 							className={`absolute inset-0 w-full h-full border-none p-0 cursor-default transition-colors ${
-								dragOverTrackId === track.id 
-									? "bg-primary/10 border-2 border-primary border-dashed" 
+								dragOverTrackId === track.id
+									? "bg-primary/10 border-2 border-primary border-dashed"
 									: "bg-transparent"
 							}`}
 							onDrop={(e) => handleTrackDrop(track.id, e)}
@@ -195,12 +202,17 @@ export function DAWTrackContent() {
 								const rect = e.currentTarget.getBoundingClientRect();
 								const x = e.clientX;
 								const y = e.clientY;
-								if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+								if (
+									x < rect.left ||
+									x > rect.right ||
+									y < rect.top ||
+									y > rect.bottom
+								) {
 									setDragOverTrackId(null);
 								}
 							}}
 							onClick={() => setSelectedTrackId(track.id)}
-							style={{ padding: '12px' }}
+							style={{ padding: "12px" }}
 							aria-label={`Track ${track.name} drop zone`}
 						>
 							{/* Track Audio Clip */}
@@ -229,7 +241,7 @@ export function DAWTrackContent() {
 										const x = e.clientX - rect.left;
 										const isNearLeftEdge = x < 8;
 										const isNearRightEdge = x > rect.width - 8;
-										
+
 										if (!isNearLeftEdge && !isNearRightEdge) {
 											handleClipDragStart(track.id, e);
 										} else {
@@ -239,7 +251,7 @@ export function DAWTrackContent() {
 									role="button"
 									tabIndex={0}
 									onKeyDown={(e) => {
-										if (e.key === 'Enter' || e.key === ' ') {
+										if (e.key === "Enter" || e.key === " ") {
 											setSelectedTrackId(track.id);
 										}
 									}}
@@ -263,15 +275,15 @@ export function DAWTrackContent() {
 										aria-label="Resize track end"
 									/>
 
-								{/* Track Label */}
-								<div className="absolute inset-2 flex flex-col justify-center pointer-events-none">
-									<div className="text-xs font-medium truncate text-left">
-										{track.name}
+									{/* Track Label */}
+									<div className="absolute inset-2 flex flex-col justify-center pointer-events-none">
+										<div className="text-xs font-medium truncate text-left">
+											{track.name}
+										</div>
+										<div className="text-xs text-muted-foreground text-left">
+											{formatDuration((track.trimEnd - track.trimStart) / 1000)}
+										</div>
 									</div>
-									<div className="text-xs text-muted-foreground text-left">
-										{formatDuration((track.trimEnd - track.trimStart) / 1000)}
-									</div>
-								</div>
 
 									{/* Waveform placeholder */}
 									<div className="absolute bottom-1 left-2 right-2 h-4 bg-current opacity-20 rounded-sm pointer-events-none" />
@@ -295,11 +307,11 @@ export function DAWTrackContent() {
 				style={{ left: projectEndPosition }}
 				title="Project End"
 			/>
-			
+
 			{/* Buffer/dead space overlay */}
 			<div
 				className="absolute top-0 bottom-0 bg-muted/10 pointer-events-none z-30"
-				style={{ 
+				style={{
 					left: projectEndPosition,
 					right: 0,
 				}}
