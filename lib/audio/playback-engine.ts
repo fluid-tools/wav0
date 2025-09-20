@@ -391,6 +391,71 @@ export class PlaybackEngine {
 	}
 
 	/**
+	 * Reschedule a single track during playback after edits (trim/move)
+	 */
+	async rescheduleTrack(updatedTrack: Track): Promise<void> {
+		if (!this.isPlaying) return;
+		await this.getAudioContext();
+		if (!this.audioContext) return;
+
+		const trackState = this.tracks.get(updatedTrack.id);
+		if (!trackState) return;
+
+		try {
+			// Stop existing iterator and sources for this track
+			trackState.isPlaying = false;
+			if (trackState.iterator) {
+				await trackState.iterator.return?.(undefined);
+				trackState.iterator = null;
+			}
+			for (const node of [...trackState.audioSources]) {
+				try {
+					node.stop();
+				} catch {}
+			}
+			trackState.audioSources = [];
+
+			// Ensure gain node exists
+			if (!trackState.gainNode) {
+				const gainNode = this.audioContext.createGain();
+				gainNode.connect(this.masterGainNode!);
+				trackState.gainNode = gainNode;
+			}
+
+			// Compute new timing
+			const trackStartTime = updatedTrack.startTime / 1000;
+			const trimStart = updatedTrack.trimStart / 1000;
+			const trimEnd = updatedTrack.trimEnd / 1000;
+			const trackEndTime = trackStartTime + (trimEnd - trimStart);
+			const now = this.getPlaybackTime();
+
+			// If the whole track is now behind, nothing to play
+			if (now >= trackEndTime) return;
+
+			// Determine where to start reading in the file
+			const timeIntoTrack = Math.max(0, now - trackStartTime);
+			const audioFileReadStart = Math.min(trimEnd, trimStart + timeIntoTrack);
+
+			// Get sink and start new iterator
+			if (!updatedTrack.opfsFileId) return;
+			const sink = audioManager.getAudioBufferSink(updatedTrack.opfsFileId);
+			if (!sink) return;
+			trackState.iterator = sink.buffers(audioFileReadStart, trimEnd);
+			trackState.isPlaying = true;
+
+			// Start iterator with updated mapping
+			this.runTrackAudioIterator(
+				updatedTrack,
+				trackState,
+				trackStartTime,
+				trimStart,
+			);
+		} catch (e) {
+			console.error("Failed to reschedule track", updatedTrack.id, e);
+		}
+	}
+
+	/**
 	 * Get current playback time
 	 */
 	getCurrentTime(): number {
