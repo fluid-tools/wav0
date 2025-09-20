@@ -16,10 +16,12 @@ import {
 	DAW_SPACING,
 	DAW_TEXT,
 } from "@/lib/constants/daw-design";
+import { DAW_PIXELS_PER_SECOND_AT_ZOOM_1 } from "@/lib/constants";
 import {
 	addTrackAtom,
 	horizontalScrollAtom,
 	initializeAudioFromOPFSAtom,
+	timelineAtom,
 	timelineWidthAtom,
 	trackHeightZoomAtom,
 	tracksAtom,
@@ -245,6 +247,7 @@ export function DAWContainer() {
 									<div
 										ref={timelineScrollRef}
 										className="h-full overflow-x-auto overflow-y-hidden"
+										data-daw-timeline-scroll="true"
 										onScroll={onTimelineScroll}
 										style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
 									>
@@ -262,6 +265,7 @@ export function DAWContainer() {
 									<div
 										ref={trackGridScrollRef}
 										className="h-full w-full overflow-auto"
+										data-daw-grid-scroll="true"
 										onScroll={onTrackGridScroll}
 										style={{ scrollbarWidth: "thin" }}
 									>
