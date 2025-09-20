@@ -10,7 +10,10 @@ export interface PlaybackOptions {
 }
 
 type TrackPlaybackState = {
-	iterator: AsyncIterator<unknown> | null;
+	iterator: AsyncIterableIterator<{
+		buffer: AudioBuffer;
+		timestamp: number;
+	}> | null;
 	audioSources: AudioBufferSourceNode[];
 	gainNode: GainNode | null;
 	isPlaying: boolean;
@@ -55,7 +58,11 @@ export class PlaybackEngine {
 	 */
 	private getPlaybackTime(): number {
 		if (this.isPlaying && this.audioContext) {
-			return this.audioContext.currentTime - this.startTime + this.playbackTimeAtStart;
+			return (
+				this.audioContext.currentTime -
+				this.startTime +
+				this.playbackTimeAtStart
+			);
 		} else {
 			return this.playbackTimeAtStart;
 		}
@@ -67,7 +74,7 @@ export class PlaybackEngine {
 	async initializeWithTracks(tracks: Track[]): Promise<void> {
 		await this.getAudioContext();
 
-		console.log('Initializing playback engine with tracks:', tracks.length);
+		console.log("Initializing playback engine with tracks:", tracks.length);
 
 		// Clear existing tracks
 		this.tracks.clear();
@@ -75,7 +82,12 @@ export class PlaybackEngine {
 		// Initialize each track that has audio
 		for (const track of tracks) {
 			if (track.opfsFileId && audioManager.isTrackLoaded(track.opfsFileId)) {
-				console.log('Initializing track:', track.name, 'with opfsFileId:', track.opfsFileId);
+				console.log(
+					"Initializing track:",
+					track.name,
+					"with opfsFileId:",
+					track.opfsFileId,
+				);
 				this.tracks.set(track.id, {
 					iterator: null,
 					audioSources: [],
@@ -83,11 +95,15 @@ export class PlaybackEngine {
 					isPlaying: false,
 				});
 			} else {
-				console.log('Skipping track without loaded audio:', track.name);
+				console.log("Skipping track without loaded audio:", track.name);
 			}
 		}
 
-		console.log('Playback engine initialized with', this.tracks.size, 'audio tracks');
+		console.log(
+			"Playback engine initialized with",
+			this.tracks.size,
+			"audio tracks",
+		);
 	}
 
 	/**
@@ -110,7 +126,7 @@ export class PlaybackEngine {
 		this.startTime = this.audioContext.currentTime;
 		this.isPlaying = true;
 
-		console.log('Starting playback from time:', this.playbackTimeAtStart);
+		console.log("Starting playback from time:", this.playbackTimeAtStart);
 
 		// Start each track
 		for (const track of tracks) {
@@ -127,21 +143,21 @@ export class PlaybackEngine {
 				// Get the AudioBufferSink from AudioManager
 				const sink = audioManager.getAudioBufferSink(track.opfsFileId);
 				if (!sink) {
-					console.log('No AudioBufferSink found for track:', track.name);
+					console.log("No AudioBufferSink found for track:", track.name);
 					continue;
 				}
 
 				// Create gain node for this track
 				const gainNode = this.audioContext.createGain();
-				
+
 				// Set track volume (handle solo logic)
-				const hasAnyTracksInSolo = tracks.some(t => t.soloed);
+				const hasAnyTracksInSolo = tracks.some((t) => t.soloed);
 				let volume = track.volume / 100;
-				
+
 				if (hasAnyTracksInSolo) {
 					volume = track.soloed ? volume : 0;
 				}
-				
+
 				gainNode.gain.value = volume;
 				gainNode.connect(this.masterGainNode);
 				trackState.gainNode = gainNode;
@@ -150,37 +166,43 @@ export class PlaybackEngine {
 				const trackStartTime = track.startTime / 1000; // Track position in timeline (seconds)
 				const trimStart = track.trimStart / 1000; // Start of trimmed section in original file (seconds)
 				const trimEnd = track.trimEnd / 1000; // End of trimmed section in original file (seconds)
-				
+
 				// Calculate track's end time in timeline
 				const trackEndTime = trackStartTime + (trimEnd - trimStart);
-				
-				// Skip if playback time is outside track's timeline range
-				if (this.playbackTimeAtStart < trackStartTime || this.playbackTimeAtStart >= trackEndTime) {
-					console.log('Track not in playback range:', track.name, {
-						playbackTime: this.playbackTimeAtStart,
-						trackStart: trackStartTime,
-						trackEnd: trackEndTime
-					});
+
+				// Only skip if playback starts after the track has fully ended
+				if (this.playbackTimeAtStart >= trackEndTime) {
+					console.log(
+						"Track is completely past playback start, skipping:",
+						track.name,
+						{
+							playbackTime: this.playbackTimeAtStart,
+							trackStart: trackStartTime,
+							trackEnd: trackEndTime,
+						},
+					);
 					continue;
 				}
 
 				// Calculate where to start reading in the original audio file
-				const timeIntoTrack = this.playbackTimeAtStart - trackStartTime; // How far into the track we are
+				// If playback starts before the track, begin at the start of the trimmed audio
+				const timeIntoTrackRaw = this.playbackTimeAtStart - trackStartTime; // may be negative
+				const timeIntoTrack = Math.max(0, timeIntoTrackRaw); // clamp to 0 for future-starting tracks
 				const audioFileReadStart = trimStart + timeIntoTrack; // Corresponding position in original file
-				
+
 				// Don't read past the trim end
 				if (audioFileReadStart >= trimEnd) {
-					console.log('Audio read start past trim end:', track.name);
+					console.log("Audio read start past trim end:", track.name);
 					continue;
 				}
 
-				console.log('Starting MediaBunny iteration for track:', track.name, {
+				console.log("Starting MediaBunny iteration for track:", track.name, {
 					trackStartTime,
 					trimStart,
 					trimEnd,
 					timeIntoTrack,
 					audioFileReadStart,
-					playbackTime: this.playbackTimeAtStart
+					playbackTime: this.playbackTimeAtStart,
 				});
 
 				// MediaBunny: buffers(start, end) reads from original file timestamps
@@ -189,8 +211,12 @@ export class PlaybackEngine {
 				trackState.isPlaying = true;
 
 				// Start the audio iterator for this track
-				this.runTrackAudioIterator(track, trackState, trackStartTime, trimStart);
-
+				this.runTrackAudioIterator(
+					track,
+					trackState,
+					trackStartTime,
+					trimStart,
+				);
 			} catch (error) {
 				console.error(`Failed to start playback for track ${track.id}:`, error);
 			}
@@ -204,12 +230,13 @@ export class PlaybackEngine {
 	 * Run audio iterator for a track - properly map original file timestamps to timeline
 	 */
 	private async runTrackAudioIterator(
-		track: Track, 
+		track: Track,
 		trackState: TrackPlaybackState,
 		trackStartTime: number,
-		trimStart: number
+		trimStart: number,
 	): Promise<void> {
-		if (!trackState.iterator || !trackState.gainNode || !this.audioContext) return;
+		if (!trackState.iterator || !trackState.gainNode || !this.audioContext)
+			return;
 
 		try {
 			for await (const { buffer, timestamp } of trackState.iterator) {
@@ -217,11 +244,11 @@ export class PlaybackEngine {
 					break;
 				}
 
-				console.log('Playing audio buffer for track:', track.name, {
+				console.log("Playing audio buffer for track:", track.name, {
 					originalFileTimestamp: timestamp,
 					duration: buffer.duration,
 					trimStart,
-					trackStartTime
+					trackStartTime,
 				});
 
 				// Create audio source
@@ -233,14 +260,15 @@ export class PlaybackEngine {
 				// timestamp is from the original file, we need to convert to timeline
 				const timeInTrimmedAudio = timestamp - trimStart; // How far into the trimmed section
 				const timelinePosition = trackStartTime + timeInTrimmedAudio; // Where this should play in timeline
-				const audioContextStartTime = this.startTime + timelinePosition - this.playbackTimeAtStart;
+				const audioContextStartTime =
+					this.startTime + timelinePosition - this.playbackTimeAtStart;
 
-				console.log('Audio timing calculation:', {
+				console.log("Audio timing calculation:", {
 					originalFileTimestamp: timestamp,
 					timeInTrimmedAudio,
 					timelinePosition,
 					audioContextStartTime,
-					currentAudioTime: this.audioContext.currentTime
+					currentAudioTime: this.audioContext.currentTime,
 				});
 
 				if (audioContextStartTime >= this.audioContext.currentTime) {
@@ -252,7 +280,12 @@ export class PlaybackEngine {
 						node.start(this.audioContext.currentTime, offset);
 					} else {
 						// Skip this buffer - we're too late
-						console.log('Skipping buffer - too late:', offset, 'vs', buffer.duration);
+						console.log(
+							"Skipping buffer - too late:",
+							offset,
+							"vs",
+							buffer.duration,
+						);
 						continue;
 					}
 				}
@@ -271,9 +304,12 @@ export class PlaybackEngine {
 				// Buffer ahead control based on timeline position
 				const currentTimelineTime = this.getPlaybackTime();
 				if (timelinePosition - currentTimelineTime >= 1) {
-					await new Promise(resolve => {
+					await new Promise((resolve) => {
 						const id = setInterval(() => {
-							if (timelinePosition - this.getPlaybackTime() < 1 || !this.isPlaying) {
+							if (
+								timelinePosition - this.getPlaybackTime() < 1 ||
+								!this.isPlaying
+							) {
 								clearInterval(id);
 								resolve(undefined);
 							}
@@ -282,7 +318,11 @@ export class PlaybackEngine {
 				}
 			}
 		} catch (iteratorError) {
-			console.error('Error in track audio iterator:', track.name, iteratorError);
+			console.error(
+				"Error in track audio iterator:",
+				track.name,
+				iteratorError,
+			);
 		}
 	}
 
@@ -332,7 +372,7 @@ export class PlaybackEngine {
 	 */
 	async seek(time: number): Promise<void> {
 		const wasPlaying = this.isPlaying;
-		
+
 		if (wasPlaying) {
 			await this.pause();
 		}
@@ -428,7 +468,7 @@ export class PlaybackEngine {
 	cleanup(): void {
 		this.stop();
 		this.tracks.clear();
-		
+
 		if (this.audioContext) {
 			this.audioContext.close();
 			this.audioContext = null;
