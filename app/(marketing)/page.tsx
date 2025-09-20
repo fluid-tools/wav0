@@ -1,9 +1,6 @@
-<<<<<<< HEAD:app/page.tsx
-import Image from "next/image";
-=======
 import { Music2, Wrench, Zap } from "lucide-react";
 import dynamic from "next/dynamic";
->>>>>>> refs/remotes/origin/feat/agent:app/(marketing)/page.tsx
+import Image from "next/image";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +15,10 @@ export default function Home() {
 			{/* Navigation */}
 			<nav className="flex items-center justify-between px-6 py-4">
 				<div className="flex items-center gap-3">
-					<Link href="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
+					<Link
+						href="/"
+						className="flex items-center gap-3 hover:opacity-90 transition-opacity"
+					>
 						<Image src="/apple-icon.png" alt="WAV0" width={20} height={20} />
 						<h1 className="text-base tracking-tight uppercase font-bold font-mono text-foreground">
 							wav<span className="text-muted-foreground">0</span>
@@ -58,9 +58,15 @@ export default function Home() {
 
 			{/* Hero Section */}
 			<main className="px-6 py-20">
-				<section id="hero" className="max-w-6xl mx-auto grid items-center gap-12 lg:grid-cols-2">
+				<section
+					id="hero"
+					className="max-w-6xl mx-auto grid items-center gap-12 lg:grid-cols-2"
+				>
 					<div className="space-y-8">
-						<Badge variant="outline" className="font-mono text-[10px] uppercase tracking-wider">
+						<Badge
+							variant="outline"
+							className="font-mono text-[10px] uppercase tracking-wider"
+						>
 							AI-Native Music Studio
 						</Badge>
 						<h1 className="text-5xl md:text-7xl font-bold tracking-tighter leading-[0.95]">
@@ -69,13 +75,24 @@ export default function Home() {
 							<span className="text-muted-foreground">in Seconds</span>
 						</h1>
 						<p className="text-lg md:text-xl text-muted-foreground max-w-xl leading-relaxed">
-							The fastest AI producer, songwriter, and sound designer in your pocket. Create reference tracks, soundpacks, samples, and beats instantly.
+							The fastest AI producer, songwriter, and sound designer in your
+							pocket. Create reference tracks, soundpacks, samples, and beats
+							instantly.
 						</p>
 						<div className="flex flex-col sm:flex-row gap-3">
-							<Button asChild size="lg" className="font-mono text-sm uppercase tracking-tight">
+							<Button
+								asChild
+								size="lg"
+								className="font-mono text-sm uppercase tracking-tight"
+							>
 								<Link href="/create">Start Creating</Link>
 							</Button>
-							<Button asChild size="lg" variant="outline" className="font-mono text-sm uppercase tracking-tight">
+							<Button
+								asChild
+								size="lg"
+								variant="outline"
+								className="font-mono text-sm uppercase tracking-tight"
+							>
 								<Link href="#features">See How It Works</Link>
 							</Button>
 						</div>
@@ -89,7 +106,13 @@ export default function Home() {
 					</div>
 					<div className="justify-self-center">
 						<div className="w-[320px] h-[320px] rounded-3xl border bg-gradient-to-b from-muted/40 to-background flex items-center justify-center">
-							<Image src="/apple-icon.png" alt="WAV0 Logo" width={192} height={192} className="object-contain" />
+							<Image
+								src="/apple-icon.png"
+								alt="WAV0 Logo"
+								width={192}
+								height={192}
+								className="object-contain"
+							/>
 						</div>
 					</div>
 				</section>
@@ -99,23 +122,40 @@ export default function Home() {
 			<section id="features" className="px-6 py-24">
 				<div className="max-w-6xl mx-auto">
 					<div className="text-center space-y-3 mb-14">
-						<h2 className="text-3xl md:text-4xl font-bold tracking-tight">Everything you need to create</h2>
-						<p className="text-muted-foreground max-w-2xl mx-auto">Clean tools, predictable results, zero friction.</p>
+						<h2 className="text-3xl md:text-4xl font-bold tracking-tight">
+							Everything you need to create
+						</h2>
+						<p className="text-muted-foreground max-w-2xl mx-auto">
+							Clean tools, predictable results, zero friction.
+						</p>
 					</div>
-<<<<<<< HEAD:app/page.tsx
 					<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 						{/* WAV0 AI */}
 						<div className="group rounded-2xl border p-6 bg-card/50 hover:bg-card transition-colors">
 							<div className="flex items-start gap-4">
 								<div className="size-10 rounded-lg border flex items-center justify-center">
-								{/* Bolt Icon */}
-								<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-foreground/80" aria-hidden="true" focusable="false">
+									{/* Bolt Icon */}
+									<svg
+										width="18"
+										height="18"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										strokeWidth="2"
+										className="text-foreground/80"
+										aria-hidden="true"
+										focusable="false"
+									>
 										<path d="M13 3L4 14h7l-1 7 9-11h-7l1-7z" />
 									</svg>
 								</div>
 								<div className="space-y-1.5">
-									<h3 className="text-lg font-semibold tracking-tight">WAV0 AI</h3>
-									<p className="text-sm text-muted-foreground">Describe your idea. Get a track. Iterate fast.</p>
+									<h3 className="text-lg font-semibold tracking-tight">
+										WAV0 AI
+									</h3>
+									<p className="text-sm text-muted-foreground">
+										Describe your idea. Get a track. Iterate fast.
+									</p>
 								</div>
 							</div>
 						</div>
@@ -124,8 +164,18 @@ export default function Home() {
 						<div className="group rounded-2xl border p-6 bg-card/50 hover:bg-card transition-colors">
 							<div className="flex items-start gap-4">
 								<div className="size-10 rounded-lg border flex items-center justify-center">
-								{/* Grid Icon */}
-								<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-foreground/80" aria-hidden="true" focusable="false">
+									{/* Grid Icon */}
+									<svg
+										width="18"
+										height="18"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										strokeWidth="2"
+										className="text-foreground/80"
+										aria-hidden="true"
+										focusable="false"
+									>
 										<rect x="3" y="3" width="7" height="7" />
 										<rect x="14" y="3" width="7" height="7" />
 										<rect x="3" y="14" width="7" height="7" />
@@ -133,8 +183,12 @@ export default function Home() {
 									</svg>
 								</div>
 								<div className="space-y-1.5">
-									<h3 className="text-lg font-semibold tracking-tight">Studio</h3>
-									<p className="text-sm text-muted-foreground">A minimal AI-assisted DAW in your browser.</p>
+									<h3 className="text-lg font-semibold tracking-tight">
+										Studio
+									</h3>
+									<p className="text-sm text-muted-foreground">
+										A minimal AI-assisted DAW in your browser.
+									</p>
 								</div>
 							</div>
 						</div>
@@ -143,15 +197,29 @@ export default function Home() {
 						<div className="group rounded-2xl border p-6 bg-card/50 hover:bg-card transition-colors">
 							<div className="flex items-start gap-4">
 								<div className="size-10 rounded-lg border flex items-center justify-center">
-								{/* Lock Icon */}
-								<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-foreground/80" aria-hidden="true" focusable="false">
+									{/* Lock Icon */}
+									<svg
+										width="18"
+										height="18"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										strokeWidth="2"
+										className="text-foreground/80"
+										aria-hidden="true"
+										focusable="false"
+									>
 										<rect x="3" y="11" width="18" height="10" rx="2" />
 										<path d="M7 11V7a5 5 0 0 1 10 0v4" />
 									</svg>
 								</div>
 								<div className="space-y-1.5">
-									<h3 className="text-lg font-semibold tracking-tight">Vault</h3>
-									<p className="text-sm text-muted-foreground">Secure storage with fine-grained access control.</p>
+									<h3 className="text-lg font-semibold tracking-tight">
+										Vault
+									</h3>
+									<p className="text-sm text-muted-foreground">
+										Secure storage with fine-grained access control.
+									</p>
 								</div>
 							</div>
 						</div>
@@ -160,63 +228,31 @@ export default function Home() {
 						<div className="group rounded-2xl border p-6 bg-card/50 hover:bg-card transition-colors">
 							<div className="flex items-start gap-4">
 								<div className="size-10 rounded-lg border flex items-center justify-center">
-								{/* Bars Icon */}
-								<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-foreground/80" aria-hidden="true" focusable="false">
+									{/* Bars Icon */}
+									<svg
+										width="18"
+										height="18"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										strokeWidth="2"
+										className="text-foreground/80"
+										aria-hidden="true"
+										focusable="false"
+									>
 										<path d="M6 20V10" />
 										<path d="M12 20V4" />
 										<path d="M18 20v-7" />
 									</svg>
 								</div>
 								<div className="space-y-1.5">
-									<h3 className="text-lg font-semibold tracking-tight">Version Control</h3>
-									<p className="text-sm text-muted-foreground">Branch, compare, and revert your generations.</p>
+									<h3 className="text-lg font-semibold tracking-tight">
+										Version Control
+									</h3>
+									<p className="text-sm text-muted-foreground">
+										Branch, compare, and revert your generations.
+									</p>
 								</div>
-=======
-
-					<div className="grid md:grid-cols-3 gap-6 md:gap-8">
-						<div className="rounded-lg border bg-card p-6 text-left">
-							<div className="size-12 bg-primary/10 rounded-lg flex items-center justify-center">
-								<Zap className="size-5 text-primary" aria-hidden />
-							</div>
-							<div className="mt-4 space-y-2">
-								<h3 className="font-mono text-sm uppercase tracking-tight font-semibold">
-									Lightning Fast
-								</h3>
-								<p className="text-sm text-muted-foreground">
-									Generate complete tracks in seconds, not hours. AI that
-									actually keeps up with your creativity.
-								</p>
-							</div>
-						</div>
-
-						<div className="rounded-lg border bg-card p-6 text-left">
-							<div className="size-12 bg-primary/10 rounded-lg flex items-center justify-center">
-								<Music2 className="size-5 text-primary" aria-hidden />
-							</div>
-							<div className="mt-4 space-y-2">
-								<h3 className="font-mono text-sm uppercase tracking-tight font-semibold">
-									Any Genre
-								</h3>
-								<p className="text-sm text-muted-foreground">
-									From trap to ambient, house to jazz. Our AI understands every
-									style and nuance.
-								</p>
-							</div>
-						</div>
-
-						<div className="rounded-lg border bg-card p-6 text-left">
-							<div className="size-12 bg-primary/10 rounded-lg flex items-center justify-center">
-								<Wrench className="size-5 text-primary" aria-hidden />
-							</div>
-							<div className="mt-4 space-y-2">
-								<h3 className="font-mono text-sm uppercase tracking-tight font-semibold">
-									Producer Grade
-								</h3>
-								<p className="text-sm text-muted-foreground">
-									Professional quality output ready for your DAW. No
-									post-processing needed.
-								</p>
->>>>>>> refs/remotes/origin/feat/agent:app/(marketing)/page.tsx
 							</div>
 						</div>
 					</div>
