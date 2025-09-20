@@ -59,14 +59,10 @@ export function DAWTrackContent() {
 		const startTime = x / pixelsPerMs;
 
 		try {
-			// Use MediaBunny integration to load audio file into existing track
-			const updatedTrack = await loadAudioFile(file, trackId);
-
-			// Update the track position based on drop location
-			updateTrack(trackId, {
-				startTime,
+			// Use MediaBunny integration to load audio file into existing track at drop time
+			const updatedTrack = await loadAudioFile(file, trackId, {
+				startTimeMs: startTime,
 			});
-
 			console.log(
 				"Audio file loaded successfully into track:",
 				updatedTrack.name,
@@ -171,6 +167,24 @@ export function DAWTrackContent() {
 				const trackY = index * trackHeight;
 				const trackWidth = (track.trimEnd - track.trimStart) * pixelsPerMs;
 				const trackX = track.startTime * pixelsPerMs;
+
+				// Compute clips for rendering (fallback to legacy single-clip)
+				const clips =
+					track.clips && track.clips.length > 0
+						? track.clips
+						: [
+								{
+									id: track.id,
+									name: track.name,
+									opfsFileId: track.opfsFileId!,
+									audioFileName: track.audioFileName,
+									audioFileType: track.audioFileType,
+									startTime: track.startTime,
+									trimStart: track.trimStart,
+									trimEnd: track.trimEnd,
+									color: track.color,
+								},
+							];
 
 				return (
 					<div

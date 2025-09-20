@@ -134,6 +134,24 @@ export function DAWContainer() {
 		[handleHorizontalScroll, handleVerticalScroll],
 	);
 
+	useEffect(() => {
+		// Prevent back/forward swipe gestures interfering with DAW grid
+		const preventTouchNav = (e: TouchEvent) => {
+			if ((e as any).touches && (e as any).touches.length === 2) {
+				// pinch zoom
+				e.preventDefault();
+			}
+		};
+		document.body.style.overscrollBehavior = "none";
+		document.addEventListener("touchstart", preventTouchNav, {
+			passive: false,
+		});
+		return () => {
+			document.body.style.overscrollBehavior = "";
+			document.removeEventListener("touchstart", preventTouchNav);
+		};
+	}, []);
+
 	return (
 		<div className="h-screen flex flex-col bg-background">
 			{/* Toolbar */}

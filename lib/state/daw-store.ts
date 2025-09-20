@@ -7,6 +7,23 @@ import { playbackEngine } from "@/lib/audio/playback-engine";
 import { DAW_PIXELS_PER_SECOND_AT_ZOOM_1 } from "@/lib/constants";
 import { generateTrackId } from "@/lib/storage/opfs";
 
+export type Clip = {
+	id: string;
+	name: string;
+	opfsFileId: string;
+	audioFileName?: string;
+	audioFileType?: string;
+	// Timeline positioning (absolute, in ms)
+	startTime: number;
+	// File region in ms
+	trimStart: number;
+	trimEnd: number;
+	// Optional fade envelopes (ms)
+	fadeIn?: number;
+	fadeOut?: number;
+	color?: string;
+};
+
 export type Track = {
 	id: string;
 	name: string;
@@ -20,10 +37,12 @@ export type Track = {
 	muted: boolean;
 	soloed: boolean;
 	color: string;
-	// OPFS file reference for persistent storage
+	// OPFS file reference for persistent storage (legacy single-clip)
 	opfsFileId?: string;
 	audioFileName?: string;
 	audioFileType?: string;
+	// Multiple clips per track (new model)
+	clips?: Clip[];
 	// Cached audio data from MediaBunny
 	mediaBunnyInput?: unknown; // Will be typed properly in the audio handler
 };
@@ -143,15 +162,28 @@ export const updateTrackAtom = atom(
 		);
 		set(tracksAtom, updatedTracks);
 
-		// If playing, reschedule just the edited track for immediate audio correctness
-		if (playback.isPlaying) {
-			const updatedTrack = updatedTracks.find((t) => t.id === trackId);
-			if (updatedTrack) {
-				try {
-					await playbackEngine.rescheduleTrack(updatedTrack);
-				} catch (e) {
-					console.error("Failed to reschedule track after update", trackId, e);
-				}
+		const updatedTrack = updatedTracks.find((t) => t.id === trackId);
+		if (!updatedTrack) return;
+
+		// Volume/mute should reflect immediately without reschedule
+		if (typeof updates.volume === "number") {
+			playbackEngine.updateTrackVolume(trackId, updates.volume);
+		}
+		if (typeof updates.muted === "boolean") {
+			playbackEngine.updateTrackMute(trackId, updates.muted);
+		}
+
+		// If playing and timing changed, reschedule for immediate correctness
+		if (
+			playback.isPlaying &&
+			(updates.startTime !== undefined ||
+				updates.trimStart !== undefined ||
+				updates.trimEnd !== undefined)
+		) {
+			try {
+				await playbackEngine.rescheduleTrack(updatedTrack);
+			} catch (e) {
+				console.error("Failed to reschedule track after update", trackId, e);
 			}
 		}
 	},
@@ -223,7 +255,13 @@ export const initializeAudioFromOPFSAtom = atom(null, async (get, _set) => {
 // Audio file operations
 export const loadAudioFileAtom = atom(
 	null,
-	async (get, set, file: File, existingTrackId?: string) => {
+	async (
+		get,
+		set,
+		file: File,
+		existingTrackId?: string,
+		opts?: { startTimeMs?: number },
+	) => {
 		try {
 			// Always generate a unique ID for OPFS storage
 			const opfsFileId = generateTrackId();
@@ -239,24 +277,32 @@ export const loadAudioFileAtom = atom(
 				const existingTrack = tracks.find((t) => t.id === existingTrackId);
 
 				if (existingTrack) {
-					// Update the existing track
-					const updatedTrack: Track = {
-						...existingTrack,
-						name: file.name.replace(/\.[^/.]+$/, ""), // Remove file extension
-						duration: audioInfo.duration * 1000, // Convert to ms
-						trimStart: 0,
-						trimEnd: audioInfo.duration * 1000,
-						opfsFileId: opfsFileId,
+					// Update the existing track (legacy fields) AND append a new clip
+					const clipId = crypto.randomUUID();
+					const clip = {
+						id: clipId,
+						name: file.name.replace(/\.[^/.]+$/, ""),
+						opfsFileId,
 						audioFileName: audioInfo.fileName,
 						audioFileType: audioInfo.fileType,
+						startTime: opts?.startTimeMs ?? existingTrack.startTime,
+						trimStart: 0,
+						trimEnd: audioInfo.duration * 1000,
+						color: existingTrack.color,
+					} satisfies Clip;
+
+					const updatedTrack: Track = {
+						...existingTrack,
+						name: file.name.replace(/\.[^/.]+$/, ""),
+						duration: audioInfo.duration * 1000,
+						trimStart: 0,
+						trimEnd: audioInfo.duration * 1000,
+						opfsFileId,
+						audioFileName: audioInfo.fileName,
+						audioFileType: audioInfo.fileType,
+						clips: [...(existingTrack.clips ?? []), clip],
 					};
 
-					console.log(
-						"Updated existing track:",
-						updatedTrack.id,
-						"with opfsFileId:",
-						updatedTrack.opfsFileId,
-					);
 					set(
 						tracksAtom,
 						tracks.map((t) => (t.id === existingTrackId ? updatedTrack : t)),
@@ -265,35 +311,39 @@ export const loadAudioFileAtom = atom(
 				}
 			}
 
-			// Create new track with audio information
+			// Create new track with audio information and a single clip
 			const newTrackId = generateTrackId();
+			const clipId = crypto.randomUUID();
+			const clip: Clip = {
+				id: clipId,
+				name: file.name.replace(/\.[^/.]+$/, ""),
+				opfsFileId,
+				audioFileName: audioInfo.fileName,
+				audioFileType: audioInfo.fileType,
+				startTime: opts?.startTimeMs ?? 0,
+				trimStart: 0,
+				trimEnd: audioInfo.duration * 1000,
+				color: "#3b82f6",
+			};
 			const newTrack: Track = {
 				id: newTrackId,
-				name: file.name.replace(/\.[^/.]+$/, ""), // Remove file extension
-				duration: audioInfo.duration * 1000, // Convert to ms
+				name: file.name.replace(/\.[^/.]+$/, ""),
+				duration: audioInfo.duration * 1000,
 				startTime: 0,
 				trimStart: 0,
 				trimEnd: audioInfo.duration * 1000,
 				volume: 75,
 				muted: false,
 				soloed: false,
-				color: "#3b82f6", // Default blue
-				opfsFileId: opfsFileId,
+				color: "#3b82f6",
+				opfsFileId,
 				audioFileName: audioInfo.fileName,
 				audioFileType: audioInfo.fileType,
+				clips: [clip],
 			};
 
-			console.log(
-				"Created new track:",
-				newTrackId,
-				"with opfsFileId:",
-				opfsFileId,
-			);
-
-			// Add track to state
-			const tracks = get(tracksAtom);
-			set(tracksAtom, [...tracks, newTrack]);
-
+			const tracks2 = get(tracksAtom);
+			set(tracksAtom, [...tracks2, newTrack]);
 			return newTrack;
 		} catch (error) {
 			console.error("Failed to load audio file:", error);
