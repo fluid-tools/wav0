@@ -269,8 +269,9 @@ export function DAWTrackContent() {
 						}}
 					>
 						{/* Track Drop Zone */}
-						<button
-							type="button"
+						<div
+							role="button"
+							tabIndex={0}
 							className={`absolute inset-0 w-full h-full border-none p-0 cursor-default transition-colors ${
 								dragOverTrackId === track.id
 									? "bg-primary/10 border-2 border-primary border-dashed"
@@ -293,7 +294,14 @@ export function DAWTrackContent() {
 								}
 							}}
 							onClick={() => setSelectedTrackId(track.id)}
+							onKeyDown={(e) => {
+								if (e.key === "Enter" || e.key === " ") {
+									e.preventDefault();
+									setSelectedTrackId(track.id);
+								}
+							}}
 							style={{ padding: "12px" }}
+							role="group"
 							aria-label={`Track ${track.name} drop zone`}
 						>
 							{/* Render clips */}
@@ -521,7 +529,7 @@ export function DAWTrackContent() {
 										Drop audio file here
 									</div>
 								)}
-						</button>
+						</div>
 					</div>
 				);
 			})}
