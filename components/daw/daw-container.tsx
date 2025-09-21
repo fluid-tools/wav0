@@ -21,6 +21,7 @@ import {
 	addTrackAtom,
 	horizontalScrollAtom,
 	initializeAudioFromOPFSAtom,
+	playbackAtom,
 	timelineAtom,
 	timelineWidthAtom,
 	trackHeightZoomAtom,
@@ -42,6 +43,8 @@ export function DAWContainer() {
 	const [, addTrack] = useAtom(addTrackAtom);
 	const [, setHorizontalScroll] = useAtom(horizontalScrollAtom);
 	const [, setVerticalScroll] = useAtom(verticalScrollAtom);
+	const [playback] = useAtom(playbackAtom);
+	const [timeline] = useAtom(timelineAtom);
 	const [, initializeAudioFromOPFS] = useAtom(initializeAudioFromOPFSAtom);
 
 	const timelineScrollRef = useRef<HTMLDivElement>(null);
@@ -153,6 +156,23 @@ export function DAWContainer() {
 			document.removeEventListener("touchstart", preventTouchNav);
 		};
 	}, []);
+
+	// Playhead-follow: keep playhead within center band
+	useEffect(() => {
+		if (!timelineScrollRef.current || !trackGridScrollRef.current) return;
+		const pxPerSec = DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * timeline.zoom;
+		const x = (playback.currentTime / 1000) * pxPerSec;
+		const grid = trackGridScrollRef.current;
+		const left = grid.scrollLeft;
+		const right = left + grid.clientWidth;
+		const bandLeft = left + grid.clientWidth * 0.35;
+		const bandRight = left + grid.clientWidth * 0.65;
+		if (x < bandLeft || x > bandRight) {
+			const target = Math.max(0, x - grid.clientWidth * 0.5);
+			grid.scrollTo({ left: target });
+			timelineScrollRef.current.scrollTo({ left: target });
+		}
+	}, [playback.currentTime, timeline.zoom]);
 
 	return (
 		<div className="h-screen flex flex-col bg-background">

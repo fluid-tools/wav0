@@ -33,6 +33,10 @@ import {
 	togglePlaybackAtom,
 	totalDurationAtom,
 	trackHeightZoomAtom,
+	selectedTrackIdAtom,
+	selectedClipIdAtom,
+	tracksAtom,
+	updateClipAtom,
 } from "@/lib/state/daw-store";
 import { formatDuration } from "@/lib/storage/opfs";
 
@@ -47,6 +51,12 @@ export function DAWControls() {
 	const [, setTimelineZoom] = useAtom(setTimelineZoomAtom);
 	const [, setTrackHeightZoom] = useAtom(setTrackHeightZoomAtom);
 	const [totalDuration] = useAtom(totalDurationAtom);
+
+	// Selection and clip update atoms
+	const [selectedTrackId] = useAtom(selectedTrackIdAtom);
+	const [selectedClipId] = useAtom(selectedClipIdAtom);
+	const [tracks] = useAtom(tracksAtom);
+	const [, updateClip] = useAtom(updateClipAtom);
 
 	const handleStop = async () => {
 		try {
@@ -82,6 +92,45 @@ export function DAWControls() {
 
 	const handleTrackHeightZoomOut = () => {
 		setTrackHeightZoom(Math.max(trackHeightZoom - 0.2, 0.6));
+	};
+
+	// Selected clip lookup
+	const findSelectedClip = () => {
+		if (!selectedTrackId || !selectedClipId) return null as any;
+		const track = tracks.find((t) => t.id === selectedTrackId);
+		if (!track || !track.clips) return null as any;
+		const clip = track.clips.find((c) => c.id === selectedClipId);
+		if (!clip) return null as any;
+		return { track, clip } as const;
+	};
+
+	const loopState = (() => {
+		const sel = findSelectedClip();
+		return sel?.clip?.loop === true;
+	})();
+
+	const onToggleLoop = async () => {
+		const sel = findSelectedClip();
+		if (!sel) return;
+		const { track, clip } = sel;
+		const isLooping = clip.loop === true;
+		if (isLooping) {
+			await updateClip(track.id, clip.id, { loop: false });
+			return;
+		}
+		// enabling loop
+		let loopEnd = clip.loopEnd;
+		if (loopEnd === undefined) {
+			const bars = 8;
+			const beatsPerBar = 4;
+			const msPerBeat =
+				60000 / Math.max(30, Math.min(300, playback.bpm || 120));
+			const defaultLen = bars * beatsPerBar * msPerBeat;
+			const oneShotEnd =
+				clip.startTime + Math.max(0, clip.trimEnd - clip.trimStart);
+			loopEnd = Math.max(clip.startTime + defaultLen, oneShotEnd);
+		}
+		await updateClip(track.id, clip.id, { loop: true, loopEnd });
 	};
 
 	return (
@@ -235,9 +284,16 @@ export function DAWControls() {
 						max={200}
 					/>
 				</div>
-				<Button variant={playback.looping ? "default" : "ghost"} size="sm">
+
+				<Button
+					variant={loopState ? "secondary" : "ghost"}
+					size="sm"
+					onClick={onToggleLoop}
+					title="Toggle loop for selected clip"
+				>
 					<Repeat className={DAW_ICONS.MD} />
 				</Button>
+
 				<div className="flex items-center gap-2">
 					<Volume2 className={`${DAW_ICONS.MD} text-muted-foreground`} />
 					<input

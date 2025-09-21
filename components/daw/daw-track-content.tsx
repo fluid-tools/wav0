@@ -15,6 +15,7 @@ import {
 	tracksAtom,
 	updateTrackAtom,
 	updateClipAtom,
+	totalDurationAtom,
 } from "@/lib/state/daw-store";
 import { formatDuration } from "@/lib/storage/opfs";
 
@@ -29,6 +30,7 @@ export function DAWTrackContent() {
 	const [timeline] = useAtom(timelineAtom);
 	const [trackHeightZoom] = useAtom(trackHeightZoomAtom);
 	const [projectEndPosition] = useAtom(projectEndPositionAtom);
+	const [totalDuration] = useAtom(totalDurationAtom);
 
 	const [resizingClip, setResizingClip] = useState<{
 		trackId: string;
@@ -45,6 +47,14 @@ export function DAWTrackContent() {
 		clipId: string;
 		startX: number;
 		startTime: number;
+	} | null>(null);
+
+	// Loop-end dragging state
+	const [loopDragging, setLoopDragging] = useState<{
+		trackId: string;
+		clipId: string;
+		startX: number;
+		startLoopEnd: number | undefined;
 	} | null>(null);
 
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -76,9 +86,9 @@ export function DAWTrackContent() {
 		}
 	};
 
-	// Attach document-level pointer listeners while resizing or dragging
+	// Attach document-level pointer listeners while resizing, dragging, or loop-dragging
 	useEffect(() => {
-		if (!resizingClip && !draggingClip) return;
+		if (!resizingClip && !draggingClip && !loopDragging) return;
 
 		let raf = 0;
 		let lastX = 0;
@@ -140,12 +150,33 @@ export function DAWTrackContent() {
 						startTime: newStartTime,
 					});
 				}
+
+				if (loopDragging) {
+					const deltaX = lastX - loopDragging.startX;
+					const deltaTime = deltaX / pixelsPerMs;
+					const track = tracks.find((t) => t.id === loopDragging.trackId);
+					const clip = track?.clips?.find((c) => c.id === loopDragging.clipId);
+					if (clip) {
+						const clipDur = Math.max(0, clip.trimEnd - clip.trimStart);
+						const oneShotEnd = clip.startTime + clipDur;
+						const baseLoopEnd =
+							loopDragging.startLoopEnd === undefined
+								? oneShotEnd
+								: loopDragging.startLoopEnd;
+						let newLoopEnd = Math.max(oneShotEnd, baseLoopEnd + deltaTime);
+						newLoopEnd = Math.min(newLoopEnd, totalDuration);
+						updateClip(loopDragging.trackId, loopDragging.clipId, {
+							loopEnd: newLoopEnd,
+						});
+					}
+				}
 			});
 		};
 
 		const onUp = () => {
 			setResizingClip(null);
 			setDraggingClip(null);
+			setLoopDragging(null);
 			if (raf) cancelAnimationFrame(raf);
 		};
 
@@ -156,7 +187,15 @@ export function DAWTrackContent() {
 			window.removeEventListener("mouseup", onUp);
 			if (raf) cancelAnimationFrame(raf);
 		};
-	}, [resizingClip, draggingClip, pixelsPerMs, updateClip]);
+	}, [
+		resizingClip,
+		draggingClip,
+		loopDragging,
+		pixelsPerMs,
+		updateClip,
+		tracks,
+		totalDuration,
+	]);
 
 	return (
 		<div ref={containerRef} className="relative w-full h-full">
@@ -314,6 +353,23 @@ export function DAWTrackContent() {
 											aria-label="Resize clip end"
 										/>
 
+										{/* Loop handle (selected + clip.loop) */}
+										{isSelected && (clip as any).loop && (
+											<div
+												className="absolute top-1/2 -translate-y-1/2 right-[-6px] w-3 h-6 rounded-sm bg-primary shadow cursor-ew-resize"
+												onMouseDown={(e) => {
+													e.stopPropagation();
+													setLoopDragging({
+														trackId: track.id,
+														clipId: clip.id,
+														startX: e.clientX,
+														startLoopEnd: (clip as any).loopEnd,
+													});
+												}}
+												aria-label="Adjust loop end"
+											/>
+										)}
+
 										{/* Clip label */}
 										<div className="absolute inset-2 flex flex-col justify-center pointer-events-none">
 											<div className="text-xs font-medium truncate text-left">
@@ -323,6 +379,60 @@ export function DAWTrackContent() {
 												{formatDuration((clip.trimEnd - clip.trimStart) / 1000)}
 											</div>
 										</div>
+									</div>
+								);
+							})}
+
+							{/* Ghost loop tiles and separators */}
+							{clips.map((clip) => {
+								const loop = (clip as any).loop;
+								const loopEnd = (clip as any).loopEnd as number | undefined;
+								if (!loop || !loopEnd) return null;
+								const clipDur = Math.max(0, clip.trimEnd - clip.trimStart);
+								if (clipDur <= 0) return null;
+								const oneShotEnd = clip.startTime + clipDur;
+								if (loopEnd <= oneShotEnd) return null;
+
+								const tiles: any[] = [];
+								const separators: any[] = [];
+								for (let t = oneShotEnd; t < loopEnd; t += clipDur) {
+									const end = Math.min(t + clipDur, loopEnd);
+									const left = t * pixelsPerMs;
+									const width = Math.max((end - t) * pixelsPerMs, 8);
+									tiles.push(
+										<div
+											key={`ghost-${clip.id}-${t}`}
+											className="absolute top-0 bottom-0 rounded-md pointer-events-none"
+											style={{
+												left,
+												width,
+												backgroundColor: `${clip.color ?? track.color}14`,
+												border: `1px dashed ${clip.color ?? track.color}`,
+												opacity: 0.5,
+												zIndex: 1,
+											}}
+										/>,
+									);
+									separators.push(
+										<div
+											key={`sep-${clip.id}-${t}`}
+											className="absolute top-0 bottom-0 w-px pointer-events-none"
+											style={{
+												left,
+												backgroundColor: clip.color ?? track.color,
+												opacity: 0.5,
+												zIndex: 2,
+											}}
+										/>,
+									);
+								}
+								return (
+									<div
+										key={`ghost-wrap-${clip.id}`}
+										className="absolute inset-0"
+									>
+										{tiles}
+										{separators}
 									</div>
 								);
 							})}
