@@ -381,25 +381,6 @@ export function DAWTrackContent() {
 											aria-label="Resize clip end"
 										/>
 
-										{/* Loop handle anchored at clip end (visible when selected + loop) */}
-										{isSelected && (clip as any).loop && (
-											<div
-												className="absolute top-1/2 -translate-y-1/2 right-[-6px] w-3 h-6 rounded-sm bg-primary shadow cursor-ew-resize"
-												onMouseDown={(e) => {
-													e.stopPropagation();
-													setSelectedTrackId(track.id);
-													setSelectedClipId(clip.id);
-													setLoopDragging({
-														trackId: track.id,
-														clipId: clip.id,
-														startX: e.clientX,
-														startLoopEnd: (clip as any).loopEnd,
-													});
-												}}
-												aria-label="Adjust loop end"
-											/>
-										)}
-
 										{/* Clip label */}
 										<div className="absolute inset-2 flex flex-col justify-center pointer-events-none">
 											<div className="text-xs font-medium truncate text-left">
@@ -471,11 +452,12 @@ export function DAWTrackContent() {
 								const isSelected =
 									selectedTrackId === track.id && selectedClipId === clip.id;
 								const isLoop = (clip as any).loop;
-								if (!isSelected || !isLoop) return null;
 								const clipDur = Math.max(0, clip.trimEnd - clip.trimStart);
 								const oneShotEnd = clip.startTime + clipDur;
 								const loopEnd = (clip as any).loopEnd as number | undefined;
-								const xPx = (loopEnd ?? oneShotEnd) * pixelsPerMs;
+								if (!isSelected || !isLoop || !loopEnd || loopEnd <= oneShotEnd)
+									return null;
+								const xPx = loopEnd * pixelsPerMs;
 								return (
 									<div
 										key={`loop-end-${clip.id}`}
@@ -486,7 +468,7 @@ export function DAWTrackContent() {
 											style={{ left: xPx }}
 										/>
 										<div
-											className="absolute top-1/2 -translate-y-1/2 w-3 h-6 rounded-sm bg-primary shadow cursor-ew-resize"
+											className="absolute top-1/2 -translate-y-1/2 w-3 h-6 rounded-sm bg-primary shadow cursor-ew-resize pointer-events-auto"
 											style={{ left: xPx - 6 }}
 											onMouseDown={(e) => {
 												e.stopPropagation();
