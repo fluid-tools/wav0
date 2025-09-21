@@ -289,6 +289,7 @@ export function DAWControls() {
 					variant={loopState ? "secondary" : "ghost"}
 					size="sm"
 					onClick={onToggleLoop}
+					disabled={!findSelectedClip()}
 					title="Toggle loop for selected clip"
 				>
 					<Repeat className={DAW_ICONS.MD} />
