@@ -59,7 +59,7 @@ export class AudioManager {
 	 */
 	async loadAudioFile(file: File, trackId: string): Promise<AudioFileInfo> {
 		try {
-			console.log('AudioManager.loadAudioFile called with trackId:', trackId);
+			console.log("AudioManager.loadAudioFile called with trackId:", trackId);
 
 			// Create MediaBunny input from file
 			const input = new Input({
@@ -94,7 +94,7 @@ export class AudioManager {
 			};
 
 			// Store loaded track globally - this is key for state management
-			console.log('Storing loaded track with trackId:', trackId);
+			console.log("Storing loaded track with trackId:", trackId);
 			this.loadedTracks.set(trackId, {
 				audioTrack,
 				sink,
@@ -102,13 +102,19 @@ export class AudioManager {
 				info,
 			});
 
-			console.log('Loaded tracks now contains:', Array.from(this.loadedTracks.keys()));
+			console.log(
+				"Loaded tracks now contains:",
+				Array.from(this.loadedTracks.keys()),
+			);
 
 			// Save original file to OPFS for persistence
 			const arrayBuffer = await file.arrayBuffer();
 			await opfsManager.saveAudioFile(trackId, arrayBuffer);
 
-			console.log('Audio file loaded and cached successfully for trackId:', trackId);
+			console.log(
+				"Audio file loaded and cached successfully for trackId:",
+				trackId,
+			);
 			return info;
 		} catch (error) {
 			console.error("Failed to load audio file:", error);

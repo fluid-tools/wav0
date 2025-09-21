@@ -180,9 +180,9 @@ export const splitClipAtPlayheadAtom = atom(null, async (get, set) => {
 	newLeft.fadeOut = newLeft.fadeOut ?? 15;
 	newRight.fadeIn = newRight.fadeIn ?? 15;
 
-	const updatedClips = track.clips
-		.map((c) => (c.id === clip.id ? [newLeft, newRight] : c))
-		.flat() as Clip[];
+	const updatedClips = track.clips.flatMap((c) =>
+		c.id === clip.id ? [newLeft, newRight] : c,
+	) as Clip[];
 
 	const updatedTrack: Track = { ...track, clips: updatedClips };
 	const updatedTracks = tracks.map((t) =>
@@ -286,7 +286,11 @@ export const updateTrackAtom = atom(
 			playbackEngine.updateTrackVolume(trackId, updates.volume);
 		}
 		if (typeof updates.muted === "boolean") {
-			playbackEngine.updateTrackMute(trackId, updates.muted);
+			const vol =
+				typeof updates.volume === "number"
+					? updates.volume
+					: updatedTrack.volume;
+			playbackEngine.updateTrackMute(trackId, updates.muted, vol);
 		}
 
 		// If playing and timing changed, reschedule for immediate correctness

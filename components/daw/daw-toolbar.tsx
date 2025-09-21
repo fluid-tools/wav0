@@ -60,7 +60,10 @@ export function DAWToolbar() {
 	};
 
 	return (
-		<div className="bg-background border-b flex items-center justify-between px-4" style={{ height: DAW_HEIGHTS.TOOLBAR }}>
+		<div
+			className="bg-background border-b flex items-center justify-between px-4"
+			style={{ height: DAW_HEIGHTS.TOOLBAR }}
+		>
 			<div className="flex items-center gap-4">
 				<h1 className={DAW_TEXT.BRAND}>
 					wav<span className="text-muted-foreground">0</span>

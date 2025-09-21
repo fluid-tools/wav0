@@ -113,10 +113,12 @@ export class OPFSManager {
 			const audioDir = await this.opfsRoot.getDirectoryHandle("audio");
 			const files: string[] = [];
 
-			// Type assertion to access File System Access API methods
-			const dirHandle = audioDir as any;
-
-			for await (const [name, handle] of dirHandle.entries()) {
+			// Iterate directory entries (File System Access API)
+			// TypeScript lacks async iterator typing on FileSystemDirectoryHandle.entries()
+			// so we use a for-await over `as unknown as AsyncIterable<[string, FileSystemHandle]>`.
+			for await (const [name, handle] of audioDir as unknown as AsyncIterable<
+				[string, FileSystemHandle]
+			>) {
 				if (handle.kind === "file" && name.endsWith(".wav")) {
 					files.push(name.replace(".wav", ""));
 				}

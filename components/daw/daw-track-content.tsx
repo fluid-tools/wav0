@@ -4,18 +4,19 @@ import { useAtom } from "jotai";
 import { useEffect, useRef, useState } from "react";
 import { DAW_PIXELS_PER_SECOND_AT_ZOOM_1 } from "@/lib/constants";
 import { DAW_HEIGHTS } from "@/lib/constants/daw-design";
+import type { Clip } from "@/lib/state/daw-store";
 import {
+	activeToolAtom,
 	loadAudioFileAtom,
 	projectEndPositionAtom,
-	selectedTrackIdAtom,
 	selectedClipIdAtom,
-	activeToolAtom,
+	selectedTrackIdAtom,
 	timelineAtom,
+	totalDurationAtom,
 	trackHeightZoomAtom,
 	tracksAtom,
-	updateTrackAtom,
 	updateClipAtom,
-	totalDurationAtom,
+	updateTrackAtom,
 } from "@/lib/state/daw-store";
 import { formatDuration } from "@/lib/storage/opfs";
 
@@ -23,8 +24,8 @@ export function DAWTrackContent() {
 	const [tracks] = useAtom(tracksAtom);
 	const [selectedTrackId, setSelectedTrackId] = useAtom(selectedTrackIdAtom);
 	const [selectedClipId, setSelectedClipId] = useAtom(selectedClipIdAtom);
-	const [activeTool] = useAtom(activeToolAtom);
-	const [, updateTrack] = useAtom(updateTrackAtom);
+	const [_activeTool] = useAtom(activeToolAtom);
+	const [, _updateTrack] = useAtom(updateTrackAtom);
 	const [, updateClip] = useAtom(updateClipAtom);
 	const [, loadAudioFile] = useAtom(loadAudioFileAtom);
 	const [timeline] = useAtom(timelineAtom);
@@ -58,6 +59,24 @@ export function DAWTrackContent() {
 	} | null>(null);
 
 	const containerRef = useRef<HTMLDivElement>(null);
+	const [_gridCount, setGridCount] = useState(0);
+
+	useEffect(() => {
+		const update = () => {
+			const width = containerRef.current?.getBoundingClientRect().width ?? 0;
+			const gridSpacing = 100;
+			setGridCount(Math.max(0, Math.ceil(width / gridSpacing)));
+		};
+		update();
+		const ro =
+			typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
+		if (ro && containerRef.current) ro.observe(containerRef.current);
+		window.addEventListener("resize", update);
+		return () => {
+			window.removeEventListener("resize", update);
+			if (ro && containerRef.current) ro.unobserve(containerRef.current);
+		};
+	}, []);
 	const [dragOverTrackId, setDragOverTrackId] = useState<string | null>(null);
 
 	const pixelsPerMs = (DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * timeline.zoom) / 1000; // px/ms
@@ -212,22 +231,28 @@ export function DAWTrackContent() {
 				const trackY = index * trackHeight;
 
 				// Fallback legacy clip if no clips array yet
-				const clips =
+				const clips: Clip[] =
 					track.clips && track.clips.length > 0
-						? track.clips
-						: [
-								{
-									id: track.id,
-									name: track.name,
-									opfsFileId: track.opfsFileId!,
-									audioFileName: track.audioFileName,
-									audioFileType: track.audioFileType,
-									startTime: track.startTime,
-									trimStart: track.trimStart,
-									trimEnd: track.trimEnd,
-									color: track.color,
-								},
-							];
+						? (track.clips as Clip[])
+						: track.opfsFileId
+							? [
+									{
+										id: track.id,
+										name: track.name,
+										opfsFileId: track.opfsFileId,
+										audioFileName: track.audioFileName,
+										audioFileType: track.audioFileType,
+										startTime: track.startTime,
+										trimStart: track.trimStart,
+										trimEnd: track.trimEnd,
+										sourceDurationMs: Math.max(
+											0,
+											track.trimEnd - track.trimStart,
+										),
+										color: track.color,
+									} as Clip,
+								]
+							: [];
 
 				return (
 					<div
@@ -294,31 +319,36 @@ export function DAWTrackContent() {
 											backgroundColor: `${clip.color ?? track.color}20`,
 											borderColor: clip.color ?? track.color,
 										}}
-										role="button"
-										tabIndex={0}
-										aria-label={`Select audio clip: ${clip.name}`}
-										onMouseDown={(e) => {
-											// Drag body if click is not near edges
-											const rect = (
-												e.currentTarget as HTMLDivElement
-											).getBoundingClientRect();
-											const localX = e.clientX - rect.left;
-											const nearLeft = localX < 8;
-											const nearRight = localX > rect.width - 8;
-											setSelectedTrackId(track.id);
-											setSelectedClipId(clip.id);
-											if (!nearLeft && !nearRight) {
-												setDraggingClip({
-													trackId: track.id,
-													clipId: clip.id,
-													startX: e.clientX,
-													startTime: clip.startTime,
-												});
-											}
-										}}
 									>
+										{/* Full-body interactive area */}
+										<button
+											type="button"
+											className="absolute inset-0 rounded-md bg-transparent cursor-default"
+											aria-label={`Select audio clip: ${clip.name}`}
+											onMouseDown={(e) => {
+												// Drag body if click is not near edges
+												const rect = (
+													e.currentTarget as HTMLButtonElement
+												).getBoundingClientRect();
+												const localX = e.clientX - rect.left;
+												const nearLeft = localX < 8;
+												const nearRight = localX > rect.width - 8;
+												setSelectedTrackId(track.id);
+												setSelectedClipId(clip.id);
+												if (!nearLeft && !nearRight) {
+													setDraggingClip({
+														trackId: track.id,
+														clipId: clip.id,
+														startX: e.clientX,
+														startTime: clip.startTime,
+													});
+												}
+											}}
+										/>
+
 										{/* Visible grab handle on hover */}
-										<div
+										<button
+											type="button"
 											className="absolute top-1/2 -translate-y-1/2 left-2 h-8 w-2 rounded-sm opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing"
 											style={{
 												background:
@@ -339,7 +369,8 @@ export function DAWTrackContent() {
 										/>
 
 										{/* Left resize handle */}
-										<div
+										<button
+											type="button"
 											className="absolute left-0 top-0 bottom-0 w-2 cursor-w-resize bg-primary/20 hover:bg-primary/40"
 											onMouseDown={(e) => {
 												e.stopPropagation();
@@ -355,12 +386,11 @@ export function DAWTrackContent() {
 													startClipStartTime: clip.startTime,
 												});
 											}}
-											role="button"
-											tabIndex={0}
 											aria-label="Resize clip start"
 										/>
 										{/* Right resize handle */}
-										<div
+										<button
+											type="button"
 											className="absolute right-0 top-0 bottom-0 w-2 cursor-e-resize bg-primary/20 hover:bg-primary/40"
 											onMouseDown={(e) => {
 												e.stopPropagation();
@@ -376,8 +406,6 @@ export function DAWTrackContent() {
 													startClipStartTime: clip.startTime,
 												});
 											}}
-											role="button"
-											tabIndex={0}
 											aria-label="Resize clip end"
 										/>
 
@@ -396,15 +424,15 @@ export function DAWTrackContent() {
 
 							{/* Loop ghosts overlay (non-interactive) */}
 							{clips.map((clip) => {
-								const loop = (clip as any).loop;
-								const loopEnd = (clip as any).loopEnd as number | undefined;
+								const loop = clip.loop;
+								const loopEnd = clip.loopEnd;
 								const clipDur = Math.max(0, clip.trimEnd - clip.trimStart);
 								if (!loop || clipDur <= 0) return null;
 								const oneShotEnd = clip.startTime + clipDur;
 								if (!loopEnd || loopEnd <= oneShotEnd) return null;
 
-								const tiles: any[] = [];
-								const separators: any[] = [];
+								const tiles: React.ReactNode[] = [];
+								const separators: React.ReactNode[] = [];
 								for (let t = oneShotEnd; t < loopEnd; t += clipDur) {
 									const end = Math.min(t + clipDur, loopEnd);
 									const left = t * pixelsPerMs;
@@ -451,10 +479,10 @@ export function DAWTrackContent() {
 							{clips.map((clip) => {
 								const isSelected =
 									selectedTrackId === track.id && selectedClipId === clip.id;
-								const isLoop = (clip as any).loop;
+								const isLoop = clip.loop;
 								const clipDur = Math.max(0, clip.trimEnd - clip.trimStart);
 								const oneShotEnd = clip.startTime + clipDur;
-								const loopEnd = (clip as any).loopEnd as number | undefined;
+								const loopEnd = clip.loopEnd;
 								if (!isSelected || !isLoop || !loopEnd || loopEnd <= oneShotEnd)
 									return null;
 								const xPx = loopEnd * pixelsPerMs;
@@ -467,7 +495,8 @@ export function DAWTrackContent() {
 											className="absolute top-0 bottom-0 w-px bg-primary/70 pointer-events-none"
 											style={{ left: xPx }}
 										/>
-										<div
+										<button
+											type="button"
 											className="absolute top-1/2 -translate-y-1/2 w-3 h-6 rounded-sm bg-primary shadow cursor-ew-resize pointer-events-auto"
 											style={{ left: xPx - 6 }}
 											onMouseDown={(e) => {
@@ -476,7 +505,7 @@ export function DAWTrackContent() {
 													trackId: track.id,
 													clipId: clip.id,
 													startX: e.clientX,
-													startLoopEnd: (clip as any).loopEnd,
+													startLoopEnd: clip.loopEnd,
 												});
 											}}
 											aria-label="Adjust loop end"
@@ -512,13 +541,19 @@ export function DAWTrackContent() {
 
 			{/* Grid Lines */}
 			<div className="absolute inset-0 pointer-events-none">
-				{Array.from({ length: Math.ceil(2000 / 100) }).map((_, i) => (
-					<div
-						key={`grid-line-${i * 100}`}
-						className="absolute top-0 bottom-0 w-px bg-border/20"
-						style={{ left: i * 100 }}
-					/>
-				))}
+				{(() => {
+					const gridSpacing = 100;
+					const width =
+						containerRef.current?.getBoundingClientRect().width ?? 0;
+					const count = Math.ceil(width / gridSpacing);
+					return Array.from({ length: count }).map((_, i) => (
+						<div
+							key={`grid-line-${i * gridSpacing}`}
+							className="absolute top-0 bottom-0 w-px bg-border/20"
+							style={{ left: i * gridSpacing }}
+						/>
+					));
+				})()}
 			</div>
 		</div>
 	);
