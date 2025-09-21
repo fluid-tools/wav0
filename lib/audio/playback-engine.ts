@@ -462,11 +462,23 @@ export class PlaybackEngine {
 				: clipOneShotEndSec;
 			if (now >= loopUntilSec) continue;
 
-			const timeIntoClip = Math.max(0, now - clipStartSec);
-			const audioFileReadStart = Math.min(
-				clipTrimEndSec,
-				clipTrimStartSec + timeIntoClip,
-			);
+			let cycleOffsetSec = 0;
+			let timeIntoClip = 0;
+			if (clip.loop) {
+				if (now <= clipStartSec) {
+					timeIntoClip = 0;
+					cycleOffsetSec = 0;
+				} else {
+					const elapsed = now - clipStartSec;
+					const cycleIndex =
+						clipDurationSec > 0 ? Math.floor(elapsed / clipDurationSec) : 0;
+					cycleOffsetSec = cycleIndex * clipDurationSec;
+					timeIntoClip = clipDurationSec > 0 ? elapsed - cycleOffsetSec : 0;
+				}
+			} else {
+				timeIntoClip = Math.max(0, now - clipStartSec);
+			}
+			const audioFileReadStart = clipTrimStartSec + timeIntoClip;
 			if (audioFileReadStart >= clipTrimEndSec) continue;
 
 			let cps = trackState.clipStates.get(clip.id);
@@ -519,6 +531,8 @@ export class PlaybackEngine {
 				cps,
 				clipStartSec,
 				clipTrimStartSec,
+				cycleOffsetSec,
+				loopUntilSec,
 			);
 		}
 	}
