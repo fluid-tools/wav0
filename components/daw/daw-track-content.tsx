@@ -381,6 +381,25 @@ export function DAWTrackContent() {
 											aria-label="Resize clip end"
 										/>
 
+										{/* Loop handle anchored at clip end (visible when selected + loop) */}
+										{isSelected && (clip as any).loop && (
+											<div
+												className="absolute top-1/2 -translate-y-1/2 right-[-6px] w-3 h-6 rounded-sm bg-primary shadow cursor-ew-resize"
+												onMouseDown={(e) => {
+													e.stopPropagation();
+													setSelectedTrackId(track.id);
+													setSelectedClipId(clip.id);
+													setLoopDragging({
+														trackId: track.id,
+														clipId: clip.id,
+														startX: e.clientX,
+														startLoopEnd: (clip as any).loopEnd,
+													});
+												}}
+												aria-label="Adjust loop end"
+											/>
+										)}
+
 										{/* Clip label */}
 										<div className="absolute inset-2 flex flex-col justify-center pointer-events-none">
 											<div className="text-xs font-medium truncate text-left">
@@ -460,7 +479,7 @@ export function DAWTrackContent() {
 								return (
 									<div
 										key={`loop-end-${clip.id}`}
-										className="absolute inset-0 z-20"
+										className="absolute inset-0 z-20 pointer-events-none"
 									>
 										<div
 											className="absolute top-0 bottom-0 w-px bg-primary/70 pointer-events-none"
