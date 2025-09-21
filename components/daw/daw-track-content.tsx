@@ -447,7 +447,7 @@ export function DAWTrackContent() {
 								);
 							})}
 
-							{/* Loop-end marker + handle (interactive) */}
+							{/* Loop-end marker + handle (interactive only at loopEnd) */}
 							{clips.map((clip) => {
 								const isSelected =
 									selectedTrackId === track.id && selectedClipId === clip.id;
