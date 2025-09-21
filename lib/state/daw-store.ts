@@ -124,12 +124,14 @@ export const updateClipAtom = atom(
 		const updatedTrack = updatedTracks.find((t) => t.id === trackId);
 		if (!updatedTrack) return;
 
-		// If playing and timing changed, reschedule for immediate correctness
+		// If playing and timing/looping changed, reschedule for immediate correctness
 		if (
 			playback.isPlaying &&
 			(updates.startTime !== undefined ||
 				updates.trimStart !== undefined ||
-				updates.trimEnd !== undefined)
+				updates.trimEnd !== undefined ||
+				updates.loop !== undefined ||
+				updates.loopEnd !== undefined)
 		) {
 			try {
 				await playbackEngine.rescheduleTrack(updatedTrack);
