@@ -1,6 +1,6 @@
 "use client";
 
-import type { Track, Clip } from "@/lib/state/daw-store";
+import type { Clip, Track } from "@/lib/state/daw-store";
 import { audioManager } from "./audio-manager";
 
 export interface PlaybackOptions {
@@ -39,6 +39,7 @@ export class PlaybackEngine {
 	private options: PlaybackOptions = {};
 	private animationFrameId: number | null = null;
 	private queuedAudioNodes = new Set<AudioBufferSourceNode>();
+	private throttleIntervalId: ReturnType<typeof setInterval> | null = null;
 
 	private constructor() {}
 
@@ -194,13 +195,16 @@ export class PlaybackEngine {
 						gainNode: this.audioContext.createGain(),
 						audioSources: [],
 					};
-					cps.gainNode!.connect(trackState.gainNode!);
+					if (cps.gainNode && trackState.gainNode) {
+						cps.gainNode.connect(trackState.gainNode);
+					}
 					trackState.clipStates.set(clip.id, cps);
 				}
 
 				// Configure clip fades (basic linear ramps) — apply to one-shot segment only
 				try {
-					const clipGain = cps.gainNode!;
+					const clipGain = cps.gainNode ?? this.masterGainNode;
+					if (!clipGain) continue;
 					clipGain.gain.cancelScheduledValues(0);
 					clipGain.gain.setValueAtTime(1, 0);
 					const clipStartAC =
@@ -263,7 +267,9 @@ export class PlaybackEngine {
 				// Create node per buffer
 				const node = this.audioContext.createBufferSource();
 				node.buffer = buffer;
-				node.connect(clipGain ?? this.masterGainNode!);
+				node.connect(
+					clipGain ?? this.masterGainNode ?? this.audioContext.destination,
+				);
 
 				// timeline position mapping
 				const timeInTrimmed = timestamp - clipTrimStartSec;
@@ -296,9 +302,12 @@ export class PlaybackEngine {
 				const currentTimeline = this.getPlaybackTime();
 				if (timelinePos - currentTimeline >= 1) {
 					await new Promise((resolve) => {
-						const id = setInterval(() => {
+						if (this.throttleIntervalId) clearInterval(this.throttleIntervalId);
+						this.throttleIntervalId = setInterval(() => {
 							if (timelinePos - this.getPlaybackTime() < 1 || !this.isPlaying) {
-								clearInterval(id);
+								if (this.throttleIntervalId)
+									clearInterval(this.throttleIntervalId);
+								this.throttleIntervalId = null;
 								resolve(undefined);
 							}
 						}, 100);
@@ -336,6 +345,12 @@ export class PlaybackEngine {
 	async pause(): Promise<void> {
 		this.playbackTimeAtStart = this.getPlaybackTime();
 		this.isPlaying = false;
+
+		// Clear any throttle interval
+		if (this.throttleIntervalId) {
+			clearInterval(this.throttleIntervalId);
+			this.throttleIntervalId = null;
+		}
 
 		// Stop all iterators and nodes
 		for (const trackState of this.tracks.values()) {
@@ -402,7 +417,11 @@ export class PlaybackEngine {
 		// Ensure track gain exists
 		if (!trackState.gainNode) {
 			trackState.gainNode = this.audioContext.createGain();
-			trackState.gainNode.connect(this.masterGainNode!);
+			if (this.masterGainNode) {
+				trackState.gainNode.connect(this.masterGainNode);
+			} else if (this.audioContext) {
+				trackState.gainNode.connect(this.audioContext.destination);
+			}
 		}
 
 		trackState.isPlaying = true;
@@ -457,13 +476,20 @@ export class PlaybackEngine {
 					gainNode: this.audioContext.createGain(),
 					audioSources: [],
 				};
-				cps.gainNode!.connect(trackState.gainNode!);
+				if (cps.gainNode && trackState.gainNode) {
+					cps.gainNode.connect(trackState.gainNode);
+				} else if (cps.gainNode) {
+					(cps.gainNode as GainNode).connect(
+						this.masterGainNode ?? this.audioContext.destination,
+					);
+				}
 				trackState.clipStates.set(clip.id, cps);
 			}
 
 			// Reapply fades
 			try {
-				const clipGain = cps.gainNode!;
+				const clipGain = cps.gainNode ?? this.masterGainNode;
+				if (!clipGain) return;
 				clipGain.gain.cancelScheduledValues(0);
 				clipGain.gain.setValueAtTime(1, 0);
 				const clipStartAC =
@@ -529,10 +555,28 @@ export class PlaybackEngine {
 		}
 	}
 
-	updateTrackMute(trackId: string, muted: boolean): void {
+	updateTrackMute(trackId: string, muted: boolean, volume?: number): void {
 		const trackState = this.tracks.get(trackId);
-		if (trackState?.gainNode) {
-			trackState.gainNode.gain.value = muted ? 0 : 1;
+		if (!trackState?.gainNode) return;
+		const gn = trackState.gainNode;
+		// Attach a strongly-typed previousVolume on the state map entry using a symbol
+		const prevKey: unique symbol = Symbol("prev");
+		const stateAny = trackState as unknown as {
+			[k: symbol]: number | undefined;
+		};
+		if (muted) {
+			stateAny[prevKey] =
+				gn.gain?.value ?? (typeof volume === "number" ? volume / 100 : 1);
+			gn.gain.value = 0;
+		} else {
+			const prev = stateAny[prevKey];
+			const target =
+				typeof volume === "number"
+					? volume / 100
+					: typeof prev === "number"
+						? prev
+						: 1;
+			gn.gain.value = target;
 		}
 	}
 
@@ -542,11 +586,19 @@ export class PlaybackEngine {
 		}
 	}
 
-	cleanup(): void {
-		this.stop();
+	async cleanup(): Promise<void> {
+		try {
+			await this.stop();
+		} catch (e) {
+			console.error("Error while stopping during cleanup", e);
+		}
 		this.tracks.clear();
 		if (this.audioContext) {
-			this.audioContext.close();
+			try {
+				await this.audioContext.close();
+			} catch (e) {
+				console.error("Error closing audio context", e);
+			}
 			this.audioContext = null;
 			this.masterGainNode = null;
 		}

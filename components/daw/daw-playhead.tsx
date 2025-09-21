@@ -6,7 +6,6 @@ import { DAW_PIXELS_PER_SECOND_AT_ZOOM_1 } from "@/lib/constants";
 import {
 	horizontalScrollAtom,
 	playbackAtom,
-	projectEndPositionAtom,
 	setCurrentTimeAtom,
 	timelineAtom,
 	totalDurationAtom,
@@ -26,7 +25,10 @@ export function DAWPlayhead({ containerRef }: DAWPlayheadProps) {
 	const playheadRef = useRef<HTMLDivElement>(null);
 
 	// Calculate playhead position
-	const playheadPosition = (playback.currentTime / 1000) * timeline.zoom * DAW_PIXELS_PER_SECOND_AT_ZOOM_1;
+	const playheadPosition =
+		(playback.currentTime / 1000) *
+		timeline.zoom *
+		DAW_PIXELS_PER_SECOND_AT_ZOOM_1;
 	const viewportPosition = playheadPosition - horizontalScroll;
 
 	// Handle playhead dragging
@@ -42,24 +44,32 @@ export function DAWPlayhead({ containerRef }: DAWPlayheadProps) {
 			const rect = containerRef.current.getBoundingClientRect();
 			const x = e.clientX - rect.left + horizontalScroll;
 			const pixelsPerSecond = timeline.zoom * DAW_PIXELS_PER_SECOND_AT_ZOOM_1;
-			
+
 			// Snap-to-grid if enabled
 			const rawSeconds = x / pixelsPerSecond;
 			let snappedSeconds = rawSeconds;
-			
+
 			if (timeline.snapToGrid) {
 				const secondsPerBeat = 60 / playback.bpm;
 				const snapSeconds = secondsPerBeat / 4; // 16th grid
 				snappedSeconds = Math.round(rawSeconds / snapSeconds) * snapSeconds;
 			}
-			
+
 			// Clamp to project duration (don't allow past yellow marker)
 			const maxSeconds = totalDuration / 1000;
 			const clampedSeconds = Math.min(Math.max(0, snappedSeconds), maxSeconds);
 			const time = clampedSeconds * 1000;
 			setCurrentTime(time);
 		},
-		[isDragging, containerRef, horizontalScroll, timeline, playback.bpm, totalDuration, setCurrentTime]
+		[
+			isDragging,
+			containerRef,
+			horizontalScroll,
+			timeline,
+			playback.bpm,
+			totalDuration,
+			setCurrentTime,
+		],
 	);
 
 	const handleMouseUp = useCallback(() => {
@@ -82,7 +92,10 @@ export function DAWPlayhead({ containerRef }: DAWPlayheadProps) {
 	}, [isDragging, handleMouseMove, handleMouseUp]);
 
 	// Only render if visible in viewport (client-side only)
-	if (typeof window !== 'undefined' && (viewportPosition < -10 || viewportPosition > window.innerWidth)) {
+	if (
+		typeof window !== "undefined" &&
+		(viewportPosition < -10 || viewportPosition > window.innerWidth)
+	) {
 		return null;
 	}
 
@@ -105,7 +118,7 @@ export function DAWPlayhead({ containerRef }: DAWPlayheadProps) {
 			aria-valuenow={playback.currentTime}
 		>
 			{/* Playhead handle */}
-			<div 
+			<div
 				className={`w-3 h-3 rounded-sm -ml-1.5 transition-colors ${
 					isDragging ? "bg-red-400" : "bg-red-500"
 				}`}

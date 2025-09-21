@@ -21,7 +21,10 @@ export function DAWTimeline() {
 	const [horizontalScroll] = useAtom(horizontalScrollAtom);
 
 	// Calculate timeline playhead position
-	const timelinePlayheadPosition = (playback.currentTime / 1000) * timeline.zoom * DAW_PIXELS_PER_SECOND_AT_ZOOM_1;
+	const timelinePlayheadPosition =
+		(playback.currentTime / 1000) *
+		timeline.zoom *
+		DAW_PIXELS_PER_SECOND_AT_ZOOM_1;
 	const timelinePlayheadViewport = timelinePlayheadPosition - horizontalScroll;
 
 	// Calculate time markers based on zoom and BPM
@@ -70,16 +73,16 @@ export function DAWTimeline() {
 		const rect = e.currentTarget.getBoundingClientRect();
 		const x = e.clientX - rect.left;
 		const pixelsPerSecond = timeline.zoom * DAW_PIXELS_PER_SECOND_AT_ZOOM_1;
-		
+
 		// Don't allow clicking past project end
 		if (x > projectEndPosition) return;
-		
+
 		// Snap-to-grid (quarter note)
 		const secondsPerBeat = 60 / playback.bpm;
 		const snapSeconds = secondsPerBeat / 4; // 16th grid
 		const rawSeconds = x / pixelsPerSecond;
-		const snappedSeconds = timeline.snapToGrid 
-			? Math.round(rawSeconds / snapSeconds) * snapSeconds 
+		const snappedSeconds = timeline.snapToGrid
+			? Math.round(rawSeconds / snapSeconds) * snapSeconds
 			: rawSeconds;
 		const time = snappedSeconds * 1000; // ms
 		setCurrentTime(Math.max(0, time));
@@ -129,26 +132,27 @@ export function DAWTimeline() {
 				style={{ left: projectEndPosition }}
 				title="Project End"
 			/>
-			
+
 			{/* Buffer/dead space overlay */}
 			<div
 				className="absolute top-0 bottom-0 bg-muted/20 pointer-events-none z-20"
-				style={{ 
+				style={{
 					left: projectEndPosition,
 					right: 0,
 				}}
 			/>
 
 			{/* Timeline playhead indicator */}
-			{timelinePlayheadViewport >= -2 && timelinePlayheadViewport <= timelineWidth && (
-				<div
-					className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-50 pointer-events-none"
-					style={{ left: timelinePlayheadViewport }}
-				>
-					{/* Timeline playhead triangle indicator */}
-					<div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-b-3 border-transparent border-b-red-500" />
-				</div>
-			)}
+			{timelinePlayheadViewport >= -2 &&
+				timelinePlayheadViewport <= timelineWidth && (
+					<div
+						className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-50 pointer-events-none"
+						style={{ left: timelinePlayheadViewport }}
+					>
+						{/* Timeline playhead triangle indicator */}
+						<div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-b-3 border-transparent border-b-red-500" />
+					</div>
+				)}
 
 			{/* Snap grid overlay */}
 			{timeline.snapToGrid && (

@@ -9,6 +9,7 @@ import {
 	ResizablePanel,
 	ResizablePanelGroup,
 } from "@/components/ui/resizable";
+import { DAW_PIXELS_PER_SECOND_AT_ZOOM_1 } from "@/lib/constants";
 import {
 	DAW_COLORS,
 	DAW_HEIGHTS,
@@ -16,7 +17,6 @@ import {
 	DAW_SPACING,
 	DAW_TEXT,
 } from "@/lib/constants/daw-design";
-import { DAW_PIXELS_PER_SECOND_AT_ZOOM_1 } from "@/lib/constants";
 import {
 	addTrackAtom,
 	horizontalScrollAtom,
@@ -142,7 +142,7 @@ export function DAWContainer() {
 	useEffect(() => {
 		// Prevent back/forward swipe gestures interfering with DAW grid
 		const preventTouchNav = (e: TouchEvent) => {
-			if ((e as any).touches && (e as any).touches.length === 2) {
+			if (e.touches && e.touches.length === 2) {
 				// pinch zoom
 				e.preventDefault();
 			}
@@ -164,7 +164,7 @@ export function DAWContainer() {
 		const x = (playback.currentTime / 1000) * pxPerSec;
 		const grid = trackGridScrollRef.current;
 		const left = grid.scrollLeft;
-		const right = left + grid.clientWidth;
+		const _right = left + grid.clientWidth;
 		const bandLeft = left + grid.clientWidth * 0.35;
 		const bandRight = left + grid.clientWidth * 0.65;
 		if (x < bandLeft || x > bandRight) {

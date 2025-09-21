@@ -24,6 +24,8 @@ import {
 } from "@/lib/constants/daw-design";
 import {
 	playbackAtom,
+	selectedClipIdAtom,
+	selectedTrackIdAtom,
 	setBpmAtom,
 	setCurrentTimeAtom,
 	setTimelineZoomAtom,
@@ -33,8 +35,6 @@ import {
 	togglePlaybackAtom,
 	totalDurationAtom,
 	trackHeightZoomAtom,
-	selectedTrackIdAtom,
-	selectedClipIdAtom,
 	tracksAtom,
 	updateClipAtom,
 } from "@/lib/state/daw-store";
@@ -96,11 +96,15 @@ export function DAWControls() {
 
 	// Selected clip lookup
 	const findSelectedClip = () => {
-		if (!selectedTrackId || !selectedClipId) return null as any;
+		if (!selectedTrackId || !selectedClipId)
+			return null as {
+				track: import("@/lib/state/daw-store").Track;
+				clip: import("@/lib/state/daw-store").Clip;
+			} | null;
 		const track = tracks.find((t) => t.id === selectedTrackId);
-		if (!track || !track.clips) return null as any;
+		if (!track || !track.clips) return null;
 		const clip = track.clips.find((c) => c.id === selectedClipId);
-		if (!clip) return null as any;
+		if (!clip) return null;
 		return { track, clip } as const;
 	};
 
