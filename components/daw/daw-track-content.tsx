@@ -164,6 +164,11 @@ export function DAWTrackContent() {
 								? oneShotEnd
 								: loopDragging.startLoopEnd;
 						let newLoopEnd = Math.max(oneShotEnd, baseLoopEnd + deltaTime);
+						// Snap to grid if enabled for cleaner control
+						if (timeline.snapToGrid && timeline.gridSize > 0) {
+							newLoopEnd =
+								Math.round(newLoopEnd / timeline.gridSize) * timeline.gridSize;
+						}
 						newLoopEnd = Math.min(newLoopEnd, totalDuration);
 						updateClip(loopDragging.trackId, loopDragging.clipId, {
 							loopEnd: newLoopEnd,
@@ -195,6 +200,8 @@ export function DAWTrackContent() {
 		updateClip,
 		tracks,
 		totalDuration,
+		timeline.snapToGrid,
+		timeline.gridSize,
 	]);
 
 	return (
@@ -276,7 +283,7 @@ export function DAWTrackContent() {
 								return (
 									<div
 										key={clip.id}
-										className={`absolute top-0 bottom-0 rounded-md border-2 transition-all ${
+										className={`group absolute top-0 bottom-0 rounded-md border-2 transition-all ${
 											isSelected
 												? "border-primary bg-primary/20"
 												: "border-border bg-muted/50 hover:bg-muted/70"
@@ -310,9 +317,30 @@ export function DAWTrackContent() {
 											}
 										}}
 									>
+										{/* Visible grab handle on hover */}
+										<div
+											className="absolute top-1/2 -translate-y-1/2 left-2 h-8 w-2 rounded-sm opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing"
+											style={{
+												background:
+													"repeating-linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.35) 2px, transparent 2px, transparent 4px)",
+											}}
+											onMouseDown={(e) => {
+												e.stopPropagation();
+												setSelectedTrackId(track.id);
+												setSelectedClipId(clip.id);
+												setDraggingClip({
+													trackId: track.id,
+													clipId: clip.id,
+													startX: e.clientX,
+													startTime: clip.startTime,
+												});
+											}}
+											aria-label="Drag clip"
+										/>
+
 										{/* Left resize handle */}
 										<div
-											className="absolute left-0 top-0 bottom-0 w-2 cursor-w-resize bg-primary/50 opacity-0 hover:opacity-100"
+											className="absolute left-0 top-0 bottom-0 w-2 cursor-w-resize bg-primary/20 hover:bg-primary/40"
 											onMouseDown={(e) => {
 												e.stopPropagation();
 												setSelectedTrackId(track.id);
@@ -333,7 +361,7 @@ export function DAWTrackContent() {
 										/>
 										{/* Right resize handle */}
 										<div
-											className="absolute right-0 top-0 bottom-0 w-2 cursor-e-resize bg-primary/50 opacity-0 hover:opacity-100"
+											className="absolute right-0 top-0 bottom-0 w-2 cursor-e-resize bg-primary/20 hover:bg-primary/40"
 											onMouseDown={(e) => {
 												e.stopPropagation();
 												setSelectedTrackId(track.id);
@@ -353,23 +381,6 @@ export function DAWTrackContent() {
 											aria-label="Resize clip end"
 										/>
 
-										{/* Loop handle (selected + clip.loop) */}
-										{isSelected && (clip as any).loop && (
-											<div
-												className="absolute top-1/2 -translate-y-1/2 right-[-6px] w-3 h-6 rounded-sm bg-primary shadow cursor-ew-resize"
-												onMouseDown={(e) => {
-													e.stopPropagation();
-													setLoopDragging({
-														trackId: track.id,
-														clipId: clip.id,
-														startX: e.clientX,
-														startLoopEnd: (clip as any).loopEnd,
-													});
-												}}
-												aria-label="Adjust loop end"
-											/>
-										)}
-
 										{/* Clip label */}
 										<div className="absolute inset-2 flex flex-col justify-center pointer-events-none">
 											<div className="text-xs font-medium truncate text-left">
@@ -383,15 +394,14 @@ export function DAWTrackContent() {
 								);
 							})}
 
-							{/* Ghost loop tiles and separators */}
+							{/* Loop ghosts overlay (non-interactive) */}
 							{clips.map((clip) => {
 								const loop = (clip as any).loop;
 								const loopEnd = (clip as any).loopEnd as number | undefined;
-								if (!loop || !loopEnd) return null;
 								const clipDur = Math.max(0, clip.trimEnd - clip.trimStart);
-								if (clipDur <= 0) return null;
+								if (!loop || clipDur <= 0) return null;
 								const oneShotEnd = clip.startTime + clipDur;
-								if (loopEnd <= oneShotEnd) return null;
+								if (!loopEnd || loopEnd <= oneShotEnd) return null;
 
 								const tiles: any[] = [];
 								const separators: any[] = [];
@@ -429,10 +439,47 @@ export function DAWTrackContent() {
 								return (
 									<div
 										key={`ghost-wrap-${clip.id}`}
-										className="absolute inset-0"
+										className="absolute inset-0 pointer-events-none z-0"
 									>
 										{tiles}
 										{separators}
+									</div>
+								);
+							})}
+
+							{/* Loop-end marker + handle (interactive) */}
+							{clips.map((clip) => {
+								const isSelected =
+									selectedTrackId === track.id && selectedClipId === clip.id;
+								const isLoop = (clip as any).loop;
+								if (!isSelected || !isLoop) return null;
+								const clipDur = Math.max(0, clip.trimEnd - clip.trimStart);
+								const oneShotEnd = clip.startTime + clipDur;
+								const loopEnd = (clip as any).loopEnd as number | undefined;
+								const xPx = (loopEnd ?? oneShotEnd) * pixelsPerMs;
+								return (
+									<div
+										key={`loop-end-${clip.id}`}
+										className="absolute inset-0 z-20"
+									>
+										<div
+											className="absolute top-0 bottom-0 w-px bg-primary/70 pointer-events-none"
+											style={{ left: xPx }}
+										/>
+										<div
+											className="absolute top-1/2 -translate-y-1/2 w-3 h-6 rounded-sm bg-primary shadow cursor-ew-resize"
+											style={{ left: xPx - 6 }}
+											onMouseDown={(e) => {
+												e.stopPropagation();
+												setLoopDragging({
+													trackId: track.id,
+													clipId: clip.id,
+													startX: e.clientX,
+													startLoopEnd: (clip as any).loopEnd,
+												});
+											}}
+											aria-label="Adjust loop end"
+										/>
 									</div>
 								);
 							})}
