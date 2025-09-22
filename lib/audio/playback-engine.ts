@@ -39,6 +39,8 @@ export class PlaybackEngine {
 	private options: PlaybackOptions = {};
 	private animationFrameId: number | null = null;
 	private queuedAudioNodes = new Set<AudioBufferSourceNode>();
+	private prevTrackVolumes = new Map<string, number>();
+	private DEBUG_AUDIO = false;
 	private throttleIntervalId: ReturnType<typeof setInterval> | null = null;
 
 	private constructor() {}
@@ -204,27 +206,48 @@ export class PlaybackEngine {
 				// Configure clip fades (basic linear ramps) — apply to one-shot segment only
 				try {
 					const clipGain = cps.gainNode ?? this.masterGainNode;
-					if (!clipGain) continue;
-					clipGain.gain.cancelScheduledValues(0);
-					clipGain.gain.setValueAtTime(1, 0);
+					if (!clipGain || !this.audioContext) continue;
+					const now = this.audioContext.currentTime;
+					// Reset automation from 'now' to avoid stale ramps
+					if (
+						typeof (clipGain.gain as any).cancelAndHoldAtTime === "function"
+					) {
+						(clipGain.gain as any).cancelAndHoldAtTime(now);
+					} else {
+						clipGain.gain.cancelScheduledValues(now);
+						clipGain.gain.setValueAtTime(clipGain.gain.value ?? 1, now);
+					}
 					const clipStartAC =
 						this.startTime + clipStartSec - this.playbackTimeAtStart;
-					const clipEndForFadeSec = clipOneShotEndSec;
-					const clipEndAC =
-						this.startTime + clipEndForFadeSec - this.playbackTimeAtStart;
+					const loopEndSec = loopUntilSec;
+					const loopEndAC =
+						this.startTime + loopEndSec - this.playbackTimeAtStart;
+					const oneShotEndAC =
+						this.startTime + clipOneShotEndSec - this.playbackTimeAtStart;
 					if (clip.fadeIn && clip.fadeIn > 0) {
-						clipGain.gain.setValueAtTime(0, Math.max(0, clipStartAC));
+						clipGain.gain.setValueAtTime(0, Math.max(now, clipStartAC));
 						clipGain.gain.linearRampToValueAtTime(
 							1,
-							Math.max(0, clipStartAC + clip.fadeIn / 1000),
+							Math.max(now, clipStartAC + clip.fadeIn / 1000),
 						);
 					}
+					// Only apply fadeOut at the final end: for loops, at loopEnd (if finite)
 					if (clip.fadeOut && clip.fadeOut > 0) {
-						clipGain.gain.setValueAtTime(
-							1,
-							Math.max(0, clipEndAC - clip.fadeOut / 1000),
-						);
-						clipGain.gain.linearRampToValueAtTime(0, Math.max(0, clipEndAC));
+						const targetEnd = clip.loop
+							? Number.isFinite(loopEndSec)
+								? loopEndAC
+								: null
+							: oneShotEndAC;
+						if (targetEnd !== null) {
+							clipGain.gain.setValueAtTime(
+								1,
+								Math.max(now, targetEnd - clip.fadeOut / 1000),
+							);
+							clipGain.gain.linearRampToValueAtTime(
+								0,
+								Math.max(now, targetEnd),
+							);
+						}
 					}
 				} catch (e) {
 					console.warn("Failed to schedule clip fades", e);
@@ -302,12 +325,9 @@ export class PlaybackEngine {
 				const currentTimeline = this.getPlaybackTime();
 				if (timelinePos - currentTimeline >= 1) {
 					await new Promise((resolve) => {
-						if (this.throttleIntervalId) clearInterval(this.throttleIntervalId);
-						this.throttleIntervalId = setInterval(() => {
+						const id = setInterval(() => {
 							if (timelinePos - this.getPlaybackTime() < 1 || !this.isPlaying) {
-								if (this.throttleIntervalId)
-									clearInterval(this.throttleIntervalId);
-								this.throttleIntervalId = null;
+								clearInterval(id);
 								resolve(undefined);
 							}
 						}, 100);
@@ -346,11 +366,7 @@ export class PlaybackEngine {
 		this.playbackTimeAtStart = this.getPlaybackTime();
 		this.isPlaying = false;
 
-		// Clear any throttle interval
-		if (this.throttleIntervalId) {
-			clearInterval(this.throttleIntervalId);
-			this.throttleIntervalId = null;
-		}
+		// Clear any throttle interval (no longer used globally)
 
 		// Stop all iterators and nodes
 		for (const trackState of this.tracks.values()) {
@@ -573,24 +589,14 @@ export class PlaybackEngine {
 		const trackState = this.tracks.get(trackId);
 		if (!trackState?.gainNode) return;
 		const gn = trackState.gainNode;
-		// Attach a strongly-typed previousVolume on the state map entry using a symbol
-		const prevKey: unique symbol = Symbol("prev");
-		const stateAny = trackState as unknown as {
-			[k: symbol]: number | undefined;
-		};
 		if (muted) {
-			stateAny[prevKey] =
-				gn.gain?.value ?? (typeof volume === "number" ? volume / 100 : 1);
+			this.prevTrackVolumes.set(trackId, gn.gain.value);
 			gn.gain.value = 0;
 		} else {
-			const prev = stateAny[prevKey];
-			const target =
-				typeof volume === "number"
-					? volume / 100
-					: typeof prev === "number"
-						? prev
-						: 1;
+			const prev = this.prevTrackVolumes.get(trackId);
+			const target = typeof volume === "number" ? volume / 100 : (prev ?? 1);
 			gn.gain.value = target;
+			this.prevTrackVolumes.delete(trackId);
 		}
 	}
 
@@ -607,6 +613,7 @@ export class PlaybackEngine {
 			console.error("Error while stopping during cleanup", e);
 		}
 		this.tracks.clear();
+		this.prevTrackVolumes.clear();
 		if (this.audioContext) {
 			try {
 				await this.audioContext.close();
