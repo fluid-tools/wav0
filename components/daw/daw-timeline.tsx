@@ -74,8 +74,7 @@ export function DAWTimeline() {
 		const x = e.clientX - rect.left;
 		const pixelsPerSecond = timeline.zoom * DAW_PIXELS_PER_SECOND_AT_ZOOM_1;
 
-		// Don't allow clicking past project end
-		if (x > projectEndPosition) return;
+		// Allow clicking past project end; snap playhead and move if needed
 
 		// Snap-to-grid (quarter note)
 		const secondsPerBeat = 60 / playback.bpm;
