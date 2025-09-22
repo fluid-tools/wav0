@@ -55,10 +55,8 @@ export function DAWPlayhead({ containerRef }: DAWPlayheadProps) {
 				snappedSeconds = Math.round(rawSeconds / snapSeconds) * snapSeconds;
 			}
 
-			// Clamp to project duration (don't allow past yellow marker)
-			const maxSeconds = totalDuration / 1000;
-			const clampedSeconds = Math.min(Math.max(0, snappedSeconds), maxSeconds);
-			const time = clampedSeconds * 1000;
+			// Allow seeking past project end; playhead sets time directly
+			const time = Math.max(0, snappedSeconds * 1000);
 			setCurrentTime(time);
 		},
 		[

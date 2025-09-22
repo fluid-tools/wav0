@@ -209,23 +209,31 @@ export const selectedTrackAtom = atom((get) => {
 	return tracks.find((track) => track.id === selectedId) || null;
 });
 
+// Optional manual project end override
+export const projectEndOverrideAtom = atomWithStorage<number | null>(
+	"daw-project-end-override",
+	null,
+);
+
 export const totalDurationAtom = atom((get) => {
 	const tracks = get(tracksAtom);
-	// Compute from clips if present, fallback to legacy fields
+	const override = get(projectEndOverrideAtom);
+	// Compute from clips, including loopEnd if present (infinite loops ignored)
 	const perTrackEnds = tracks.map((track) => {
 		if (track.clips && track.clips.length > 0) {
-			return Math.max(
-				...track.clips.map(
-					(c) => c.startTime + Math.max(0, c.trimEnd - c.trimStart),
-				),
-				0,
-			);
+			const ends = track.clips.map((c) => {
+				const oneShotEnd = c.startTime + Math.max(0, c.trimEnd - c.trimStart);
+				const loopEnd = c.loop ? (c.loopEnd ?? oneShotEnd) : oneShotEnd;
+				return loopEnd;
+			});
+			return Math.max(...ends, 0);
 		}
 		return track.startTime + track.duration;
 	});
 	const tracksDuration = Math.max(...perTrackEnds, 0);
 	const minimumDuration = 3 * 60 * 1000; // 3 minutes default canvas
-	return Math.max(tracksDuration, minimumDuration);
+	const computed = Math.max(tracksDuration, minimumDuration);
+	return override !== null ? Math.max(override, computed) : computed;
 });
 
 export const timelineWidthAtom = atom((get) => {
@@ -281,7 +289,7 @@ export const updateTrackAtom = atom(
 		const updatedTrack = updatedTracks.find((t) => t.id === trackId);
 		if (!updatedTrack) return;
 
-		// Volume/mute should reflect immediately without reschedule
+		// Volume/mute/solo should reflect immediately without reschedule
 		if (typeof updates.volume === "number") {
 			playbackEngine.updateTrackVolume(trackId, updates.volume);
 		}
@@ -291,6 +299,9 @@ export const updateTrackAtom = atom(
 					? updates.volume
 					: updatedTrack.volume;
 			playbackEngine.updateTrackMute(trackId, updates.muted, vol);
+		}
+		if (typeof updates.soloed === "boolean") {
+			playbackEngine.updateSoloStates(updatedTracks);
 		}
 
 		// If playing and timing changed, reschedule for immediate correctness
@@ -327,7 +338,18 @@ export const setCurrentTimeAtom = atom(null, async (get, set, time: number) => {
 			startTime: time / 1000,
 			onTimeUpdate: (currentTime) => {
 				const newPlayback = get(playbackAtom);
-				set(playbackAtom, { ...newPlayback, currentTime: currentTime * 1000 });
+				// Restart at end-of-project if we cross it
+				const total = get(totalDurationAtom);
+				const ms = currentTime * 1000;
+				if (ms >= total) {
+					set(playbackAtom, {
+						...newPlayback,
+						currentTime: 0,
+						isPlaying: false,
+					});
+					return;
+				}
+				set(playbackAtom, { ...newPlayback, currentTime: ms });
 			},
 			onPlaybackEnd: () => {
 				const endPlayback = get(playbackAtom);
@@ -543,9 +565,15 @@ export const togglePlaybackAtom = atom(null, async (get, set) => {
 		await playbackEngine.play(tracks, {
 			startTime: currentTime,
 			onTimeUpdate: (time) => {
-				// Update time without triggering seek
+				// Update time and restart when crossing project end
 				const playback = get(playbackAtom);
-				set(playbackAtom, { ...playback, currentTime: time * 1000 });
+				const total = get(totalDurationAtom);
+				const ms = time * 1000;
+				if (ms >= total) {
+					set(playbackAtom, { ...playback, currentTime: 0, isPlaying: false });
+					return;
+				}
+				set(playbackAtom, { ...playback, currentTime: ms });
 			},
 			onPlaybackEnd: () => {
 				const endPlayback = get(playbackAtom);

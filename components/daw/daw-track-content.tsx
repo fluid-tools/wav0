@@ -188,7 +188,6 @@ export function DAWTrackContent() {
 							newLoopEnd =
 								Math.round(newLoopEnd / timeline.gridSize) * timeline.gridSize;
 						}
-						newLoopEnd = Math.min(newLoopEnd, totalDuration);
 						updateClip(loopDragging.trackId, loopDragging.clipId, {
 							loopEnd: newLoopEnd,
 						});
@@ -301,7 +300,6 @@ export function DAWTrackContent() {
 								}
 							}}
 							style={{ padding: "12px" }}
-							role="group"
 							aria-label={`Track ${track.name} drop zone`}
 						>
 							{/* Render clips */}

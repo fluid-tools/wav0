@@ -595,6 +595,25 @@ export class PlaybackEngine {
 		}
 	}
 
+	updateSoloStates(tracks: Track[]): void {
+		if (!this.audioContext || !this.masterGainNode) return;
+		const hasAnyTracksInSolo = tracks.some((t) => t.soloed);
+		for (const t of tracks) {
+			const state = this.tracks.get(t.id);
+			if (!state) continue;
+			if (!state.gainNode) {
+				state.gainNode = this.audioContext.createGain();
+				state.gainNode.connect(this.masterGainNode);
+			}
+			const baseVolume = t.volume / 100;
+			state.gainNode.gain.value = hasAnyTracksInSolo
+				? t.soloed
+					? baseVolume
+					: 0
+				: baseVolume;
+		}
+	}
+
 	updateTrackMute(trackId: string, muted: boolean, volume?: number): void {
 		const trackState = this.tracks.get(trackId);
 		if (!trackState?.gainNode) return;

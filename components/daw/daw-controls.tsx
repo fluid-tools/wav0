@@ -113,16 +113,21 @@ export function DAWControls() {
 		return sel?.clip?.loop === true;
 	})();
 
-	const onToggleLoop = async () => {
+	const onToggleLoop = async (e?: React.MouseEvent) => {
 		const sel = findSelectedClip();
 		if (!sel) return;
 		const { track, clip } = sel;
 		const isLooping = clip.loop === true;
 		if (isLooping) {
-			await updateClip(track.id, clip.id, { loop: false });
+			await updateClip(track.id, clip.id, { loop: false, loopEnd: undefined });
 			return;
 		}
 		// enabling loop
+		const infinite = !!(e && (e.shiftKey || e.altKey));
+		if (infinite) {
+			await updateClip(track.id, clip.id, { loop: true, loopEnd: undefined });
+			return;
+		}
 		let loopEnd = clip.loopEnd;
 		if (loopEnd === undefined) {
 			const bars = 8;
@@ -292,9 +297,9 @@ export function DAWControls() {
 				<Button
 					variant={loopState ? "secondary" : "ghost"}
 					size="sm"
-					onClick={onToggleLoop}
+					onClick={(e) => onToggleLoop(e)}
 					disabled={!findSelectedClip()}
-					title="Toggle loop for selected clip"
+					title="Toggle loop for selected clip (Shift = infinite)"
 				>
 					<Repeat className={DAW_ICONS.MD} />
 				</Button>
