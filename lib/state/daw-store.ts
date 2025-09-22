@@ -232,8 +232,11 @@ export const totalDurationAtom = atom((get) => {
 	});
 	const tracksDuration = Math.max(...perTrackEnds, 0);
 	const minimumDuration = 3 * 60 * 1000; // 3 minutes default canvas
-	const computed = Math.max(tracksDuration, minimumDuration);
-	return override !== null ? Math.max(override, computed) : computed;
+	if (override !== null) {
+		// Respect manual override even below default canvas, but never below actual media end
+		return Math.max(override, tracksDuration);
+	}
+	return Math.max(tracksDuration, minimumDuration);
 });
 
 export const timelineWidthAtom = atom((get) => {

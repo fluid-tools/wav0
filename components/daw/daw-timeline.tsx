@@ -1,11 +1,13 @@
 "use client";
 
 import { useAtom } from "jotai";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DAW_PIXELS_PER_SECOND_AT_ZOOM_1 } from "@/lib/constants";
 import {
 	horizontalScrollAtom,
 	playbackAtom,
 	projectEndPositionAtom,
+	projectEndOverrideAtom,
 	setCurrentTimeAtom,
 	timelineAtom,
 	timelineWidthAtom,
@@ -18,6 +20,34 @@ export function DAWTimeline() {
 	const [, setCurrentTime] = useAtom(setCurrentTimeAtom);
 	const [timelineWidth] = useAtom(timelineWidthAtom);
 	const [projectEndPosition] = useAtom(projectEndPositionAtom);
+	const [projectEndOverride, setProjectEndOverride] = useAtom(
+		projectEndOverrideAtom,
+	);
+	const containerRef = useRef<HTMLButtonElement>(null);
+	const [isDraggingEnd, setIsDraggingEnd] = useState(false);
+
+	const onMouseMove = useCallback(
+		(e: MouseEvent) => {
+			if (!isDraggingEnd || !containerRef.current) return;
+			const rect = containerRef.current.getBoundingClientRect();
+			const x = e.clientX - rect.left;
+			const pxPerMs = (DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * timeline.zoom) / 1000;
+			const ms = Math.max(0, Math.round(x / pxPerMs));
+			setProjectEndOverride(ms);
+		},
+		[isDraggingEnd, timeline.zoom, setProjectEndOverride],
+	);
+
+	useEffect(() => {
+		if (!isDraggingEnd) return;
+		document.addEventListener("mousemove", onMouseMove);
+		document.addEventListener("mouseup", () => setIsDraggingEnd(false), {
+			once: true,
+		});
+		return () => {
+			document.removeEventListener("mousemove", onMouseMove);
+		};
+	}, [isDraggingEnd, onMouseMove]);
 	const [horizontalScroll] = useAtom(horizontalScrollAtom);
 
 	// Calculate timeline playhead position
@@ -94,9 +124,13 @@ export function DAWTimeline() {
 
 	return (
 		<button
+			ref={containerRef}
 			type="button"
 			className="h-full w-full relative bg-muted/10 cursor-pointer select-none border-none p-0"
-			onClick={handleTimelineClick}
+			onClick={(e) => {
+				if (isDraggingEnd) return;
+				handleTimelineClick(e);
+			}}
 			style={{ width: timelineWidth }}
 			aria-label="Timeline - click to set playback position"
 		>
@@ -130,6 +164,14 @@ export function DAWTimeline() {
 				className="absolute top-0 bottom-0 w-px bg-yellow-500/70 z-30"
 				style={{ left: projectEndPosition }}
 				title="Project End"
+				role="slider"
+				aria-label="Project end"
+				aria-valuemin={0}
+				aria-valuenow={Math.max(0, Math.round(projectEndPosition))}
+				onMouseDown={(e) => {
+					e.preventDefault();
+					setIsDraggingEnd(true);
+				}}
 			/>
 
 			{/* Buffer/dead space overlay */}
