@@ -35,6 +35,7 @@ import { DAWTimeline } from "./daw-timeline";
 import { DAWToolbar } from "./daw-toolbar";
 import { DAWTrackContent } from "./daw-track-content";
 import { DAWTrackList } from "./daw-track-list";
+import { GlobalShortcuts } from "./global-shortcuts";
 
 export function DAWContainer() {
 	const [timelineWidth] = useAtom(timelineWidthAtom);
@@ -178,6 +179,8 @@ export function DAWContainer() {
 		<div className="h-screen flex flex-col bg-background">
 			{/* Toolbar */}
 			<DAWToolbar />
+			{/* Global keyboard shortcuts */}
+			<GlobalShortcuts />
 
 			{/* Main DAW Interface */}
 			<div className="flex-1 flex flex-col overflow-hidden">
