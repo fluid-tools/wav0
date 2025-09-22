@@ -8,6 +8,7 @@ import {
 	Save,
 	Settings,
 	Upload,
+	HelpCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +18,14 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+	DialogTrigger,
+} from "@/components/ui/dialog";
 import { DAW_HEIGHTS, DAW_ICONS, DAW_TEXT } from "@/lib/constants/daw-design";
 import { projectNameAtom, tracksAtom } from "@/lib/state/daw-store";
 
@@ -99,6 +108,48 @@ export function DAWToolbar() {
 					<Download className={DAW_ICONS.MD} />
 					<span className="ml-1 text-xs">Export</span>
 				</Button>
+
+				<Dialog>
+					<DialogTrigger asChild>
+						<Button variant="ghost" size="sm" aria-label="Keyboard shortcuts">
+							<HelpCircle className={DAW_ICONS.MD} />
+						</Button>
+					</DialogTrigger>
+					<DialogContent className="sm:max-w-xl">
+						<DialogHeader>
+							<DialogTitle>Keyboard shortcuts</DialogTitle>
+							<DialogDescription>
+								Quick controls to keep you in flow
+							</DialogDescription>
+						</DialogHeader>
+						<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+							<div>
+								<b>Space</b>: Play/Pause
+							</div>
+							<div>
+								<b>S</b>: Stop
+							</div>
+							<div>
+								<b>L</b>: Toggle loop for selected clip
+							</div>
+							<div>
+								<b>M</b>/<b>Solo</b>: Mute/Solo track
+							</div>
+							<div>
+								<b>←/→</b>: Move project end by grid
+							</div>
+							<div>
+								<b>Shift+←/→</b>: ×4 step
+							</div>
+							<div>
+								<b>Home</b>: Project end to 0
+							</div>
+							<div>
+								<b>End</b>: Project end to media end
+							</div>
+						</div>
+					</DialogContent>
+				</Dialog>
 
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
