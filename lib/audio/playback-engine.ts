@@ -16,6 +16,7 @@ type ClipPlaybackState = {
 	}> | null;
 	gainNode: GainNode | null;
 	audioSources: AudioBufferSourceNode[];
+	generation: number; // increments to cancel stale schedulers
 };
 
 type TrackPlaybackState = {
@@ -39,9 +40,9 @@ export class PlaybackEngine {
 	private options: PlaybackOptions = {};
 	private animationFrameId: number | null = null;
 	private queuedAudioNodes = new Set<AudioBufferSourceNode>();
+	private nodeStartTimes = new WeakMap<AudioBufferSourceNode, number>();
 	private prevTrackVolumes = new Map<string, number>();
 	private DEBUG_AUDIO = false;
-	private throttleIntervalId: ReturnType<typeof setInterval> | null = null;
 
 	private constructor() {}
 
@@ -71,6 +72,19 @@ export class PlaybackEngine {
 			);
 		} else {
 			return this.playbackTimeAtStart;
+		}
+	}
+
+	// Safely cancel gain automation from a point in time
+	private cancelGainAutomation(gain: AudioParam, atTime: number): void {
+		const g = gain as AudioParam & {
+			cancelAndHoldAtTime?: (time: number) => void;
+		};
+		if (typeof g.cancelAndHoldAtTime === "function") {
+			g.cancelAndHoldAtTime(atTime);
+		} else {
+			gain.cancelScheduledValues(atTime);
+			gain.setValueAtTime(gain.value, atTime);
 		}
 	}
 
@@ -196,6 +210,7 @@ export class PlaybackEngine {
 						iterator: null,
 						gainNode: this.audioContext.createGain(),
 						audioSources: [],
+						generation: 0,
 					};
 					if (cps.gainNode && trackState.gainNode) {
 						cps.gainNode.connect(trackState.gainNode);
@@ -209,14 +224,7 @@ export class PlaybackEngine {
 					if (!clipGain || !this.audioContext) continue;
 					const now = this.audioContext.currentTime;
 					// Reset automation from 'now' to avoid stale ramps
-					if (
-						typeof (clipGain.gain as any).cancelAndHoldAtTime === "function"
-					) {
-						(clipGain.gain as any).cancelAndHoldAtTime(now);
-					} else {
-						clipGain.gain.cancelScheduledValues(now);
-						clipGain.gain.setValueAtTime(clipGain.gain.value ?? 1, now);
-					}
+					this.cancelGainAutomation(clipGain.gain, now);
 					const clipStartAC =
 						this.startTime + clipStartSec - this.playbackTimeAtStart;
 					const loopEndSec = loopUntilSec;
@@ -254,6 +262,7 @@ export class PlaybackEngine {
 				}
 
 				// Start buffers iterator for this clip
+				cps.generation = (cps.generation ?? 0) + 1;
 				cps.iterator = sink.buffers(audioFileReadStart, clipTrimEndSec);
 				// Fire-and-forget so multiple clips run concurrently
 				this.runClipAudioIterator(
@@ -280,13 +289,14 @@ export class PlaybackEngine {
 		cycleOffsetSec: number = 0,
 		loopUntilSec: number = Number.POSITIVE_INFINITY,
 	): Promise<void> {
+		const myGen = cps.generation ?? 0;
 		if (!cps.iterator || !this.audioContext) return;
 		const clipGain = cps.gainNode;
 		const clipTrimEndSec = clip.trimEnd / 1000;
 		const clipDurationSec = clipTrimEndSec - clipTrimStartSec;
 		try {
 			for await (const { buffer, timestamp } of cps.iterator) {
-				if (!this.isPlaying) break;
+				if (!this.isPlaying || myGen !== (cps.generation ?? 0)) break;
 				// Create node per buffer
 				const node = this.audioContext.createBufferSource();
 				node.buffer = buffer;
@@ -304,10 +314,13 @@ export class PlaybackEngine {
 
 				if (startAt >= this.audioContext.currentTime) {
 					node.start(startAt);
+					this.nodeStartTimes.set(node, startAt);
 				} else {
 					const offset = this.audioContext.currentTime - startAt;
 					if (offset < buffer.duration) {
-						node.start(this.audioContext.currentTime, offset);
+						const actualStart = this.audioContext.currentTime;
+						node.start(actualStart, offset);
+						this.nodeStartTimes.set(node, actualStart);
 					} else {
 						continue; // too late
 					}
@@ -319,23 +332,29 @@ export class PlaybackEngine {
 					const idx = cps.audioSources.indexOf(node);
 					if (idx > -1) cps.audioSources.splice(idx, 1);
 					this.queuedAudioNodes.delete(node);
+					this.nodeStartTimes.delete(node);
 				};
 
-				// Throttle scheduling when far ahead
+				// Short lookahead window (~250ms)
 				const currentTimeline = this.getPlaybackTime();
-				if (timelinePos - currentTimeline >= 1) {
+				if (timelinePos - currentTimeline >= 0.25) {
 					await new Promise((resolve) => {
 						const id = setInterval(() => {
-							if (timelinePos - this.getPlaybackTime() < 1 || !this.isPlaying) {
+							if (
+								timelinePos - this.getPlaybackTime() < 0.25 ||
+								!this.isPlaying ||
+								myGen !== (cps.generation ?? 0)
+							) {
 								clearInterval(id);
 								resolve(undefined);
 							}
-						}, 100);
+						}, 25);
 					});
 				}
 			}
 			// If clip loops, restart iterator for the next cycle within loopUntilSec
-			if (this.isPlaying && clip.loop) {
+			// Guard with generation to avoid stale schedulers spawning cycles
+			if (this.isPlaying && clip.loop && myGen === (cps.generation ?? 0)) {
 				const sink = clip.opfsFileId
 					? audioManager.getAudioBufferSink(clip.opfsFileId)
 					: null;
@@ -343,6 +362,7 @@ export class PlaybackEngine {
 					const nextCycleStart =
 						cycleOffsetSec + clipDurationSec + clipStartSec;
 					if (nextCycleStart < loopUntilSec) {
+						cps.generation = (cps.generation ?? 0) + 1;
 						cps.iterator = sink.buffers(clipTrimStartSec, clipTrimEndSec);
 						// Fire-and-forget next cycle
 						this.runClipAudioIterator(
@@ -374,6 +394,7 @@ export class PlaybackEngine {
 			for (const cps of trackState.clipStates.values()) {
 				await cps.iterator?.return?.(undefined);
 				cps.iterator = null;
+				cps.generation = (cps.generation ?? 0) + 1;
 				for (const node of [...cps.audioSources]) {
 					try {
 						node.stop();
@@ -422,6 +443,7 @@ export class PlaybackEngine {
 		for (const cps of trackState.clipStates.values()) {
 			await cps.iterator?.return?.(undefined);
 			cps.iterator = null;
+			cps.generation = (cps.generation ?? 0) + 1; // invalidate any in-flight schedulers
 			for (const node of [...cps.audioSources]) {
 				try {
 					node.stop();
@@ -503,6 +525,7 @@ export class PlaybackEngine {
 					iterator: null,
 					gainNode: this.audioContext.createGain(),
 					audioSources: [],
+					generation: 0,
 				};
 				if (cps.gainNode && trackState.gainNode) {
 					cps.gainNode.connect(trackState.gainNode);
@@ -550,6 +573,7 @@ export class PlaybackEngine {
 				}
 			} catch {}
 
+			cps.generation = (cps.generation ?? 0) + 1;
 			cps.iterator = sink.buffers(audioFileReadStart, clipTrimEndSec);
 			this.runClipAudioIterator(
 				updatedTrack,
