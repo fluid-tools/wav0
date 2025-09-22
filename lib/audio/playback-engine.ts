@@ -517,26 +517,36 @@ export class PlaybackEngine {
 			// Reapply fades
 			try {
 				const clipGain = cps.gainNode ?? this.masterGainNode;
-				if (!clipGain) return;
-				clipGain.gain.cancelScheduledValues(0);
-				clipGain.gain.setValueAtTime(1, 0);
+				if (!clipGain || !this.audioContext) return;
+				const nowAC = this.audioContext.currentTime;
+				clipGain.gain.cancelScheduledValues(nowAC);
+				clipGain.gain.setValueAtTime(clipGain.gain.value ?? 1, nowAC);
 				const clipStartAC =
 					this.startTime + clipStartSec - this.playbackTimeAtStart;
-				const clipEndAC =
+				const oneShotEndAC =
 					this.startTime + clipOneShotEndSec - this.playbackTimeAtStart;
+				const loopEndAC =
+					this.startTime + loopUntilSec - this.playbackTimeAtStart;
 				if (clip.fadeIn && clip.fadeIn > 0) {
-					clipGain.gain.setValueAtTime(0, Math.max(0, clipStartAC));
+					const fadeInStart = Math.max(nowAC, clipStartAC);
+					clipGain.gain.setValueAtTime(0, fadeInStart);
 					clipGain.gain.linearRampToValueAtTime(
 						1,
-						Math.max(0, clipStartAC + clip.fadeIn / 1000),
+						fadeInStart + clip.fadeIn / 1000,
 					);
 				}
 				if (clip.fadeOut && clip.fadeOut > 0) {
-					clipGain.gain.setValueAtTime(
-						1,
-						Math.max(0, clipEndAC - clip.fadeOut / 1000),
-					);
-					clipGain.gain.linearRampToValueAtTime(0, Math.max(0, clipEndAC));
+					if (clip.loop) {
+						if (Number.isFinite(loopUntilSec)) {
+							const end = Math.max(nowAC, loopEndAC);
+							clipGain.gain.setValueAtTime(1, end - clip.fadeOut / 1000);
+							clipGain.gain.linearRampToValueAtTime(0, end);
+						}
+					} else {
+						const end = Math.max(nowAC, oneShotEndAC);
+						clipGain.gain.setValueAtTime(1, end - clip.fadeOut / 1000);
+						clipGain.gain.linearRampToValueAtTime(0, end);
+					}
 				}
 			} catch {}
 
