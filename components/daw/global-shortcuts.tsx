@@ -7,12 +7,13 @@ import {
 	totalDurationAtom,
 	setCurrentTimeAtom,
 	togglePlaybackAtom,
-	stopPlaybackAtom,
 	timelineAtom,
 	projectEndOverrideAtom,
 	selectedTrackIdAtom,
+	selectedClipIdAtom,
 	splitClipAtPlayheadAtom,
 	updateTrackAtom,
+	updateClipAtom,
 	tracksAtom,
 } from "@/lib/state/daw-store";
 
@@ -23,11 +24,12 @@ export function GlobalShortcuts() {
 	const [totalDuration] = useAtom(totalDurationAtom);
 	const [, setCurrentTime] = useAtom(setCurrentTimeAtom);
 	const [, togglePlayback] = useAtom(togglePlaybackAtom);
-	const [, stopPlayback] = useAtom(stopPlaybackAtom);
 	const [, setProjectEndOverride] = useAtom(projectEndOverrideAtom);
-	const [selectedTrackId] = useAtom(selectedTrackIdAtom);
+	const [selectedTrackId, setSelectedTrackId] = useAtom(selectedTrackIdAtom);
+	const [selectedClipId, setSelectedClipId] = useAtom(selectedClipIdAtom);
 	const [, splitAtPlayhead] = useAtom(splitClipAtPlayheadAtom);
 	const [, updateTrack] = useAtom(updateTrackAtom);
+	const [, updateClip] = useAtom(updateClipAtom);
 
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
@@ -37,25 +39,26 @@ export function GlobalShortcuts() {
 				(e.target as HTMLElement)?.isContentEditable;
 			if (inEditable) return;
 
-			// ? opens dialog (if exists); we emit a custom event for the toolbar to capture
-			if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "?") {
+			// Slash or ? opens dialog
+			if (
+				!e.ctrlKey &&
+				!e.metaKey &&
+				!e.altKey &&
+				(e.key === "/" || e.key === "?")
+			) {
 				e.preventDefault();
 				window.dispatchEvent(new CustomEvent("wav0:open-shortcuts"));
 				return;
 			}
 
-			// Space: play/pause; Shift+Space: stop
+			// Space: play/pause
 			if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === " ") {
 				e.preventDefault();
-				if (e.shiftKey) {
-					stopPlayback();
-				} else {
-					togglePlayback();
-				}
+				togglePlayback();
 				return;
 			}
 
-			// S: Stop; Shift+S: Split at playhead
+			// S: Restart; Shift+S: Split at playhead
 			if (
 				!e.ctrlKey &&
 				!e.metaKey &&
@@ -66,77 +69,110 @@ export function GlobalShortcuts() {
 				if (e.shiftKey) {
 					splitAtPlayhead();
 				} else {
-					stopPlayback();
+					setCurrentTime(0);
 				}
 				return;
 			}
 
-			// L: toggle loop on selected clip via UI controls (no direct atom here)
-			if (
-				!e.ctrlKey &&
-				!e.metaKey &&
-				!e.altKey &&
-				(e.key === "l" || e.key === "L")
-			) {
-				// no-op here; the UI button handles toggle on selection context
+			// 1–9: select track
+			if (!e.ctrlKey && !e.metaKey && !e.altKey && /^[1-9]$/.test(e.key)) {
+				e.preventDefault();
+				const idx = parseInt(e.key, 10) - 1;
+				const track = tracks[idx];
+				if (track) setSelectedTrackId(track.id);
 				return;
 			}
 
-			// M: mute selected track; Shift+M: solo selected track
+			// Clip navigation within selected track: [ previous, ] next
 			if (
 				!e.ctrlKey &&
 				!e.metaKey &&
 				!e.altKey &&
-				(e.key === "m" || e.key === "M")
+				(e.key === "[" || e.key === "]")
 			) {
 				e.preventDefault();
 				if (!selectedTrackId) return;
 				const track = tracks.find((t) => t.id === selectedTrackId);
-				if (!track) return;
+				const clips = (track?.clips ?? [])
+					.slice()
+					.sort((a, b) => a.startTime - b.startTime);
+				if (clips.length === 0) return;
+				let idx = clips.findIndex((c) => c.id === selectedClipId);
+				if (idx < 0) idx = 0;
+				idx =
+					e.key === "["
+						? Math.max(0, idx - 1)
+						: Math.min(clips.length - 1, idx + 1);
+				setSelectedClipId(clips[idx].id);
+				return;
+			}
+
+			// L: toggle loop for selected clip
+			if (!e.ctrlKey && !e.metaKey && (e.key === "l" || e.key === "L")) {
+				e.preventDefault();
+				if (!selectedTrackId || !selectedClipId) return;
+				const track = tracks.find((t) => t.id === selectedTrackId);
+				const clip = track?.clips?.find((c) => c.id === selectedClipId);
+				if (!clip) return;
+				const loop = !clip.loop;
+				const updates: Partial<typeof clip> = { loop };
+				// Leave loopEnd as-is when toggling; user can set via Alt+L or Shift+L
+				updateClip(selectedTrackId, clip.id, updates);
+				return;
+			}
+
+			// Alt+L: set loopEnd to playhead; Shift+L: clear loopEnd
+			if ((e.key === "l" || e.key === "L") && (e.altKey || e.shiftKey)) {
+				e.preventDefault();
+				if (!selectedTrackId || !selectedClipId) return;
+				const track = tracks.find((t) => t.id === selectedTrackId);
+				const clip = track?.clips?.find((c) => c.id === selectedClipId);
+				if (!clip) return;
 				if (e.shiftKey) {
-					updateTrack(selectedTrackId, { soloed: !track.soloed });
-				} else {
-					updateTrack(selectedTrackId, { muted: !track.muted });
+					updateClip(selectedTrackId, clip.id, { loopEnd: undefined });
+				} else if (e.altKey) {
+					const clipDur = Math.max(0, clip.trimEnd - clip.trimStart);
+					const oneShotEnd = clip.startTime + clipDur;
+					const loopEnd = Math.max(oneShotEnd, playback.currentTime);
+					updateClip(selectedTrackId, clip.id, { loop: true, loopEnd });
 				}
 				return;
 			}
 
-			// Arrow Left/Right: seek playhead; Alt+Arrows: move project end; Shift = x4
-			const stepMs = (timeline.gridSize || 500) * (e.shiftKey ? 4 : 1);
+			// Arrow Left/Right: seek by grid; Shift+Arrow: adjust project end by grid
+			const stepMs = timeline.gridSize || 500;
 			if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "ArrowRight") {
 				e.preventDefault();
-				const t = Math.min(playback.currentTime + stepMs, totalDuration);
-				setCurrentTime(t);
+				setCurrentTime(Math.min(playback.currentTime + stepMs, totalDuration));
 				return;
 			}
 			if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "ArrowLeft") {
 				e.preventDefault();
-				const t = Math.max(0, playback.currentTime - stepMs);
-				setCurrentTime(t);
+				setCurrentTime(Math.max(0, playback.currentTime - stepMs));
 				return;
 			}
-			if (e.altKey && !e.ctrlKey && !e.metaKey && e.key === "ArrowRight") {
+			if (
+				e.shiftKey &&
+				!e.ctrlKey &&
+				!e.metaKey &&
+				(e.key === "ArrowLeft" || e.key === "ArrowRight")
+			) {
 				e.preventDefault();
-				const end = Math.min(totalDuration + stepMs, Number.MAX_SAFE_INTEGER);
-				setProjectEndOverride(end);
-				return;
-			}
-			if (e.altKey && !e.ctrlKey && !e.metaKey && e.key === "ArrowLeft") {
-				e.preventDefault();
-				const end = Math.max(0, totalDuration - stepMs);
+				const delta = (e.key === "ArrowRight" ? 1 : -1) * stepMs;
+				const end = Math.max(0, totalDuration + delta);
 				setProjectEndOverride(end);
 				return;
 			}
 
-			// Home/End: seek to 0 / seek to project end
-			if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "Home") {
+			// Cmd+Left/Right: seek to start/end (Mac)
+			if (
+				e.metaKey &&
+				!e.ctrlKey &&
+				!e.altKey &&
+				(e.key === "ArrowLeft" || e.key === "ArrowRight")
+			) {
 				e.preventDefault();
-				setCurrentTime(0);
-				return;
-			}
-			if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "End") {
-				e.preventDefault();
-				setCurrentTime(totalDuration);
+				setCurrentTime(e.key === "ArrowLeft" ? 0 : totalDuration);
 				return;
 			}
 		};
@@ -147,13 +183,16 @@ export function GlobalShortcuts() {
 		timeline.gridSize,
 		totalDuration,
 		selectedTrackId,
+		selectedClipId,
 		tracks,
 		setCurrentTime,
 		togglePlayback,
-		stopPlayback,
 		setProjectEndOverride,
 		splitAtPlayhead,
 		updateTrack,
+		updateClip,
+		setSelectedClipId,
+		setSelectedTrackId,
 	]);
 
 	return null;
