@@ -300,6 +300,8 @@ export function DAWContainer() {
 											}}
 										>
 											<DAWTrackContent />
+											{/* Unified overlay spanning header + grid is rendered here */}
+											{/* Note: header also has its own timeline visuals; playhead is unified here */}
 										</div>
 									</div>
 
