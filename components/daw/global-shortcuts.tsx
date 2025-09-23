@@ -32,6 +32,45 @@ export function GlobalShortcuts() {
 	const [, updateClip] = useAtom(updateClipAtom);
 
 	useEffect(() => {
+		const ensureSelection = () => {
+			// Ensure a track is selected
+			let trackId = selectedTrackId;
+			if (!trackId) {
+				// Prefer track with a clip under playhead, else first track
+				const t = playback.currentTime;
+				const found = tracks.find((tr) =>
+					(tr.clips ?? []).some(
+						(c) =>
+							t >= c.startTime &&
+							t < c.startTime + Math.max(0, c.trimEnd - c.trimStart),
+					),
+				);
+				if (found) trackId = found.id;
+				else if (tracks[0]) trackId = tracks[0].id;
+				if (trackId) setSelectedTrackId(trackId);
+			}
+			// Ensure a clip is selected on that track
+			if (trackId) {
+				const track = tracks.find((t) => t.id === trackId);
+				const clips = (track?.clips ?? [])
+					.slice()
+					.sort((a, b) => a.startTime - b.startTime);
+				if (clips.length > 0) {
+					let clipId = selectedClipId;
+					if (!clipId) {
+						const t = playback.currentTime;
+						const under = clips.find(
+							(c) =>
+								t >= c.startTime &&
+								t < c.startTime + Math.max(0, c.trimEnd - c.trimStart),
+						);
+						clipId = under ? under.id : clips[clips.length - 1].id;
+						setSelectedClipId(clipId);
+					}
+				}
+			}
+		};
+
 		const onKey = (e: KeyboardEvent) => {
 			const tag = (e.target as HTMLElement)?.tagName;
 			const inEditable =
@@ -39,12 +78,13 @@ export function GlobalShortcuts() {
 				(e.target as HTMLElement)?.isContentEditable;
 			if (inEditable) return;
 
-			// Slash or ? opens dialog
+			// Cmd+K (primary on macOS) or / or ? open dialog
 			if (
-				!e.ctrlKey &&
-				!e.metaKey &&
-				!e.altKey &&
-				(e.key === "/" || e.key === "?")
+				(e.metaKey && e.key.toLowerCase() === "k") ||
+				(!e.ctrlKey &&
+					!e.metaKey &&
+					!e.altKey &&
+					(e.key === "/" || e.key === "?"))
 			) {
 				e.preventDefault();
 				window.dispatchEvent(new CustomEvent("wav0:open-shortcuts"));
@@ -67,6 +107,7 @@ export function GlobalShortcuts() {
 			) {
 				e.preventDefault();
 				if (e.shiftKey) {
+					ensureSelection();
 					splitAtPlayhead();
 				} else {
 					setCurrentTime(0);
@@ -74,12 +115,28 @@ export function GlobalShortcuts() {
 				return;
 			}
 
-			// 1–9: select track
+			// 1–9: select track (and auto-select clip under playhead or rightmost)
 			if (!e.ctrlKey && !e.metaKey && !e.altKey && /^[1-9]$/.test(e.key)) {
 				e.preventDefault();
 				const idx = parseInt(e.key, 10) - 1;
 				const track = tracks[idx];
-				if (track) setSelectedTrackId(track.id);
+				if (track) {
+					setSelectedTrackId(track.id);
+					const clips = (track.clips ?? [])
+						.slice()
+						.sort((a, b) => a.startTime - b.startTime);
+					if (clips.length > 0) {
+						const t = playback.currentTime;
+						const under = clips.find(
+							(c) =>
+								t >= c.startTime &&
+								t < c.startTime + Math.max(0, c.trimEnd - c.trimStart),
+						);
+						setSelectedClipId((under ?? clips[clips.length - 1]).id);
+					} else {
+						setSelectedClipId(null);
+					}
+				}
 				return;
 			}
 
@@ -91,7 +148,7 @@ export function GlobalShortcuts() {
 				(e.key === "[" || e.key === "]")
 			) {
 				e.preventDefault();
-				if (!selectedTrackId) return;
+				ensureSelection();
 				const track = tracks.find((t) => t.id === selectedTrackId);
 				const clips = (track?.clips ?? [])
 					.slice()
@@ -104,26 +161,19 @@ export function GlobalShortcuts() {
 						? Math.max(0, idx - 1)
 						: Math.min(clips.length - 1, idx + 1);
 				setSelectedClipId(clips[idx].id);
+				requestAnimationFrame(() => {
+					const el = document.querySelector(
+						`[data-clip-id="${clips[idx].id}"]`,
+					) as HTMLElement | null;
+					el?.scrollIntoView({ block: "nearest", inline: "nearest" });
+				});
 				return;
 			}
 
-			// L: toggle loop for selected clip
-			if (!e.ctrlKey && !e.metaKey && (e.key === "l" || e.key === "L")) {
-				e.preventDefault();
-				if (!selectedTrackId || !selectedClipId) return;
-				const track = tracks.find((t) => t.id === selectedTrackId);
-				const clip = track?.clips?.find((c) => c.id === selectedClipId);
-				if (!clip) return;
-				const loop = !clip.loop;
-				const updates: Partial<typeof clip> = { loop };
-				// Leave loopEnd as-is when toggling; user can set via Alt+L or Shift+L
-				updateClip(selectedTrackId, clip.id, updates);
-				return;
-			}
-
-			// Alt+L: set loopEnd to playhead; Shift+L: clear loopEnd
+			// Option+L: set loopEnd to playhead; Shift+L: clear loopEnd (handle before plain L)
 			if ((e.key === "l" || e.key === "L") && (e.altKey || e.shiftKey)) {
 				e.preventDefault();
+				ensureSelection();
 				if (!selectedTrackId || !selectedClipId) return;
 				const track = tracks.find((t) => t.id === selectedTrackId);
 				const clip = track?.clips?.find((c) => c.id === selectedClipId);
@@ -134,6 +184,39 @@ export function GlobalShortcuts() {
 					const clipDur = Math.max(0, clip.trimEnd - clip.trimStart);
 					const oneShotEnd = clip.startTime + clipDur;
 					const loopEnd = Math.max(oneShotEnd, playback.currentTime);
+					updateClip(selectedTrackId, clip.id, { loop: true, loopEnd });
+				}
+				return;
+			}
+
+			// L: toggle loop (parity with toolbar defaults)
+			if (
+				!e.ctrlKey &&
+				!e.metaKey &&
+				!e.altKey &&
+				(e.key === "l" || e.key === "L")
+			) {
+				e.preventDefault();
+				ensureSelection();
+				if (!selectedTrackId || !selectedClipId) return;
+				const track = tracks.find((t) => t.id === selectedTrackId);
+				const clip = track?.clips?.find((c) => c.id === selectedClipId);
+				if (!clip) return;
+				const isLooping = clip.loop === true;
+				if (isLooping) {
+					updateClip(selectedTrackId, clip.id, {
+						loop: false,
+						loopEnd: undefined,
+					});
+				} else {
+					// Default musical length (8 bars @ current BPM)
+					const beatsPerBar = 4;
+					const msPerBeat =
+						60000 / Math.max(30, Math.min(300, playback.bpm || 120));
+					const defaultLen = 8 * beatsPerBar * msPerBeat;
+					const clipDur = Math.max(0, clip.trimEnd - clip.trimStart);
+					const oneShotEnd = clip.startTime + clipDur;
+					const loopEnd = Math.max(clip.startTime + defaultLen, oneShotEnd);
 					updateClip(selectedTrackId, clip.id, { loop: true, loopEnd });
 				}
 				return;
@@ -180,6 +263,7 @@ export function GlobalShortcuts() {
 		return () => window.removeEventListener("keydown", onKey);
 	}, [
 		playback.currentTime,
+		playback.bpm,
 		timeline.gridSize,
 		totalDuration,
 		selectedTrackId,

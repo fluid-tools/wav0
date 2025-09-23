@@ -131,7 +131,12 @@ export function DAWToolbar() {
 
 				<Dialog>
 					<DialogTrigger asChild>
-						<Button variant="ghost" size="sm" aria-label="Keyboard shortcuts">
+						<Button
+							variant="ghost"
+							size="sm"
+							aria-label="Keyboard shortcuts"
+							onClick={(e) => e.stopPropagation()}
+						>
 							<HelpCircle className={DAW_ICONS.MD} />
 						</Button>
 					</DialogTrigger>
