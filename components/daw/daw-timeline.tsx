@@ -55,7 +55,7 @@ export function DAWTimeline() {
 		(playback.currentTime / 1000) *
 		timeline.zoom *
 		DAW_PIXELS_PER_SECOND_AT_ZOOM_1;
-	const timelinePlayheadViewport = timelinePlayheadPosition - horizontalScroll;
+	const timelinePlayheadViewport = timelinePlayheadPosition - horizontalScroll; // kept for UI but unified via playheadViewportPxAtom if needed
 
 	// Calculate time markers based on zoom and BPM
 	const getTimeMarkers = () => {

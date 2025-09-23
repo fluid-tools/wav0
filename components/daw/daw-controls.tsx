@@ -28,7 +28,6 @@ import {
 	selectedTrackIdAtom,
 	setBpmAtom,
 	setCurrentTimeAtom,
-	setTimelineZoomAtom,
 	setTrackHeightZoomAtom,
 	stopPlaybackAtom,
 	timelineAtom,
@@ -37,6 +36,7 @@ import {
 	trackHeightZoomAtom,
 	tracksAtom,
 	updateClipAtom,
+	setTimelineZoomAtom,
 } from "@/lib/state/daw-store";
 import { formatDuration } from "@/lib/storage/opfs";
 
