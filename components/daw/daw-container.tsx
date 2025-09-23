@@ -35,6 +35,7 @@ import { DAWTimeline } from "./daw-timeline";
 import { DAWToolbar } from "./daw-toolbar";
 import { DAWTrackContent } from "./daw-track-content";
 import { DAWTrackList } from "./daw-track-list";
+import { UnifiedOverlay } from "./unified-overlay";
 import { GlobalShortcuts } from "./global-shortcuts";
 
 export function DAWContainer() {
@@ -300,8 +301,8 @@ export function DAWContainer() {
 											}}
 										>
 											<DAWTrackContent />
-											{/* Unified overlay spanning header + grid is rendered here */}
-											{/* Note: header also has its own timeline visuals; playhead is unified here */}
+											{/* Unified overlay spanning header + grid */}
+											<UnifiedOverlay />
 										</div>
 									</div>
 

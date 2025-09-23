@@ -332,15 +332,15 @@ export function DAWTrackContent() {
 													}),
 										}}
 									>
-										{/* Full-body interactive area */}
-										<button
-											type="button"
+										{/* Full-body interactive area with context menu */}
+										<div
+											role="button"
+											tabIndex={0}
 											className="absolute inset-0 rounded-md bg-transparent cursor-default"
 											aria-label={`Select audio clip: ${clip.name}`}
 											onMouseDown={(e) => {
-												// Drag body if click is not near edges
 												const rect = (
-													e.currentTarget as HTMLButtonElement
+													e.currentTarget as HTMLDivElement
 												).getBoundingClientRect();
 												const localX = e.clientX - rect.left;
 												const nearLeft = localX < 8;
@@ -355,6 +355,22 @@ export function DAWTrackContent() {
 														startTime: clip.startTime,
 													});
 												}
+											}}
+											onContextMenu={(e) => {
+												e.preventDefault();
+												setSelectedTrackId(track.id);
+												setSelectedClipId(clip.id);
+												// Programmatically open context menu near cursor by dispatching a custom event
+												window.dispatchEvent(
+													new CustomEvent("wav0:open-clip-menu", {
+														detail: {
+															x: e.clientX,
+															y: e.clientY,
+															trackId: track.id,
+															clipId: clip.id,
+														},
+													}),
+												);
 											}}
 										/>
 

@@ -94,13 +94,11 @@ export class PlaybackEngine {
 		this.tracks.clear();
 
 		for (const track of tracks) {
-			const hasLoadedClip = (track.clips ?? []).some((c) =>
-				c.opfsFileId ? audioManager.isTrackLoaded(c.opfsFileId) : false,
-			);
-			const hasLoadedLegacy = track.opfsFileId
-				? audioManager.isTrackLoaded(track.opfsFileId)
-				: false;
-			if (hasLoadedClip || hasLoadedLegacy) {
+			// Create a playback state for any track that references audio,
+			// even if the sink isn't loaded yet; we'll lazy-load during play
+			const hasClipRef = (track.clips ?? []).some((c) => !!c.opfsFileId);
+			const hasLegacyRef = !!track.opfsFileId;
+			if (hasClipRef || hasLegacyRef) {
 				this.tracks.set(track.id, {
 					clipStates: new Map(),
 					gainNode: null,
@@ -167,7 +165,16 @@ export class PlaybackEngine {
 
 			for (const clip of clips) {
 				if (!clip.opfsFileId) continue;
-				const sink = audioManager.getAudioBufferSink(clip.opfsFileId);
+				let sink = audioManager.getAudioBufferSink(clip.opfsFileId);
+				if (!sink) {
+					try {
+						await audioManager.loadTrackFromOPFS(
+							clip.opfsFileId,
+							clip.audioFileName ?? clip.name ?? "",
+						);
+						sink = audioManager.getAudioBufferSink(clip.opfsFileId);
+					} catch {}
+				}
 				if (!sink) continue;
 
 				const clipStartSec = clip.startTime / 1000;
@@ -484,7 +491,14 @@ export class PlaybackEngine {
 
 		for (const clip of clips) {
 			if (!clip.opfsFileId) continue;
-			const sink = audioManager.getAudioBufferSink(clip.opfsFileId);
+			let sink = audioManager.getAudioBufferSink(clip.opfsFileId);
+			if (!sink) {
+				await audioManager.loadTrackFromOPFS(
+					clip.opfsFileId,
+					clip.audioFileName ?? clip.name ?? "",
+				);
+				sink = audioManager.getAudioBufferSink(clip.opfsFileId);
+			}
 			if (!sink) continue;
 
 			const clipStartSec = clip.startTime / 1000;
