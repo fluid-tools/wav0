@@ -244,7 +244,8 @@ export const timelineWidthAtom = atom((get) => {
 	const zoom = get(timelineAtom).zoom;
 	const pxPerMs = (DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * zoom) / 1000;
 	const durationPx = durationMs * pxPerMs;
-	const paddingPx = DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * zoom * 10; // 10s visual buffer (zoom-aware)
+	// Reduced padding keeps zoom targets consistent
+	const paddingPx = DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * zoom * 2; // 2s visual buffer
 	return durationPx + paddingPx;
 });
 
@@ -253,6 +254,33 @@ export const projectEndPositionAtom = atom((get) => {
 	const zoom = get(timelineAtom).zoom;
 	const pxPerMs = (DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * zoom) / 1000;
 	return durationMs * pxPerMs;
+});
+
+// Derived: playhead viewport position in px relative to left of visible area
+export const playheadViewportPxAtom = atom((get) => {
+	const { currentTime } = get(playbackAtom);
+	const { zoom } = get(timelineAtom);
+	const scroll = get(horizontalScrollAtom);
+	const pxPerMs = (DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * zoom) / 1000;
+	return currentTime * pxPerMs - scroll;
+});
+
+// Zoom limits and setter (single definition)
+export const zoomLimitsAtom = atom<{ min: number; max: number }>({
+	min: 0.05,
+	max: 5,
+});
+export const setZoomLimitsAtom = atom(
+	null,
+	(_get, set, limits: { min: number; max: number }) => {
+		set(zoomLimitsAtom, limits);
+	},
+);
+export const setTimelineZoomAtom = atom(null, (get, set, zoom: number) => {
+	const limits = get(zoomLimitsAtom);
+	const clamped = Math.max(limits.min, Math.min(limits.max, zoom));
+	const t = get(timelineAtom);
+	set(timelineAtom, { ...t, zoom: clamped });
 });
 
 // Action atoms
@@ -360,11 +388,6 @@ export const setCurrentTimeAtom = atom(null, async (get, set, time: number) => {
 			},
 		});
 	}
-});
-
-export const setTimelineZoomAtom = atom(null, (get, set, zoom: number) => {
-	const timeline = get(timelineAtom);
-	set(timelineAtom, { ...timeline, zoom });
 });
 
 export const setTrackHeightZoomAtom = atom(null, (_get, set, zoom: number) => {

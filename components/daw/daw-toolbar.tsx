@@ -27,7 +27,11 @@ import {
 	DialogTrigger,
 } from "@/components/ui/dialog";
 import { DAW_HEIGHTS, DAW_ICONS, DAW_TEXT } from "@/lib/constants/daw-design";
-import { projectNameAtom, tracksAtom } from "@/lib/state/daw-store";
+import {
+	projectNameAtom,
+	tracksAtom,
+	splitClipAtPlayheadAtom,
+} from "@/lib/state/daw-store";
 
 export function DAWToolbar() {
 	const [projectName, setProjectName] = useAtom(projectNameAtom);
@@ -109,6 +113,22 @@ export function DAWToolbar() {
 					<span className="ml-1 text-xs">Export</span>
 				</Button>
 
+				<Button
+					variant="ghost"
+					size="sm"
+					onClick={() => {
+						// Use global shortcut path already wired; duplicate here for discoverability
+						const event = new KeyboardEvent("keydown", {
+							key: "S",
+							shiftKey: true,
+						});
+						window.dispatchEvent(event);
+					}}
+					title="Split at playhead (Shift+S)"
+				>
+					<span className="ml-1 text-xs">Split</span>
+				</Button>
+
 				<Dialog>
 					<DialogTrigger asChild>
 						<Button variant="ghost" size="sm" aria-label="Keyboard shortcuts">
@@ -122,30 +142,33 @@ export function DAWToolbar() {
 								Quick controls to keep you in flow
 							</DialogDescription>
 						</DialogHeader>
-						<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+						<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm leading-6">
 							<div>
 								<b>Space</b>: Play/Pause
 							</div>
 							<div>
-								<b>S</b>: Stop
+								<b>S</b>: Restart from 0
 							</div>
 							<div>
-								<b>L</b>: Toggle loop for selected clip
+								<b>Shift+S</b>: Split at playhead
 							</div>
 							<div>
-								<b>M</b>/<b>Solo</b>: Mute/Solo track
+								<b>L</b>: Loop toggle / clip navigation flow
 							</div>
 							<div>
-								<b>←/→</b>: Move project end by grid
+								<b>M</b>/<b>Shift+M</b>: Mute/Solo track
 							</div>
 							<div>
-								<b>Shift+←/→</b>: ×4 step
+								<b>←/→</b>: Seek by grid (Shift = ×4)
 							</div>
 							<div>
-								<b>Home</b>: Project end to 0
+								<b>Alt+←/→</b>: Project end by grid (Shift = ×4)
 							</div>
 							<div>
-								<b>End</b>: Project end to media end
+								<b>Home</b>/<b>End</b>: Seek to start/end
+							</div>
+							<div>
+								<b>?</b>: Open this dialog
 							</div>
 						</div>
 					</DialogContent>
