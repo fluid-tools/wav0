@@ -314,16 +314,22 @@ export function DAWTrackContent() {
 								return (
 									<div
 										key={clip.id}
+										data-clip-id={clip.id}
+										data-selected={isSelected ? "true" : "false"}
 										className={`group absolute top-0 bottom-0 rounded-md border-2 transition-all ${
 											isSelected
-												? "border-primary bg-primary/20"
+												? "border-primary bg-primary/10 ring-2 ring-primary"
 												: "border-border bg-muted/50 hover:bg-muted/70"
 										} ${track.muted ? "opacity-50" : ""}`}
 										style={{
 											left: clipX,
 											width: clipWidth,
-											backgroundColor: `${clip.color ?? track.color}20`,
-											borderColor: clip.color ?? track.color,
+											...(isSelected
+												? { backgroundColor: "hsl(var(--primary) / 0.18)" }
+												: {
+														backgroundColor: `${clip.color ?? track.color}20`,
+														borderColor: clip.color ?? track.color,
+													}),
 										}}
 									>
 										{/* Full-body interactive area */}
@@ -415,15 +421,17 @@ export function DAWTrackContent() {
 											aria-label="Resize clip end"
 										/>
 
-										{/* Clip label */}
-										<div className="absolute inset-2 flex flex-col justify-center pointer-events-none">
-											<div className="text-xs font-medium truncate text-left">
+										{/* Clip label (Logic-style: top bar with name/duration) */}
+										<div className="absolute left-2 right-2 top-1 flex items-center justify-between gap-2 pointer-events-none">
+											<div className="text-[11px] font-medium truncate">
 												{clip.name}
 											</div>
-											<div className="text-xs text-muted-foreground text-left">
+											<div className="text-[11px] text-muted-foreground tabular-nums">
 												{formatDuration((clip.trimEnd - clip.trimStart) / 1000)}
 											</div>
 										</div>
+										{/* Reserved center area for waveform */}
+										<div className="absolute inset-x-2 top-5 bottom-2 rounded-sm bg-background/20 pointer-events-none" />
 									</div>
 								);
 							})}
