@@ -153,22 +153,24 @@ export function DAWToolbar() {
 								<b>Shift+S</b>: Split at playhead
 							</div>
 							<div>
-								<b>L</b>: Loop toggle / clip navigation flow
+								<b>L</b>: Loop toggle; [ / ] prev/next clip; Alt+L set loop end;
+								Shift+L clear
 							</div>
 							<div>
-								<b>M</b>/<b>Shift+M</b>: Mute/Solo track
+								<b>M</b>/<b>Shift+M</b>: Mute/Solo track; <b>1–9</b>: Select
+								track
 							</div>
 							<div>
-								<b>←/→</b>: Seek by grid (Shift = ×4)
+								<b>←/→</b>: Seek by grid
 							</div>
 							<div>
-								<b>Alt+←/→</b>: Project end by grid (Shift = ×4)
+								<b>Shift+←/→</b>: Project end by grid
 							</div>
 							<div>
-								<b>Home</b>/<b>End</b>: Seek to start/end
+								<b>Cmd+←/→</b>: Seek to start/end (Mac)
 							</div>
 							<div>
-								<b>?</b>: Open this dialog
+								<b>/</b> or <b>?</b>: Open this dialog
 							</div>
 						</div>
 					</DialogContent>
