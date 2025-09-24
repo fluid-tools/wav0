@@ -2,7 +2,6 @@
 
 import { useAtom } from "jotai";
 import { useEffect, useRef, useState } from "react";
-import { DAW_PIXELS_PER_SECOND_AT_ZOOM_1 } from "@/lib/constants";
 import { DAW_HEIGHTS } from "@/lib/constants/daw-design";
 import type { Clip } from "@/lib/state/daw-store";
 import {
@@ -12,6 +11,7 @@ import {
 	selectedClipIdAtom,
 	selectedTrackIdAtom,
 	timelineAtom,
+	timelinePxPerMsAtom,
 	totalDurationAtom,
 	trackHeightZoomAtom,
 	tracksAtom,
@@ -29,6 +29,7 @@ export function DAWTrackContent() {
 	const [, updateClip] = useAtom(updateClipAtom);
 	const [, loadAudioFile] = useAtom(loadAudioFileAtom);
 	const [timeline] = useAtom(timelineAtom);
+	const [pxPerMs] = useAtom(timelinePxPerMsAtom);
 	const [trackHeightZoom] = useAtom(trackHeightZoomAtom);
 	const [projectEndPosition] = useAtom(projectEndPositionAtom);
 	const [totalDuration] = useAtom(totalDurationAtom);
@@ -79,7 +80,7 @@ export function DAWTrackContent() {
 	}, []);
 	const [dragOverTrackId, setDragOverTrackId] = useState<string | null>(null);
 
-	const pixelsPerMs = (DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * timeline.zoom) / 1000; // px/ms
+	const pixelsPerMs = pxPerMs;
 
 	const handleTrackDrop = async (trackId: string, e: React.DragEvent) => {
 		e.preventDefault();
