@@ -187,17 +187,7 @@ export function DAWTimeline() {
 				}}
 			/>
 
-			{/* Timeline playhead indicator */}
-			{timelinePlayheadViewport >= -2 &&
-				timelinePlayheadViewport <= timelineWidth && (
-					<div
-						className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-50 pointer-events-none"
-						style={{ left: timelinePlayheadViewport }}
-					>
-						{/* Timeline playhead triangle indicator */}
-						<div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-b-3 border-transparent border-b-red-500" />
-					</div>
-				)}
+            {/* Playhead is rendered in UnifiedOverlay to keep header + grid perfectly synchronized */}
 
 			{/* Snap grid overlay */}
 			{timeline.snapToGrid && (
