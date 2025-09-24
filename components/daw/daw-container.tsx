@@ -9,7 +9,6 @@ import {
 	ResizablePanel,
 	ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { DAW_PIXELS_PER_SECOND_AT_ZOOM_1 } from "@/lib/constants";
 import {
 	DAW_COLORS,
 	DAW_HEIGHTS,
@@ -22,7 +21,9 @@ import {
 	horizontalScrollAtom,
 	initializeAudioFromOPFSAtom,
 	playbackAtom,
+	setTimelineZoomAtom,
 	timelineAtom,
+	timelineViewportAtom,
 	timelineWidthAtom,
 	trackHeightZoomAtom,
 	tracksAtom,
@@ -30,13 +31,12 @@ import {
 } from "@/lib/state/daw-store";
 import { AudioTestPanel } from "./audio-test-panel";
 import { DAWControls } from "./daw-controls";
-import { DAWPlayhead } from "./daw-playhead";
 import { DAWTimeline } from "./daw-timeline";
 import { DAWToolbar } from "./daw-toolbar";
 import { DAWTrackContent } from "./daw-track-content";
 import { DAWTrackList } from "./daw-track-list";
-import { UnifiedOverlay } from "./unified-overlay";
 import { GlobalShortcuts } from "./global-shortcuts";
+import { UnifiedOverlay } from "./unified-overlay";
 
 export function DAWContainer() {
 	const [timelineWidth] = useAtom(timelineWidthAtom);
@@ -47,12 +47,28 @@ export function DAWContainer() {
 	const [, setVerticalScroll] = useAtom(verticalScrollAtom);
 	const [playback] = useAtom(playbackAtom);
 	const [timeline] = useAtom(timelineAtom);
+	const [viewport] = useAtom(timelineViewportAtom);
 	const [, initializeAudioFromOPFS] = useAtom(initializeAudioFromOPFSAtom);
+	const [, setTimelineZoom] = useAtom(setTimelineZoomAtom);
 
 	const timelineScrollRef = useRef<HTMLDivElement>(null);
 	const trackListScrollRef = useRef<HTMLDivElement>(null);
 	const trackGridScrollRef = useRef<HTMLDivElement>(null);
-	const gridContainerRef = useRef<HTMLDivElement>(null);
+	type GridController = {
+		setScroll(left: number, top: number): void;
+		cancelAnimation(): void;
+		scrollLeft: number;
+		scrollTop: number;
+		rAF: number;
+	};
+	const gridControllerRef = useRef<GridController | null>(null);
+
+	/**
+	 * Cache zoom and scroll state locally so wheel + pointer interactions
+	 * stay smooth between atom commits.
+	 */
+	const zoomRef = useRef(timeline.zoom);
+	const scrollRef = useRef({ left: 0, top: 0 });
 
 	// Initialize audio from OPFS on component mount
 	useEffect(() => {
@@ -65,81 +81,121 @@ export function DAWContainer() {
 	);
 	const contentHeight = Math.max(tracks.length * currentTrackHeight, 400);
 
-	// Sync horizontal scroll
+	const scheduleScrollSync = useCallback((scrollLeft: number, scrollTop: number) => {
+		const controller = gridControllerRef.current;
+		if (!controller) return;
+		controller.setScroll(scrollLeft, scrollTop);
+		scrollRef.current = { left: scrollLeft, top: scrollTop };
+	}, []);
+
 	const handleHorizontalScroll = useCallback(
 		(scrollLeft: number) => {
 			setHorizontalScroll(scrollLeft);
-
-			// Update timeline scroll
-			if (
-				timelineScrollRef.current &&
-				timelineScrollRef.current.scrollLeft !== scrollLeft
-			) {
-				timelineScrollRef.current.scrollLeft = scrollLeft;
-			}
-
-			// Update grid scroll
-			if (
-				trackGridScrollRef.current &&
-				trackGridScrollRef.current.scrollLeft !== scrollLeft
-			) {
-				trackGridScrollRef.current.scrollLeft = scrollLeft;
-			}
+			scheduleScrollSync(scrollLeft, scrollRef.current.top);
 		},
-		[setHorizontalScroll],
+		[setHorizontalScroll, scheduleScrollSync],
 	);
 
-	// Sync vertical scroll
 	const handleVerticalScroll = useCallback(
 		(scrollTop: number) => {
 			setVerticalScroll(scrollTop);
-
-			// Update track list scroll
-			if (
-				trackListScrollRef.current &&
-				trackListScrollRef.current.scrollTop !== scrollTop
-			) {
-				trackListScrollRef.current.scrollTop = scrollTop;
-			}
-
-			// Update grid scroll
-			if (
-				trackGridScrollRef.current &&
-				trackGridScrollRef.current.scrollTop !== scrollTop
-			) {
-				trackGridScrollRef.current.scrollTop = scrollTop;
-			}
+			scheduleScrollSync(scrollRef.current.left, scrollTop);
 		},
-		[setVerticalScroll],
+		[setVerticalScroll, scheduleScrollSync],
 	);
 
 	// Timeline scroll handler
 	const onTimelineScroll = useCallback(
 		(e: React.UIEvent<HTMLDivElement>) => {
 			const target = e.target as HTMLDivElement;
-			handleHorizontalScroll(target.scrollLeft);
+			const left = target.scrollLeft;
+			scrollRef.current.left = left;
+			scheduleScrollSync(left, scrollRef.current.top);
+			setHorizontalScroll(left);
 		},
-		[handleHorizontalScroll],
+		[scheduleScrollSync, setHorizontalScroll],
 	);
 
 	// Track list scroll handler
 	const onTrackListScroll = useCallback(
 		(e: React.UIEvent<HTMLDivElement>) => {
 			const target = e.target as HTMLDivElement;
-			handleVerticalScroll(target.scrollTop);
+			const top = target.scrollTop;
+			scrollRef.current.top = top;
+			scheduleScrollSync(scrollRef.current.left, top);
+			setVerticalScroll(top);
 		},
-		[handleVerticalScroll],
+		[scheduleScrollSync, setVerticalScroll],
 	);
 
 	// Track grid scroll handler
 	const onTrackGridScroll = useCallback(
 		(e: React.UIEvent<HTMLDivElement>) => {
 			const target = e.target as HTMLDivElement;
-			handleHorizontalScroll(target.scrollLeft);
-			handleVerticalScroll(target.scrollTop);
+			const { scrollLeft: left, scrollTop: top } = target;
+			scrollRef.current = { left, top };
+			scheduleScrollSync(left, top);
+			setHorizontalScroll(left);
+			setVerticalScroll(top);
 		},
-		[handleHorizontalScroll, handleVerticalScroll],
+		[scheduleScrollSync, setHorizontalScroll, setVerticalScroll],
 	);
+
+	useEffect(() => {
+		if (!timelineScrollRef.current || !trackGridScrollRef.current) return;
+		const timelineEl = timelineScrollRef.current;
+		const gridEl = trackGridScrollRef.current;
+
+	const controller: GridController = {
+			scrollLeft: gridEl.scrollLeft,
+			scrollTop: gridEl.scrollTop,
+			rAF: 0,
+		setScroll(left, top) {
+				if (this.rAF) cancelAnimationFrame(this.rAF);
+				this.rAF = requestAnimationFrame(() => {
+					this.rAF = 0;
+					if (timelineEl.scrollLeft !== left) timelineEl.scrollLeft = left;
+					if (gridEl.scrollLeft !== left) gridEl.scrollLeft = left;
+					if (gridEl.scrollTop !== top) gridEl.scrollTop = top;
+					this.scrollLeft = left;
+					this.scrollTop = top;
+				});
+			},
+		cancelAnimation() {
+				if (this.rAF) cancelAnimationFrame(this.rAF);
+				this.rAF = 0;
+			},
+		};
+		gridControllerRef.current = controller;
+
+		const handleWheel = (event: WheelEvent) => {
+			if (!event.ctrlKey) return;
+			event.preventDefault();
+			const delta = event.deltaY;
+			const zoomFactor = delta < 0 ? 1.1 : 0.9;
+			const { zoom } = viewport;
+			const clamped = Math.min(Math.max(zoom * zoomFactor, 0.05), 5);
+			setTimelineZoom(clamped);
+		};
+
+		const handlePointerMove = (event: PointerEvent) => {
+			if (!(event.buttons & 1)) return;
+			controller.setScroll(
+				controller.scrollLeft - event.movementX,
+				controller.scrollTop - event.movementY,
+			);
+		};
+
+		gridEl.addEventListener("wheel", handleWheel, { passive: false });
+		gridEl.addEventListener("pointermove", handlePointerMove);
+
+		return () => {
+			gridControllerRef.current = null;
+			controller.cancelAnimation();
+			gridEl.removeEventListener("wheel", handleWheel);
+			gridEl.removeEventListener("pointermove", handlePointerMove);
+		};
+	}, [viewport, setTimelineZoom]);
 
 	useEffect(() => {
 		// Prevent back/forward swipe gestures interfering with DAW grid
@@ -162,8 +218,7 @@ export function DAWContainer() {
 	// Playhead-follow: keep playhead within center band
 	useEffect(() => {
 		if (!timelineScrollRef.current || !trackGridScrollRef.current) return;
-		const pxPerSec = DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * timeline.zoom;
-		const x = (playback.currentTime / 1000) * pxPerSec;
+		const x = playback.currentTime * viewport.pxPerMs;
 		const grid = trackGridScrollRef.current;
 		const left = grid.scrollLeft;
 		const _right = left + grid.clientWidth;
@@ -259,10 +314,11 @@ export function DAWContainer() {
 
 						{/* Timeline and Grid Panel */}
 						<ResizablePanel defaultSize={75}>
-							<div className="h-full flex flex-col">
+							<div className="relative h-full flex flex-col overflow-hidden">
+								<UnifiedOverlay />
 								{/* Timeline Header */}
 								<div
-									className="border-b relative overflow-hidden"
+									className="border-b relative overflow-hidden z-10"
 									style={{
 										height: DAW_HEIGHTS.TIMELINE,
 										backgroundColor: "hsl(var(--muted) / 0.1)",
@@ -282,10 +338,7 @@ export function DAWContainer() {
 								</div>
 
 								{/* Track Content Grid */}
-								<div
-									className="flex-1 overflow-hidden relative"
-									ref={gridContainerRef}
-								>
+								<div className="relative z-10 flex-1 overflow-hidden">
 									<div
 										ref={trackGridScrollRef}
 										className="h-full w-full overflow-auto"
@@ -301,13 +354,8 @@ export function DAWContainer() {
 											}}
 										>
 											<DAWTrackContent />
-											{/* Unified overlay spanning header + grid */}
-											<UnifiedOverlay />
 										</div>
 									</div>
-
-									{/* Playhead Component */}
-									<DAWPlayhead containerRef={gridContainerRef} />
 								</div>
 							</div>
 						</ResizablePanel>

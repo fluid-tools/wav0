@@ -2,14 +2,14 @@
 
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { DAW_PIXELS_PER_SECOND_AT_ZOOM_1 } from "@/lib/constants";
 import {
-	horizontalScrollAtom,
 	playbackAtom,
-	projectEndPositionAtom,
+	playheadViewportPxAtom,
 	projectEndOverrideAtom,
+	projectEndPositionAtom,
 	setCurrentTimeAtom,
 	timelineAtom,
+	timelinePxPerMsAtom,
 	timelineWidthAtom,
 } from "@/lib/state/daw-store";
 import { formatDuration } from "@/lib/storage/opfs";
@@ -25,17 +25,18 @@ export function DAWTimeline() {
 	);
 	const containerRef = useRef<HTMLButtonElement>(null);
 	const [isDraggingEnd, setIsDraggingEnd] = useState(false);
+	const [playheadViewportPx] = useAtom(playheadViewportPxAtom);
+	const [pxPerMs] = useAtom(timelinePxPerMsAtom);
 
 	const onMouseMove = useCallback(
 		(e: MouseEvent) => {
 			if (!isDraggingEnd || !containerRef.current) return;
 			const rect = containerRef.current.getBoundingClientRect();
 			const x = e.clientX - rect.left;
-			const pxPerMs = (DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * timeline.zoom) / 1000;
 			const ms = Math.max(0, Math.round(x / pxPerMs));
 			setProjectEndOverride(ms);
 		},
-		[isDraggingEnd, timeline.zoom, setProjectEndOverride],
+		[isDraggingEnd, pxPerMs, setProjectEndOverride],
 	);
 
 	useEffect(() => {
@@ -48,19 +49,13 @@ export function DAWTimeline() {
 			document.removeEventListener("mousemove", onMouseMove);
 		};
 	}, [isDraggingEnd, onMouseMove]);
-	const [horizontalScroll] = useAtom(horizontalScrollAtom);
-
-	// Calculate timeline playhead position
-	const timelinePlayheadPosition =
-		(playback.currentTime / 1000) *
-		timeline.zoom *
-		DAW_PIXELS_PER_SECOND_AT_ZOOM_1;
-	const timelinePlayheadViewport = timelinePlayheadPosition - horizontalScroll; // kept for UI but unified via playheadViewportPxAtom if needed
+	const timelinePlayheadViewport = playheadViewportPx;
 
 	// Calculate time markers based on zoom and BPM
 	const getTimeMarkers = () => {
+		if (pxPerMs <= 0) return [];
 		const markers = [];
-		const pixelsPerSecond = timeline.zoom * DAW_PIXELS_PER_SECOND_AT_ZOOM_1; // 100px per second at zoom 1
+		const pixelsPerSecond = pxPerMs * 1000;
 		const secondsPerMarker =
 			timeline.zoom < 0.5 ? 10 : timeline.zoom < 1 ? 5 : 1;
 
@@ -80,11 +75,11 @@ export function DAWTimeline() {
 	};
 
 	const getBeatMarkers = () => {
+		if (pxPerMs <= 0) return [];
 		const markers = [];
 		const beatsPerMinute = playback.bpm;
 		const secondsPerBeat = 60 / beatsPerMinute;
-		const pixelsPerSecond = timeline.zoom * DAW_PIXELS_PER_SECOND_AT_ZOOM_1;
-		const pixelsPerBeat = secondsPerBeat * pixelsPerSecond;
+		const pixelsPerBeat = secondsPerBeat * pxPerMs * 1000;
 
 		for (let beat = 0; beat * pixelsPerBeat < timelineWidth; beat++) {
 			const time = beat * secondsPerBeat;
@@ -99,22 +94,30 @@ export function DAWTimeline() {
 		return markers;
 	};
 
-	const handleTimelineClick = (e: React.MouseEvent) => {
+	const handleTimelineClick = (e: React.MouseEvent | React.PointerEvent) => {
 		const rect = e.currentTarget.getBoundingClientRect();
 		const x = e.clientX - rect.left;
-		const pixelsPerSecond = timeline.zoom * DAW_PIXELS_PER_SECOND_AT_ZOOM_1;
+		if (pxPerMs <= 0) return;
 
 		// Allow clicking past project end; snap playhead and move if needed
 
 		// Snap-to-grid (quarter note)
 		const secondsPerBeat = 60 / playback.bpm;
 		const snapSeconds = secondsPerBeat / 4; // 16th grid
-		const rawSeconds = x / pixelsPerSecond;
+		const rawSeconds = x / (pxPerMs * 1000);
 		const snappedSeconds = timeline.snapToGrid
 			? Math.round(rawSeconds / snapSeconds) * snapSeconds
 			: rawSeconds;
 		const time = snappedSeconds * 1000; // ms
 		setCurrentTime(Math.max(0, time));
+	};
+
+	const onTimelinePointerDown = (
+		event: React.PointerEvent<HTMLButtonElement>,
+	) => {
+		if (event.button !== 0) return;
+		event.preventDefault();
+		handleTimelineClick(event);
 	};
 
 	// Playhead position calculation (now handled by DAWPlayhead component)
@@ -131,6 +134,7 @@ export function DAWTimeline() {
 				if (isDraggingEnd) return;
 				handleTimelineClick(e);
 			}}
+			onPointerDown={onTimelinePointerDown}
 			style={{ width: timelineWidth }}
 			aria-label="Timeline - click to set playback position"
 		>
