@@ -1,6 +1,5 @@
 "use client";
 
-import { useAtom } from "jotai";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,18 +12,11 @@ import {
 import { Input } from "@/components/ui/input";
 import {
 	clampDb,
-	dbToVolume,
 	formatDb,
 	VOLUME_MAX_DB,
 	VOLUME_MIN_DB,
 	volumeToDb,
 } from "@/lib/audio/volume";
-import {
-	removeTrackAtom,
-	renameTrackAtom,
-	selectedTrackIdAtom,
-	updateTrackAtom,
-} from "@/lib/state/daw-store";
 
 type TrackContextMenuProps = {
 	trackId: string;
@@ -33,9 +25,13 @@ type TrackContextMenuProps = {
 	isSoloed: boolean;
 	volume: number;
 	onRequestRename?: () => void;
-	onMuteToggle?: () => void;
-	onSoloToggle?: () => void;
-	onDelete?: () => void;
+	onToggleSolo: () => void;
+	onToggleMute: () => void;
+	onResetVolume: () => void;
+	onMuteHard: () => void;
+	onSetVolumeDb: (db: number) => void;
+	onDeleteTrack: () => void;
+	onSelectTrack: () => void;
 	children: React.ReactNode;
 };
 
@@ -46,15 +42,15 @@ export function TrackContextMenu({
 	isSoloed,
 	volume,
 	onRequestRename,
-	onMuteToggle,
-	onSoloToggle,
-	onDelete,
+	onToggleSolo,
+	onToggleMute,
+	onResetVolume,
+	onMuteHard,
+	onSetVolumeDb,
+	onDeleteTrack,
+	onSelectTrack,
 	children,
 }: TrackContextMenuProps) {
-	const [, updateTrack] = useAtom(updateTrackAtom);
-	const [, removeTrack] = useAtom(removeTrackAtom);
-	const [, setSelectedTrackId] = useAtom(selectedTrackIdAtom);
-	const [, renameTrack] = useAtom(renameTrackAtom);
 	const [menuOpen, setMenuOpen] = useState(false);
 	const [volumeDbInput, setVolumeDbInput] = useState<string>("");
 
@@ -75,50 +71,18 @@ export function TrackContextMenu({
 		}
 	}, [menuOpen, volume, displayDb]);
 
-	const handleMuteHard = () => {
-		updateTrack(trackId, { volume: 0, muted: true });
-	};
-
 	const handleVolumeCommit = (dbValue: number) => {
 		if (!Number.isFinite(dbValue)) {
-			handleMuteHard();
+			onMuteHard();
 			return;
 		}
 		const clamped = clampDb(dbValue);
-		const volumeValue = dbToVolume(clamped);
-		updateTrack(trackId, { volume: volumeValue, muted: volumeValue <= 0 });
+		onSetVolumeDb(clamped);
 	};
 
 	const handleRename = () => {
 		setMenuOpen(false);
-		if (onRequestRename) {
-			onRequestRename();
-			return;
-		}
-		const next = window.prompt("Rename track", trackName);
-		if (!next) return;
-		const trimmed = next.trim();
-		if (!trimmed || trimmed === trackName) return;
-		renameTrack(trackId, trimmed);
-	};
-
-	const handleSoloToggle = () => {
-		onSoloToggle?.();
-		updateTrack(trackId, { soloed: !isSoloed });
-	};
-
-	const handleMuteToggle = () => {
-		onMuteToggle?.();
-		if (isMuted) {
-			updateTrack(trackId, { muted: false });
-			return;
-		}
-		updateTrack(trackId, { muted: true });
-	};
-
-	const handleDelete = () => {
-		onDelete?.();
-		removeTrack(trackId);
+		onRequestRename?.();
 	};
 
 	const liveDb = volumeDbInput.length > 0 ? Number(volumeDbInput) : displayDb;
@@ -128,7 +92,7 @@ export function TrackContextMenu({
 			onOpenChange={(open) => {
 				setMenuOpen(open);
 				if (open) {
-					setSelectedTrackId(trackId);
+					onSelectTrack();
 				}
 			}}
 		>
@@ -140,16 +104,24 @@ export function TrackContextMenu({
 				</div>
 				<ContextMenuSeparator />
 				<ContextMenuItem onClick={handleRename}>Rename</ContextMenuItem>
-				<ContextMenuItem onClick={handleSoloToggle}>
+				<ContextMenuItem onClick={onToggleSolo}>
 					{isSoloed ? "Unsolo" : "Solo"}
 				</ContextMenuItem>
-				<ContextMenuItem onClick={handleMuteToggle}>
+				<ContextMenuItem onClick={onToggleMute}>
 					{isMuted ? "Unmute" : "Mute"}
 				</ContextMenuItem>
-				<ContextMenuItem onClick={() => handleVolumeCommit(0)}>
+				<ContextMenuItem onClick={() => {
+					onResetVolume();
+					setVolumeDbInput("0");
+				}}>
 					Reset to 0 dB
 				</ContextMenuItem>
-				<ContextMenuItem onClick={handleMuteHard}>Mute (−∞ dB)</ContextMenuItem>
+				<ContextMenuItem onClick={() => {
+					onMuteHard();
+					setVolumeDbInput(String(VOLUME_MIN_DB));
+				}}>
+					Mute (−∞ dB)
+				</ContextMenuItem>
 				<ContextMenuSeparator />
 				<div className="px-2 pb-2">
 					<div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -188,7 +160,10 @@ export function TrackContextMenu({
 							type="button"
 							variant="outline"
 							size="sm"
-							onClick={() => handleVolumeCommit(0)}
+							onClick={() => {
+								onResetVolume();
+								setVolumeDbInput("0");
+							}}
 						>
 							0 dB
 						</Button>
@@ -196,7 +171,10 @@ export function TrackContextMenu({
 							type="button"
 							variant="outline"
 							size="sm"
-							onClick={handleMuteHard}
+							onClick={() => {
+								onMuteHard();
+								setVolumeDbInput(String(VOLUME_MIN_DB));
+							}}
 						>
 							Mute
 						</Button>
@@ -222,7 +200,7 @@ export function TrackContextMenu({
 					/>
 				</div>
 				<ContextMenuSeparator />
-				<ContextMenuItem onClick={handleDelete} variant="destructive">
+				<ContextMenuItem onClick={onDeleteTrack} variant="destructive">
 					Delete Track
 				</ContextMenuItem>
 			</ContextMenuContent>
