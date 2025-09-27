@@ -1,15 +1,7 @@
 "use client";
 
 import { useAtom } from "jotai";
-import {
-	Edit3,
-	GripHorizontal,
-	Headphones,
-	MoreVertical,
-	Trash2,
-	Volume2,
-	VolumeX,
-} from "lucide-react";
+import { Edit3, GripHorizontal, MoreVertical, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { TrackContextMenu } from "@/components/daw/context-menus/track-context-menu";
 import { Button } from "@/components/ui/button";
@@ -21,7 +13,13 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { formatDb, volumeToDb } from "@/lib/audio/volume";
+import {
+	dbToVolume,
+	formatDb,
+	VOLUME_MAX_DB,
+	VOLUME_MIN_DB,
+	volumeToDb,
+} from "@/lib/audio/volume";
 import {
 	DAW_BUTTONS,
 	DAW_COLORS,
@@ -39,6 +37,7 @@ import {
 	updateTrackAtom,
 } from "@/lib/state/daw-store";
 import { formatDuration } from "@/lib/storage/opfs";
+import { cn } from "@/lib/utils";
 
 export function DAWTrackList() {
 	const [tracks] = useAtom(tracksAtom);
@@ -126,6 +125,22 @@ export function DAWTrackList() {
 					const dbValue = volumeToDb(track.volume);
 					const volumeLabel =
 						track.volume <= 0 || track.muted ? "Muted" : formatDb(dbValue);
+					const setVolumeFromDb = (db: number) => {
+						const volumeValue = dbToVolume(db);
+						updateTrack(track.id, {
+							volume: volumeValue,
+							muted: volumeValue <= 0 ? true : track.muted && volumeValue === 0,
+						});
+					};
+					const resetVolume = () => {
+						setVolumeFromDb(0);
+					};
+					const muteHard = () => {
+						updateTrack(track.id, { volume: 0, muted: true });
+					};
+					const toggleMuteAction = () => toggleMute(track.id, track.muted);
+					const toggleSoloAction = () => toggleSolo(track.id, track.soloed);
+					const selectTrack = () => setSelectedTrackId(track.id);
 
 					return (
 						<TrackContextMenu
@@ -136,9 +151,13 @@ export function DAWTrackList() {
 							isSoloed={track.soloed}
 							volume={track.volume}
 							onRequestRename={() => setEditingTrackId(track.id)}
-							onMuteToggle={() => toggleMute(track.id, track.muted)}
-							onSoloToggle={() => toggleSolo(track.id, track.soloed)}
-							onDelete={() => removeTrack(track.id)}
+							onToggleSolo={toggleSoloAction}
+							onToggleMute={toggleMuteAction}
+							onResetVolume={resetVolume}
+							onMuteHard={muteHard}
+							onSetVolumeDb={setVolumeFromDb}
+							onDeleteTrack={() => removeTrack(track.id)}
+							onSelectTrack={selectTrack}
 						>
 							<div
 								className={`w-full transition-colors ${DAW_COLORS.BORDER_DEFAULT} border-b ${
@@ -155,11 +174,11 @@ export function DAWTrackList() {
 								}}
 							>
 								{/* Track Header */}
-								<div className="flex items-center justify-between gap-2">
+								<div className="flex items-center justify-between">
 									<button
 										type="button"
 										className={`flex items-center gap-2 flex-1 min-w-0 cursor-pointer ${DAW_BUTTONS.TRANSPARENT} text-left`}
-										onClick={() => setSelectedTrackId(track.id)}
+										onClick={selectTrack}
 										onDoubleClick={() => setEditingTrackId(track.id)}
 									>
 										<div
@@ -189,78 +208,104 @@ export function DAWTrackList() {
 										)}
 									</button>
 
-									<div className="flex items-center gap-1">
-										<Button
-											variant="ghost"
-											size="icon"
-											className="h-7 w-7"
-											onClick={(e) => {
-												e.preventDefault();
-												setEditingTrackId(track.id);
-											}}
-										>
-											<Edit3 className="h-3.5 w-3.5" />
-										</Button>
-										<Button
-											variant="ghost"
-											size="icon"
-											className={`h-7 w-7 ${track.muted ? "text-primary" : ""}`}
-											onClick={(e) => {
-												e.preventDefault();
-												toggleMute(track.id, track.muted);
-											}}
-										>
-											{track.muted ? (
-												<VolumeX className="h-3.5 w-3.5" />
-											) : (
-												<Volume2 className="h-3.5 w-3.5" />
-											)}
-										</Button>
-										<Button
-											variant="ghost"
-											size="icon"
-											className={`h-7 w-7 ${track.soloed ? "text-primary" : ""}`}
-											onClick={(e) => {
-												e.preventDefault();
-												toggleSolo(track.id, track.soloed);
-											}}
-										>
-											<Headphones className="h-3.5 w-3.5" />
-										</Button>
-										<DropdownMenu>
-											<DropdownMenuTrigger asChild>
-												<Button variant="ghost" size="icon" className="h-7 w-7">
-													<MoreVertical className={DAW_ICONS.XS} />
-												</Button>
-											</DropdownMenuTrigger>
-											<DropdownMenuContent align="end">
-												<DropdownMenuItem
-													onClick={() => setEditingTrackId(track.id)}
-												>
-													<Edit3 className={`${DAW_ICONS.MD} mr-2`} />
-													Rename
-												</DropdownMenuItem>
-												<DropdownMenuItem
-													onClick={() => toggleMute(track.id, track.muted)}
-												>
-													{track.muted ? "Unmute" : "Mute"}
-												</DropdownMenuItem>
-												<DropdownMenuItem
-													onClick={() => toggleSolo(track.id, track.soloed)}
-												>
-													{track.soloed ? "Unsolo" : "Solo"}
-												</DropdownMenuItem>
-												<DropdownMenuSeparator />
-												<DropdownMenuItem
-													onClick={() => removeTrack(track.id)}
-													className="text-destructive"
-												>
-													<Trash2 className={`${DAW_ICONS.MD} mr-2`} />
-													Delete
-												</DropdownMenuItem>
-											</DropdownMenuContent>
-										</DropdownMenu>
-									</div>
+									<DropdownMenu>
+										<DropdownMenuTrigger asChild>
+											<Button variant="ghost" size="icon" className="h-7 w-7">
+												<MoreVertical className={DAW_ICONS.XS} />
+											</Button>
+										</DropdownMenuTrigger>
+										<DropdownMenuContent align="end" className="w-64">
+											<DropdownMenuItem
+												onClick={() => setEditingTrackId(track.id)}
+											>
+												<Edit3 className={`${DAW_ICONS.MD} mr-2`} />
+												Rename
+											</DropdownMenuItem>
+											<DropdownMenuItem onClick={toggleSoloAction}>
+												{track.soloed ? "Unsolo" : "Solo"}
+											</DropdownMenuItem>
+											<DropdownMenuItem onClick={toggleMuteAction}>
+												{track.muted ? "Unmute" : "Mute"}
+											</DropdownMenuItem>
+											<DropdownMenuItem onClick={resetVolume}>
+												Reset to 0 dB
+											</DropdownMenuItem>
+											<DropdownMenuItem onClick={muteHard}>
+												Mute (−∞ dB)
+											</DropdownMenuItem>
+											<DropdownMenuSeparator />
+											<div className="px-2 pb-2">
+												<div className="flex items-center justify-between text-xs text-muted-foreground">
+													<span>Volume (dB)</span>
+													<span className="font-medium text-foreground">
+														{volumeLabel}
+													</span>
+												</div>
+												<div className="mt-2 flex items-center gap-2">
+													<Input
+														type="number"
+														inputMode="decimal"
+														step={0.5}
+														min={VOLUME_MIN_DB}
+														max={VOLUME_MAX_DB}
+														defaultValue={
+															track.volume <= 0 || track.muted ? "" : dbValue
+														}
+														onKeyDown={(event) => {
+															if (event.key === "Enter") {
+																const parsed = Number(
+																	(event.target as HTMLInputElement).value,
+																);
+																if (Number.isFinite(parsed))
+																	setVolumeFromDb(parsed);
+															}
+														}}
+														onBlur={(event) => {
+															const parsed = Number(
+																(event.target as HTMLInputElement).value,
+															);
+															if (Number.isFinite(parsed))
+																setVolumeFromDb(parsed);
+														}}
+														className="h-8"
+													/>
+													<Button
+														variant="outline"
+														size="sm"
+														onClick={resetVolume}
+													>
+														0 dB
+													</Button>
+													<Button
+														variant="outline"
+														size="sm"
+														onClick={muteHard}
+													>
+														Mute
+													</Button>
+												</div>
+												<input
+													type="range"
+													min={VOLUME_MIN_DB}
+													max={VOLUME_MAX_DB}
+													step={0.5}
+													defaultValue={dbValue}
+													onChange={(event) =>
+														setVolumeFromDb(Number(event.target.value))
+													}
+													className="mt-3 h-1 w-full cursor-pointer appearance-none rounded bg-muted"
+												/>
+											</div>
+											<DropdownMenuSeparator />
+											<DropdownMenuItem
+												onClick={() => removeTrack(track.id)}
+												className="text-destructive"
+											>
+												<Trash2 className={`${DAW_ICONS.MD} mr-2`} />
+												Delete
+											</DropdownMenuItem>
+										</DropdownMenuContent>
+									</DropdownMenu>
 								</div>
 
 								{/* Track Info */}
@@ -272,33 +317,41 @@ export function DAWTrackList() {
 
 								{/* Track Controls */}
 								<div className="flex items-center gap-2">
-									<Button
-										variant={track.muted ? "default" : "ghost"}
-										size="sm"
-										className="h-7 w-7 p-0 flex-shrink-0"
-										onClick={(e) => {
-											e.stopPropagation();
-											toggleMute(track.id, track.muted);
-										}}
-									>
-										{track.muted ? (
-											<VolumeX className={DAW_ICONS.XS} />
-										) : (
-											<Volume2 className={DAW_ICONS.XS} />
+									<button
+										type="button"
+										className={cn(
+											"h-7 w-7 rounded-sm text-xs font-semibold transition-colors",
+											track.muted
+												? "bg-red-500 text-white"
+												: "bg-muted/40 text-muted-foreground hover:bg-muted/70",
 										)}
-									</Button>
-
-									<Button
-										variant={track.soloed ? "default" : "ghost"}
-										size="sm"
-										className="h-7 w-7 p-0 flex-shrink-0"
 										onClick={(e) => {
 											e.stopPropagation();
-											toggleSolo(track.id, track.soloed);
+											toggleMuteAction();
 										}}
+										aria-pressed={track.muted}
+										aria-label={track.muted ? "Unmute track" : "Mute track"}
 									>
-										<Headphones className={DAW_ICONS.XS} />
-									</Button>
+										M
+									</button>
+
+									<button
+										type="button"
+										className={cn(
+											"h-7 w-7 rounded-sm text-xs font-semibold transition-colors",
+											track.soloed
+												? "bg-amber-400 text-black"
+												: "bg-muted/40 text-muted-foreground hover:bg-muted/70",
+										)}
+										onClick={(e) => {
+											e.stopPropagation();
+											toggleSoloAction();
+										}}
+										aria-pressed={track.soloed}
+										aria-label={track.soloed ? "Unsolo track" : "Solo track"}
+									>
+										S
+									</button>
 
 									<div className="flex flex-1 items-center gap-2">
 										<div className="flex-1 min-w-0">
