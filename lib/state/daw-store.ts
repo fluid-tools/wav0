@@ -147,6 +147,41 @@ export const updateClipAtom = atom(
 	},
 );
 
+export const renameClipAtom = atom(
+	null,
+	async (get, set, trackId: string, clipId: string, name: string) => {
+		if (!name.trim()) return;
+		await set(updateClipAtom, trackId, clipId, { name: name.trim() });
+	},
+);
+
+export const removeClipAtom = atom(
+	null,
+	async (get, set, trackId: string, clipId: string) => {
+		const tracks = get(tracksAtom);
+		const playback = get(playbackAtom);
+		const selectedClipId = get(selectedClipIdAtom);
+		const updatedTracks = tracks.map((track) => {
+			if (track.id !== trackId || !track.clips) return track;
+			const remaining = track.clips.filter((clip) => clip.id !== clipId);
+			return { ...track, clips: remaining };
+		});
+		set(tracksAtom, updatedTracks);
+		if (selectedClipId === clipId) {
+			set(selectedClipIdAtom, null);
+		}
+		const updatedTrack = updatedTracks.find((t) => t.id === trackId);
+		if (!updatedTrack) return;
+		if (playback.isPlaying) {
+			try {
+				await playbackEngine.rescheduleTrack(updatedTrack);
+			} catch (e) {
+				console.error("Failed to reschedule track after clip removal", trackId, e);
+			}
+		}
+	},
+);
+
 export const splitClipAtPlayheadAtom = atom(null, async (get, set) => {
 	const tracks = get(tracksAtom);
 	const selectedTrackId = get(selectedTrackIdAtom);
@@ -381,6 +416,15 @@ export const updateTrackAtom = atom(
 				console.error("Failed to reschedule track after update", trackId, e);
 			}
 		}
+	},
+);
+
+export const renameTrackAtom = atom(
+	null,
+	async (get, set, trackId: string, name: string) => {
+		const safe = name.trim();
+		if (!safe) return;
+		await set(updateTrackAtom, trackId, { name: safe });
 	},
 );
 

@@ -62,6 +62,7 @@ export function DAWContainer() {
 		rAF: number;
 	};
 	const gridControllerRef = useRef<GridController | null>(null);
+	const panLockRef = useRef(false);
 
 	/**
 	 * Cache zoom and scroll state locally so wheel + pointer interactions
@@ -69,6 +70,24 @@ export function DAWContainer() {
 	 */
 	const zoomRef = useRef(timeline.zoom);
 	const scrollRef = useRef({ left: 0, top: 0 });
+
+	useEffect(() => {
+		const handlePanLock = (event: Event) => {
+			const customEvent = event as CustomEvent<boolean>;
+			const locked = Boolean(customEvent.detail);
+			panLockRef.current = locked;
+			if (locked) {
+				gridControllerRef.current?.cancelAnimation();
+			}
+		};
+		window.addEventListener("wav0:grid-pan-lock", handlePanLock as EventListener);
+		return () => {
+			window.removeEventListener(
+				"wav0:grid-pan-lock",
+				handlePanLock as EventListener,
+			);
+		};
+	}, []);
 
 	// Initialize audio from OPFS on component mount
 	useEffect(() => {
@@ -180,6 +199,7 @@ export function DAWContainer() {
 
 		const handlePointerMove = (event: PointerEvent) => {
 			if (!(event.buttons & 1)) return;
+			if (panLockRef.current) return;
 			controller.setScroll(
 				controller.scrollLeft - event.movementX,
 				controller.scrollTop - event.movementY,
