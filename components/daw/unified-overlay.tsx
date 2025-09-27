@@ -113,24 +113,24 @@ export function UnifiedOverlay() {
 			ref={containerRef}
 			className="pointer-events-none absolute inset-0 z-50"
 		>
-            <button
-                type="button"
-                className="cursor-ew pointer-events-auto absolute top-0 bottom-0 w-6 -translate-x-1/2 bg-transparent outline-none"
-                style={{
-                    transform: `translate3d(${playheadX}px,0,0) translateX(-50%)`,
-                    willChange: "transform",
-                    WebkitTransform: `translate3d(${playheadX}px,0,0) translateX(-50%)`,
-                    left: 0,
-                }}
-                onPointerDown={(event) => {
-                    if (event.button !== 0) return;
-                    event.preventDefault();
-                    dragRef.current = { active: true, pointerId: event.pointerId };
-                    event.currentTarget.setPointerCapture?.(event.pointerId);
-                    updateTime(event.clientX);
-                }}
-                aria-label="Move playhead"
-            >
+			<button
+				type="button"
+				className="cursor-ew pointer-events-auto absolute top-0 bottom-0 w-6 -translate-x-1/2 bg-transparent outline-none"
+				style={{
+					transform: `translate3d(${playheadX}px,0,0) translateX(-50%)`,
+					willChange: "transform",
+					WebkitTransform: `translate3d(${playheadX}px,0,0) translateX(-50%)`,
+					left: 0,
+				}}
+				onPointerDown={(event) => {
+					if (event.button !== 0) return;
+					event.preventDefault();
+					dragRef.current = { active: true, pointerId: event.pointerId };
+					event.currentTarget.setPointerCapture?.(event.pointerId);
+					updateTime(event.clientX);
+				}}
+				aria-label="Move playhead"
+			>
 				<span className="pointer-events-none absolute left-1/2 top-0 bottom-0 w-px -translate-x-1/2 bg-red-500" />
 				<span className="pointer-events-none absolute left-1/2 -translate-x-1/2 -translate-y-1/2 top-6 flex flex-col items-center">
 					<span className="h-3 w-4 rounded bg-red-500 shadow-[0_1px_3px_rgba(0,0,0,0.25)]" />

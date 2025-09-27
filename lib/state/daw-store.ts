@@ -149,7 +149,7 @@ export const updateClipAtom = atom(
 
 export const renameClipAtom = atom(
 	null,
-	async (get, set, trackId: string, clipId: string, name: string) => {
+	async (_get, set, trackId: string, clipId: string, name: string) => {
 		if (!name.trim()) return;
 		await set(updateClipAtom, trackId, clipId, { name: name.trim() });
 	},
@@ -176,7 +176,11 @@ export const removeClipAtom = atom(
 			try {
 				await playbackEngine.rescheduleTrack(updatedTrack);
 			} catch (e) {
-				console.error("Failed to reschedule track after clip removal", trackId, e);
+				console.error(
+					"Failed to reschedule track after clip removal",
+					trackId,
+					e,
+				);
 			}
 		}
 	},
@@ -287,8 +291,7 @@ export const timelineViewportAtom = atom<TimelineViewportMetrics>((get) => {
 	const playback = get(playbackAtom);
 	const scroll = get(horizontalScrollAtom);
 	const durationMs = get(totalDurationAtom);
-	const pxPerMs =
-		(DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * timeline.zoom) / 1000;
+	const pxPerMs = (DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * timeline.zoom) / 1000;
 	const clampedPxPerMs = Number.isFinite(pxPerMs) ? pxPerMs : 0;
 	const clampedScroll = Number.isFinite(scroll) ? scroll : 0;
 	const safeCurrentTime = Number.isFinite(playback.currentTime)
@@ -421,7 +424,7 @@ export const updateTrackAtom = atom(
 
 export const renameTrackAtom = atom(
 	null,
-	async (get, set, trackId: string, name: string) => {
+	async (_get, set, trackId: string, name: string) => {
 		const safe = name.trim();
 		if (!safe) return;
 		await set(updateTrackAtom, trackId, { name: safe });

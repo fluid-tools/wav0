@@ -1,10 +1,21 @@
 "use client";
 
 import { useAtom } from "jotai";
-import { ChevronDown, ChevronRight, Pause, Play, Square, Upload } from "lucide-react";
+import {
+	ChevronDown,
+	ChevronRight,
+	Pause,
+	Play,
+	Square,
+	Upload,
+} from "lucide-react";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { audioManager } from "@/lib/audio/audio-manager";
 import {
 	loadAudioFileAtom,
@@ -95,10 +106,7 @@ export function AudioTestPanel() {
 		<div className="border rounded-lg bg-muted/30">
 			<Collapsible open={isOpen} onOpenChange={setIsOpen}>
 				<CollapsibleTrigger asChild>
-					<Button
-						variant="ghost"
-						className="w-full justify-between p-4 h-auto"
-					>
+					<Button variant="ghost" className="w-full justify-between p-4 h-auto">
 						<h3 className="text-lg font-semibold">Audio Test Panel</h3>
 						{isOpen ? (
 							<ChevronDown className="w-4 h-4" />
@@ -153,7 +161,8 @@ export function AudioTestPanel() {
 							<div key={track.id} className="text-xs text-muted-foreground">
 								Track {index + 1}: {track.name}
 								{track.opfsFileId && " (Audio loaded)"}
-								{track.duration > 0 && ` - ${(track.duration / 1000).toFixed(1)}s`}
+								{track.duration > 0 &&
+									` - ${(track.duration / 1000).toFixed(1)}s`}
 							</div>
 						))}
 					</div>

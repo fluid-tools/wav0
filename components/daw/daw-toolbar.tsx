@@ -4,20 +4,13 @@ import { useAtom } from "jotai";
 import {
 	Download,
 	FolderOpen,
+	HelpCircle,
 	MoreHorizontal,
 	Save,
 	Settings,
 	Upload,
-	HelpCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import {
 	Dialog,
 	DialogContent,
@@ -26,12 +19,15 @@ import {
 	DialogTitle,
 	DialogTrigger,
 } from "@/components/ui/dialog";
-import { DAW_HEIGHTS, DAW_ICONS, DAW_TEXT } from "@/lib/constants/daw-design";
 import {
-	projectNameAtom,
-	tracksAtom,
-	splitClipAtPlayheadAtom,
-} from "@/lib/state/daw-store";
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { DAW_HEIGHTS, DAW_ICONS, DAW_TEXT } from "@/lib/constants/daw-design";
+import { projectNameAtom, tracksAtom } from "@/lib/state/daw-store";
 
 export function DAWToolbar() {
 	const [projectName, setProjectName] = useAtom(projectNameAtom);

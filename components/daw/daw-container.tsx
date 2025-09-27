@@ -46,7 +46,7 @@ export function DAWContainer() {
 	const [, setHorizontalScroll] = useAtom(horizontalScrollAtom);
 	const [, setVerticalScroll] = useAtom(verticalScrollAtom);
 	const [playback] = useAtom(playbackAtom);
-	const [timeline] = useAtom(timelineAtom);
+	const [_timeline] = useAtom(timelineAtom);
 	const [viewport] = useAtom(timelineViewportAtom);
 	const [, initializeAudioFromOPFS] = useAtom(initializeAudioFromOPFSAtom);
 	const [, setTimelineZoom] = useAtom(setTimelineZoomAtom);
@@ -68,7 +68,6 @@ export function DAWContainer() {
 	 * Cache zoom and scroll state locally so wheel + pointer interactions
 	 * stay smooth between atom commits.
 	 */
-	const zoomRef = useRef(timeline.zoom);
 	const scrollRef = useRef({ left: 0, top: 0 });
 
 	useEffect(() => {
@@ -80,7 +79,10 @@ export function DAWContainer() {
 				gridControllerRef.current?.cancelAnimation();
 			}
 		};
-		window.addEventListener("wav0:grid-pan-lock", handlePanLock as EventListener);
+		window.addEventListener(
+			"wav0:grid-pan-lock",
+			handlePanLock as EventListener,
+		);
 		return () => {
 			window.removeEventListener(
 				"wav0:grid-pan-lock",
@@ -100,27 +102,14 @@ export function DAWContainer() {
 	);
 	const contentHeight = Math.max(tracks.length * currentTrackHeight, 400);
 
-	const scheduleScrollSync = useCallback((scrollLeft: number, scrollTop: number) => {
-		const controller = gridControllerRef.current;
-		if (!controller) return;
-		controller.setScroll(scrollLeft, scrollTop);
-		scrollRef.current = { left: scrollLeft, top: scrollTop };
-	}, []);
-
-	const handleHorizontalScroll = useCallback(
-		(scrollLeft: number) => {
-			setHorizontalScroll(scrollLeft);
-			scheduleScrollSync(scrollLeft, scrollRef.current.top);
+	const scheduleScrollSync = useCallback(
+		(scrollLeft: number, scrollTop: number) => {
+			const controller = gridControllerRef.current;
+			if (!controller) return;
+			controller.setScroll(scrollLeft, scrollTop);
+			scrollRef.current = { left: scrollLeft, top: scrollTop };
 		},
-		[setHorizontalScroll, scheduleScrollSync],
-	);
-
-	const handleVerticalScroll = useCallback(
-		(scrollTop: number) => {
-			setVerticalScroll(scrollTop);
-			scheduleScrollSync(scrollRef.current.left, scrollTop);
-		},
-		[setVerticalScroll, scheduleScrollSync],
+		[],
 	);
 
 	// Timeline scroll handler
@@ -165,11 +154,11 @@ export function DAWContainer() {
 		const timelineEl = timelineScrollRef.current;
 		const gridEl = trackGridScrollRef.current;
 
-	const controller: GridController = {
+		const controller: GridController = {
 			scrollLeft: gridEl.scrollLeft,
 			scrollTop: gridEl.scrollTop,
 			rAF: 0,
-		setScroll(left, top) {
+			setScroll(left, top) {
 				if (this.rAF) cancelAnimationFrame(this.rAF);
 				this.rAF = requestAnimationFrame(() => {
 					this.rAF = 0;
@@ -180,7 +169,7 @@ export function DAWContainer() {
 					this.scrollTop = top;
 				});
 			},
-		cancelAnimation() {
+			cancelAnimation() {
 				if (this.rAF) cancelAnimationFrame(this.rAF);
 				this.rAF = 0;
 			},

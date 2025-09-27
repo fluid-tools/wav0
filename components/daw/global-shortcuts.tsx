@@ -1,20 +1,19 @@
 "use client";
 
-import { useEffect } from "react";
 import { useAtom } from "jotai";
+import { useEffect } from "react";
 import {
 	playbackAtom,
-	totalDurationAtom,
-	setCurrentTimeAtom,
-	togglePlaybackAtom,
-	timelineAtom,
 	projectEndOverrideAtom,
-	selectedTrackIdAtom,
 	selectedClipIdAtom,
+	selectedTrackIdAtom,
+	setCurrentTimeAtom,
 	splitClipAtPlayheadAtom,
-	updateTrackAtom,
-	updateClipAtom,
+	timelineAtom,
+	togglePlaybackAtom,
+	totalDurationAtom,
 	tracksAtom,
+	updateClipAtom,
 } from "@/lib/state/daw-store";
 
 export function GlobalShortcuts() {
@@ -28,7 +27,6 @@ export function GlobalShortcuts() {
 	const [selectedTrackId, setSelectedTrackId] = useAtom(selectedTrackIdAtom);
 	const [selectedClipId, setSelectedClipId] = useAtom(selectedClipIdAtom);
 	const [, splitAtPlayhead] = useAtom(splitClipAtPlayheadAtom);
-	const [, updateTrack] = useAtom(updateTrackAtom);
 	const [, updateClip] = useAtom(updateClipAtom);
 
 	useEffect(() => {
@@ -273,7 +271,6 @@ export function GlobalShortcuts() {
 		togglePlayback,
 		setProjectEndOverride,
 		splitAtPlayhead,
-		updateTrack,
 		updateClip,
 		setSelectedClipId,
 		setSelectedTrackId,
