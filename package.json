@@ -62,7 +62,7 @@
 		"mediabunny": "^1.17.3",
 		"motion": "^12.23.14",
 		"nanoid": "^5.1.5",
-		"next": "15.5.3",
+		"next": "^15.6.0-canary.27",
 		"next-safe-action": "^8.0.11",
 		"next-themes": "^0.4.6",
 		"nextjs-toploader": "^3.9.17",
