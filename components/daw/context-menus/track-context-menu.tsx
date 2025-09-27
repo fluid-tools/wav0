@@ -21,6 +21,7 @@ import {
 } from "@/lib/audio/volume";
 import {
 	removeTrackAtom,
+	renameTrackAtom,
 	selectedTrackIdAtom,
 	updateTrackAtom,
 } from "@/lib/state/daw-store";
@@ -32,6 +33,9 @@ type TrackContextMenuProps = {
 	isSoloed: boolean;
 	volume: number;
 	onRequestRename?: () => void;
+	onMuteToggle?: () => void;
+	onSoloToggle?: () => void;
+	onDelete?: () => void;
 	children: React.ReactNode;
 };
 
@@ -42,11 +46,15 @@ export function TrackContextMenu({
 	isSoloed,
 	volume,
 	onRequestRename,
+	onMuteToggle,
+	onSoloToggle,
+	onDelete,
 	children,
 }: TrackContextMenuProps) {
 	const [, updateTrack] = useAtom(updateTrackAtom);
 	const [, removeTrack] = useAtom(removeTrackAtom);
 	const [, setSelectedTrackId] = useAtom(selectedTrackIdAtom);
+	const [, renameTrack] = useAtom(renameTrackAtom);
 	const [menuOpen, setMenuOpen] = useState(false);
 	const [volumeDbInput, setVolumeDbInput] = useState<string>("");
 
@@ -83,14 +91,24 @@ export function TrackContextMenu({
 
 	const handleRename = () => {
 		setMenuOpen(false);
-		onRequestRename?.();
+		if (onRequestRename) {
+			onRequestRename();
+			return;
+		}
+		const next = window.prompt("Rename track", trackName);
+		if (!next) return;
+		const trimmed = next.trim();
+		if (!trimmed || trimmed === trackName) return;
+		renameTrack(trackId, trimmed);
 	};
 
 	const handleSoloToggle = () => {
+		onSoloToggle?.();
 		updateTrack(trackId, { soloed: !isSoloed });
 	};
 
 	const handleMuteToggle = () => {
+		onMuteToggle?.();
 		if (isMuted) {
 			updateTrack(trackId, { muted: false });
 			return;
@@ -99,6 +117,7 @@ export function TrackContextMenu({
 	};
 
 	const handleDelete = () => {
+		onDelete?.();
 		removeTrack(trackId);
 	};
 

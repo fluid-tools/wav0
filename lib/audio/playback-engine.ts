@@ -42,7 +42,6 @@ export class PlaybackEngine {
 	private queuedAudioNodes = new Set<AudioBufferSourceNode>();
 	private nodeStartTimes = new WeakMap<AudioBufferSourceNode, number>();
 	private prevTrackVolumes = new Map<string, number>();
-	private DEBUG_AUDIO = false;
 
 	private constructor() {}
 

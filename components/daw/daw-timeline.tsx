@@ -20,7 +20,7 @@ export function DAWTimeline() {
 	const [, setCurrentTime] = useAtom(setCurrentTimeAtom);
 	const [timelineWidth] = useAtom(timelineWidthAtom);
 	const [projectEndPosition] = useAtom(projectEndPositionAtom);
-	const [projectEndOverride, setProjectEndOverride] = useAtom(
+	const [_projectEndOverride, setProjectEndOverride] = useAtom(
 		projectEndOverrideAtom,
 	);
 	const containerRef = useRef<HTMLButtonElement>(null);
@@ -49,7 +49,7 @@ export function DAWTimeline() {
 			document.removeEventListener("mousemove", onMouseMove);
 		};
 	}, [isDraggingEnd, onMouseMove]);
-	const timelinePlayheadViewport = playheadViewportPx;
+	const _timelinePlayheadViewport = playheadViewportPx;
 
 	// Calculate time markers based on zoom and BPM
 	const getTimeMarkers = () => {
@@ -166,7 +166,11 @@ export function DAWTimeline() {
 			{/* Project end marker and buffer zone */}
 			<div
 				className="absolute top-0 bottom-0 w-px bg-yellow-500/70 z-30"
-				style={{ left: projectEndPosition }}
+				style={{
+					left: projectEndPosition,
+					cursor: "ew-resize",
+				}}
+				tabIndex={0}
 				title="Project End"
 				role="slider"
 				aria-label="Project end"
@@ -187,7 +191,7 @@ export function DAWTimeline() {
 				}}
 			/>
 
-            {/* Playhead is rendered in UnifiedOverlay to keep header + grid perfectly synchronized */}
+			{/* Playhead is rendered in UnifiedOverlay to keep header + grid perfectly synchronized */}
 
 			{/* Snap grid overlay */}
 			{timeline.snapToGrid && (

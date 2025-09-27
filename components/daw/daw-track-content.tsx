@@ -4,7 +4,6 @@ import { useAtom } from "jotai";
 import { useEffect, useRef, useState } from "react";
 import { ClipContextMenu } from "@/components/daw/context-menus/clip-context-menu";
 import { TrackContextMenu } from "@/components/daw/context-menus/track-context-menu";
-import { volumeToDb } from "@/lib/audio/volume";
 import { DAW_HEIGHTS } from "@/lib/constants/daw-design";
 import type { Clip } from "@/lib/state/daw-store";
 import {
@@ -35,7 +34,7 @@ export function DAWTrackContent() {
 	const [pxPerMs] = useAtom(timelinePxPerMsAtom);
 	const [trackHeightZoom] = useAtom(trackHeightZoomAtom);
 	const [projectEndPosition] = useAtom(projectEndPositionAtom);
-	const [totalDuration] = useAtom(totalDurationAtom);
+	const [_totalDuration] = useAtom(totalDurationAtom);
 
 	const [resizingClip, setResizingClip] = useState<{
 		trackId: string;
@@ -235,7 +234,6 @@ export function DAWTrackContent() {
 		pixelsPerMs,
 		updateClip,
 		tracks,
-		totalDuration,
 		timeline.snapToGrid,
 		timeline.gridSize,
 	]);
@@ -281,8 +279,6 @@ export function DAWTrackContent() {
 						volume={track.volume}
 					>
 						<div
-							role="button"
-							tabIndex={0}
 							className={`absolute border-b border-border/50 transition-colors ${
 								selectedTrackId === track.id ? "bg-muted/30" : ""
 							}`}
@@ -295,9 +291,8 @@ export function DAWTrackContent() {
 							}}
 						>
 							{/* Track Drop Zone */}
-							<div
-								role="button"
-								tabIndex={0}
+							<button
+								type="button"
 								className={`absolute inset-0 w-full h-full border-none p-0 cursor-default transition-colors ${
 									dragOverTrackId === track.id
 										? "bg-primary/10 border-2 border-primary border-dashed"
@@ -366,14 +361,13 @@ export function DAWTrackContent() {
 												}}
 											>
 												{/* Full-body interactive area with context menu */}
-												<div
-													role="button"
-													tabIndex={0}
+												<button
+													type="button"
 													className="absolute inset-0 rounded-md bg-transparent cursor-default"
 													aria-label={`Select audio clip: ${clip.name}`}
 													onMouseDown={(e) => {
 														const rect = (
-															e.currentTarget as HTMLDivElement
+															e.currentTarget as HTMLButtonElement
 														).getBoundingClientRect();
 														const localX = e.clientX - rect.left;
 														const nearLeft = localX < 8;
@@ -576,7 +570,7 @@ export function DAWTrackContent() {
 											Drop audio file here
 										</div>
 									)}
-							</div>
+							</button>
 						</div>
 					</TrackContextMenu>
 				);
