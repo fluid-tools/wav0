@@ -229,7 +229,7 @@ export function DAWContainer() {
 			grid.scrollTo({ left: target });
 			timelineScrollRef.current.scrollTo({ left: target });
 		}
-	}, [playback.currentTime, timeline.zoom]);
+	}, [playback.currentTime, viewport.pxPerMs]);
 
 	return (
 		<div className="h-screen flex flex-col bg-background">
