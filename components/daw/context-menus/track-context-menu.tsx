@@ -21,6 +21,7 @@ import {
 type TrackMenuHandlers = {
 	onRequestRename?: () => void;
 	onToggleSolo: () => void;
+	onToggleMute: () => void;
 	onResetVolume: () => void;
 	onSetVolumeDb: (db: number) => void;
 	onDeleteTrack: () => void;
@@ -36,7 +37,6 @@ type TrackMenuSharedProps = TrackMenuHandlers & {
 type TrackContextMenuProps = TrackMenuSharedProps & {
 	onSelectTrack: () => void;
 	children: React.ReactNode;
-	volume: number;
 };
 
 type MenuItemComponent = React.ComponentType<{
@@ -63,6 +63,7 @@ export function TrackMenuOptions({
 	currentDb,
 	onRequestRename,
 	onToggleSolo,
+	onToggleMute,
 	onResetVolume,
 	onSetVolumeDb,
 	onDeleteTrack,
@@ -98,9 +99,7 @@ export function TrackMenuOptions({
 			<MenuSeparator />
 			<MenuItem onClick={onRequestRename}>Rename</MenuItem>
 			<MenuItem onClick={onToggleSolo}>{isSoloed ? "Unsolo" : "Solo"}</MenuItem>
-			<MenuItem
-				onClick={() => onSetVolumeDb(isMuted ? currentDb : clampDb(currentDb))}
-			>
+			<MenuItem onClick={onToggleMute}>
 				{isMuted ? "Unmute" : "Mute"}
 			</MenuItem>
 			<MenuSeparator />
@@ -175,9 +174,10 @@ export function TrackContextMenu({
 	trackName,
 	isMuted,
 	isSoloed,
-	volume,
+	currentDb,
 	onRequestRename,
 	onToggleSolo,
+	onToggleMute,
 	onResetVolume,
 	onSetVolumeDb,
 	onDeleteTrack,
@@ -185,12 +185,6 @@ export function TrackContextMenu({
 	children,
 }: TrackContextMenuProps) {
 	const [_menuOpen, setMenuOpen] = useState(false);
-
-	const computedDb = useMemo(() => {
-		if (volume <= 0) return Number.NEGATIVE_INFINITY;
-		const db = volumeToDb(volume);
-		return clampDb(Number.isFinite(db) ? db : VOLUME_MIN_DB);
-	}, [volume]);
 
 	return (
 		<ContextMenu
@@ -207,9 +201,10 @@ export function TrackContextMenu({
 					trackName={trackName}
 					isMuted={isMuted}
 					isSoloed={isSoloed}
-					currentDb={computedDb}
+					currentDb={currentDb}
 					onRequestRename={onRequestRename}
 					onToggleSolo={onToggleSolo}
+					onToggleMute={onToggleMute}
 					onResetVolume={onResetVolume}
 					onSetVolumeDb={onSetVolumeDb}
 					onDeleteTrack={onDeleteTrack}
