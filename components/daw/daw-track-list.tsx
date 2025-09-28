@@ -1,9 +1,12 @@
 "use client";
 
 import { useAtom } from "jotai";
-import { Edit3, GripHorizontal, MoreVertical, Trash2 } from "lucide-react";
+import { GripHorizontal, MoreVertical, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { TrackContextMenu } from "@/components/daw/context-menus/track-context-menu";
+import {
+	TrackContextMenu,
+	TrackMenuOptions,
+} from "@/components/daw/context-menus/track-context-menu";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -13,13 +16,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import {
-	dbToVolume,
-	formatDb,
-	VOLUME_MAX_DB,
-	VOLUME_MIN_DB,
-	volumeToDb,
-} from "@/lib/audio/volume";
+import { dbToVolume, formatDb, volumeToDb } from "@/lib/audio/volume";
 import {
 	DAW_BUTTONS,
 	DAW_COLORS,
@@ -145,7 +142,6 @@ export function DAWTrackList() {
 					return (
 						<TrackContextMenu
 							key={track.id}
-							trackId={track.id}
 							trackName={track.name}
 							isMuted={track.muted}
 							isSoloed={track.soloed}
@@ -215,95 +211,25 @@ export function DAWTrackList() {
 											</Button>
 										</DropdownMenuTrigger>
 										<DropdownMenuContent align="end" className="w-64">
-											<DropdownMenuItem
-												onClick={() => setEditingTrackId(track.id)}
-											>
-												<Edit3 className={`${DAW_ICONS.MD} mr-2`} />
-												Rename
-											</DropdownMenuItem>
-											<DropdownMenuItem onClick={toggleSoloAction}>
-												{track.soloed ? "Unsolo" : "Solo"}
-											</DropdownMenuItem>
-											<DropdownMenuItem onClick={toggleMuteAction}>
-												{track.muted ? "Unmute" : "Mute"}
-											</DropdownMenuItem>
-											<DropdownMenuItem onClick={resetVolume}>
-												Reset to 0 dB
-											</DropdownMenuItem>
-											<DropdownMenuItem onClick={muteHard}>
-												Mute (−∞ dB)
-											</DropdownMenuItem>
-											<DropdownMenuSeparator />
-											<div className="px-2 pb-2">
-												<div className="flex items-center justify-between text-xs text-muted-foreground">
-													<span>Volume (dB)</span>
-													<span className="font-medium text-foreground">
-														{volumeLabel}
-													</span>
-												</div>
-												<div className="mt-2 flex items-center gap-2">
-													<Input
-														type="number"
-														inputMode="decimal"
-														step={0.5}
-														min={VOLUME_MIN_DB}
-														max={VOLUME_MAX_DB}
-														defaultValue={
-															track.volume <= 0 || track.muted ? "" : dbValue
-														}
-														onKeyDown={(event) => {
-															if (event.key === "Enter") {
-																const parsed = Number(
-																	(event.target as HTMLInputElement).value,
-																);
-																if (Number.isFinite(parsed))
-																	setVolumeFromDb(parsed);
-															}
-														}}
-														onBlur={(event) => {
-															const parsed = Number(
-																(event.target as HTMLInputElement).value,
-															);
-															if (Number.isFinite(parsed))
-																setVolumeFromDb(parsed);
-														}}
-														className="h-8"
-													/>
-													<Button
-														variant="outline"
-														size="sm"
-														onClick={resetVolume}
-													>
-														0 dB
-													</Button>
-													<Button
-														variant="outline"
-														size="sm"
-														onClick={muteHard}
-													>
-														Mute
-													</Button>
-												</div>
-												<input
-													type="range"
-													min={VOLUME_MIN_DB}
-													max={VOLUME_MAX_DB}
-													step={0.5}
-													defaultValue={dbValue}
-													onChange={(event) =>
-														setVolumeFromDb(Number(event.target.value))
-													}
-													className="mt-3 h-1 w-full cursor-pointer appearance-none rounded bg-muted"
-												/>
-											</div>
-											<DropdownMenuSeparator />
-											<DropdownMenuItem
-												onClick={() => removeTrack(track.id)}
-												className="text-destructive"
-											>
-												<Trash2 className={`${DAW_ICONS.MD} mr-2`} />
-												Delete
-											</DropdownMenuItem>
+											<TrackMenuOptions
+												trackName={track.name}
+												isMuted={track.muted}
+												isSoloed={track.soloed}
+												currentDb={dbValue}
+												onRequestRename={() => setEditingTrackId(track.id)}
+												onToggleSolo={toggleSoloAction}
+												onResetVolume={resetVolume}
+												onSetVolumeDb={setVolumeFromDb}
+												onDeleteTrack={() => removeTrack(track.id)}
+												MenuItem={({ children, ...props }) => (
+													<DropdownMenuItem {...props}>
+														{children}
+													</DropdownMenuItem>
+												)}
+												MenuSeparator={(props) => (
+													<DropdownMenuSeparator {...props} />
+												)}
+											/>
 										</DropdownMenuContent>
 									</DropdownMenu>
 								</div>
@@ -317,23 +243,21 @@ export function DAWTrackList() {
 
 								{/* Track Controls */}
 								<div className="flex items-center gap-2">
-									<button
-										type="button"
-										className={cn(
-											"h-7 w-7 rounded-sm text-xs font-semibold transition-colors",
-											track.muted
-												? "bg-red-500 text-white"
-												: "bg-muted/40 text-muted-foreground hover:bg-muted/70",
-										)}
+									<Button
+										variant={track.muted ? "default" : "ghost"}
+										size="sm"
+										className="h-7 w-7 p-0 flex-shrink-0"
 										onClick={(e) => {
 											e.stopPropagation();
-											toggleMuteAction();
+											toggleMute(track.id, track.muted);
 										}}
-										aria-pressed={track.muted}
-										aria-label={track.muted ? "Unmute track" : "Mute track"}
 									>
-										M
-									</button>
+										{track.muted ? (
+											<VolumeX className={DAW_ICONS.XS} />
+										) : (
+											<Volume2 className={DAW_ICONS.XS} />
+										)}
+									</Button>
 
 									<button
 										type="button"

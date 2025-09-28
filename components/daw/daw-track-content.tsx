@@ -519,12 +519,7 @@ export function DAWTrackContent() {
 								const clipDur = Math.max(0, clip.trimEnd - clip.trimStart);
 								const oneShotEnd = clip.startTime + clipDur;
 								const loopEnd = clip.loopEnd;
-								if (
-									!isSelected ||
-									!isLoop ||
-									!loopEnd ||
-									loopEnd <= oneShotEnd
-								)
+								if (!isSelected || !isLoop || !loopEnd || loopEnd <= oneShotEnd)
 									return null;
 								const xPx = loopEnd * pixelsPerMs;
 								return (
