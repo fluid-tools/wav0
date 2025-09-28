@@ -357,8 +357,10 @@ export function DAWTrackContent() {
 						}}
 					>
 						{/* Track Drop Zone */}
-						<button
-							type="button"
+						{/* biome-ignore lint/a11y/useSemanticElements: drop zone must remain a focusable div to host drag events without nesting buttons */}
+						<div
+							tabIndex={0}
+							role="button"
 							className={`absolute inset-0 w-full h-full border-none p-0 cursor-default transition-colors ${
 								dragOverTrackId === track.id
 									? "bg-primary/10 border-2 border-primary border-dashed"
@@ -427,14 +429,14 @@ export function DAWTrackContent() {
 											}}
 										>
 											{/* Full-body interactive area with context menu */}
-											<button
-												type="button"
+											{/* biome-ignore lint/a11y/useSemanticElements: clip overlay must stay a div to avoid nested buttons while preserving keyboard access */}
+											<div
+												role="button"
+												tabIndex={0}
 												className="absolute inset-0 rounded-md bg-transparent cursor-default"
 												aria-label={`Select audio clip: ${clip.name}`}
 												onMouseDown={(e) => {
-													const rect = (
-														e.currentTarget as HTMLButtonElement
-													).getBoundingClientRect();
+													const rect = e.currentTarget.getBoundingClientRect();
 													const localX = e.clientX - rect.left;
 													const nearLeft = localX < 8;
 													const nearRight = localX > rect.width - 8;
@@ -449,7 +451,25 @@ export function DAWTrackContent() {
 														});
 													}
 												}}
-											/>
+												onKeyDown={(e) => {
+													if (e.key === "Enter" || e.key === " ") {
+														e.preventDefault();
+														setSelectedTrackId(track.id);
+														setSelectedClipId(clip.id);
+													}
+												}}
+												onFocus={() => {
+													setSelectedTrackId(track.id);
+													setSelectedClipId(clip.id);
+												}}
+												onClick={(e) => {
+													e.preventDefault();
+													setSelectedTrackId(track.id);
+													setSelectedClipId(clip.id);
+												}}
+											>
+												<span className="sr-only">{`Select audio clip: ${clip.name}`}</span>
+											</div>
 
 											{/* Visible grab handle on hover */}
 											<button
@@ -631,7 +651,7 @@ export function DAWTrackContent() {
 										Drop audio file here
 									</div>
 								)}
-						</button>
+						</div>
 					</div>
 				);
 			})}
