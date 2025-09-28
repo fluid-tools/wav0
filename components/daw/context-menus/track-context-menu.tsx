@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	ContextMenu,
@@ -15,7 +15,6 @@ import {
 	formatDb,
 	VOLUME_MAX_DB,
 	VOLUME_MIN_DB,
-	volumeToDb,
 } from "@/lib/audio/volume";
 
 type TrackMenuHandlers = {
@@ -99,9 +98,7 @@ export function TrackMenuOptions({
 			<MenuSeparator />
 			<MenuItem onClick={onRequestRename}>Rename</MenuItem>
 			<MenuItem onClick={onToggleSolo}>{isSoloed ? "Unsolo" : "Solo"}</MenuItem>
-			<MenuItem onClick={onToggleMute}>
-				{isMuted ? "Unmute" : "Mute"}
-			</MenuItem>
+			<MenuItem onClick={onToggleMute}>{isMuted ? "Unmute" : "Mute"}</MenuItem>
 			<MenuSeparator />
 			<div className="px-2 pb-2">
 				<div className="flex items-center justify-between text-xs text-muted-foreground">

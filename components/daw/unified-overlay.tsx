@@ -1,11 +1,12 @@
 "use client";
 
 import { useAtom } from "jotai";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
 	horizontalScrollAtom,
 	playbackAtom,
-	playheadViewportPxAtom,
+	playheadDraggingAtom,
+	playheadViewportAtom,
 	projectEndViewportPxAtom,
 	setCurrentTimeAtom,
 	timelineAtom,
@@ -13,17 +14,22 @@ import {
 } from "@/lib/state/daw-store";
 
 export function UnifiedOverlay() {
-	const [playheadX] = useAtom(playheadViewportPxAtom);
+	const [playheadViewport] = useAtom(playheadViewportAtom);
 	const [projectEndX] = useAtom(projectEndViewportPxAtom);
 	const [pxPerMs] = useAtom(timelinePxPerMsAtom);
 	const [timeline] = useAtom(timelineAtom);
 	const [playback] = useAtom(playbackAtom);
 	const [horizontalScroll] = useAtom(horizontalScrollAtom);
 	const [, setCurrentTime] = useAtom(setCurrentTimeAtom);
+	const [, setPlayheadDragging] = useAtom(playheadDraggingAtom);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const dragRef = useRef<{
 		active: boolean;
 		pointerId: number | null;
+		lastMs: number;
+		lastTs: number;
+		pendingMs: number;
+		raf: number;
 	} | null>(null);
 
 	// Re-render on resize to ensure full-height
@@ -35,41 +41,64 @@ export function UnifiedOverlay() {
 		return () => ro.disconnect();
 	}, []);
 
+	const snapConfig = useMemo(() => {
+		if (!timeline.snapToGrid) return null;
+		const bpm = Math.max(30, Math.min(300, playback.bpm || 120));
+		const secondsPerBeat = 60 / bpm;
+		return secondsPerBeat / 4;
+	}, [playback.bpm, timeline.snapToGrid]);
+
 	const updateTime = useCallback(
-		(clientX: number) => {
+		(clientX: number, timeStamp?: number) => {
 			if (!containerRef.current || pxPerMs <= 0) return;
 			const rect = containerRef.current.getBoundingClientRect();
 			const localX = clientX - rect.left;
-			const absoluteX = localX + horizontalScroll;
+			const absoluteX = Math.max(0, localX + horizontalScroll);
 			if (!Number.isFinite(absoluteX)) return;
 
 			const rawMs = Math.max(0, absoluteX / pxPerMs);
 			let nextMs = rawMs;
 
-			if (timeline.snapToGrid) {
-				const bpm = Math.max(30, Math.min(300, playback.bpm || 120));
-				const secondsPerBeat = 60 / bpm;
-				const snapSeconds = secondsPerBeat / 4;
+			if (snapConfig) {
 				const snappedSeconds =
-					Math.round(rawMs / 1000 / snapSeconds) * snapSeconds;
+					Math.round(rawMs / 1000 / snapConfig) * snapConfig;
 				nextMs = Math.max(0, snappedSeconds * 1000);
 			}
 
-			setCurrentTime(nextMs);
+			const state = dragRef.current;
+			if (!state?.active) {
+				setCurrentTime(nextMs);
+				return;
+			}
+
+			state.lastMs = nextMs;
+			state.lastTs = timeStamp ?? performance.now();
+			state.pendingMs = nextMs;
+			if (!state.raf) {
+				state.raf = requestAnimationFrame(() => {
+					const current = dragRef.current;
+					if (!current) return;
+					const value = current.pendingMs;
+					current.raf = 0;
+					setCurrentTime(value);
+				});
+			}
 		},
-		[
-			horizontalScroll,
-			pxPerMs,
-			playback.bpm,
-			setCurrentTime,
-			timeline.snapToGrid,
-		],
+		[horizontalScroll, pxPerMs, setCurrentTime, snapConfig],
 	);
 
 	const stopDrag = useCallback(() => {
 		const state = dragRef.current;
 		if (!state?.active || !containerRef.current) {
-			dragRef.current = { active: false, pointerId: null };
+			dragRef.current = {
+				active: false,
+				pointerId: null,
+				lastMs: 0,
+				lastTs: 0,
+				pendingMs: 0,
+				raf: 0,
+			};
+			setPlayheadDragging(false);
 			return;
 		}
 		const element = containerRef.current;
@@ -81,14 +110,27 @@ export function UnifiedOverlay() {
 				// Ignore capture release failures
 			}
 		}
-		dragRef.current = { active: false, pointerId: null };
-	}, []);
+		if (state.raf) {
+			cancelAnimationFrame(state.raf);
+			state.raf = 0;
+		}
+		setCurrentTime(state.pendingMs);
+		dragRef.current = {
+			active: false,
+			pointerId: null,
+			lastMs: 0,
+			lastTs: 0,
+			pendingMs: 0,
+			raf: 0,
+		};
+		setPlayheadDragging(false);
+	}, [setCurrentTime, setPlayheadDragging]);
 
 	useEffect(() => {
 		const handlePointerMove = (event: PointerEvent) => {
 			const state = dragRef.current;
 			if (!state?.active || state.pointerId !== event.pointerId) return;
-			updateTime(event.clientX);
+			updateTime(event.clientX, event.timeStamp);
 		};
 
 		const handlePointerUp = (event: PointerEvent) => {
@@ -117,17 +159,25 @@ export function UnifiedOverlay() {
 				type="button"
 				className="cursor-ew pointer-events-auto absolute top-0 bottom-0 w-6 -translate-x-1/2 bg-transparent outline-none"
 				style={{
-					transform: `translate3d(${playheadX}px,0,0) translateX(-50%)`,
+					transform: `translate3d(${playheadViewport.viewportPx}px,0,0) translateX(-50%)`,
 					willChange: "transform",
-					WebkitTransform: `translate3d(${playheadX}px,0,0) translateX(-50%)`,
+					WebkitTransform: `translate3d(${playheadViewport.viewportPx}px,0,0) translateX(-50%)`,
 					left: 0,
 				}}
 				onPointerDown={(event) => {
-					if (event.button !== 0) return;
 					event.preventDefault();
-					dragRef.current = { active: true, pointerId: event.pointerId };
+					if (event.button !== 0) return;
+					dragRef.current = {
+						active: true,
+						pointerId: event.pointerId,
+						lastMs: playback.currentTime,
+						lastTs: event.timeStamp,
+						pendingMs: playback.currentTime,
+						raf: 0,
+					};
+					setPlayheadDragging(true);
 					event.currentTarget.setPointerCapture?.(event.pointerId);
-					updateTime(event.clientX);
+					updateTime(event.clientX, event.timeStamp);
 				}}
 				aria-label="Move playhead"
 			>

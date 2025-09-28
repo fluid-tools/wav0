@@ -21,6 +21,8 @@ import {
 	horizontalScrollAtom,
 	initializeAudioFromOPFSAtom,
 	playbackAtom,
+	playheadDraggingAtom,
+	playheadViewportAtom,
 	setTimelineZoomAtom,
 	timelineAtom,
 	timelineViewportAtom,
@@ -45,9 +47,11 @@ export function DAWContainer() {
 	const [, addTrack] = useAtom(addTrackAtom);
 	const [, setHorizontalScroll] = useAtom(horizontalScrollAtom);
 	const [, setVerticalScroll] = useAtom(verticalScrollAtom);
-	const [playback] = useAtom(playbackAtom);
+	const [_playback] = useAtom(playbackAtom);
 	const [_timeline] = useAtom(timelineAtom);
 	const [viewport] = useAtom(timelineViewportAtom);
+	const [playheadViewport] = useAtom(playheadViewportAtom);
+	const [isPlayheadDragging] = useAtom(playheadDraggingAtom);
 	const [, initializeAudioFromOPFS] = useAtom(initializeAudioFromOPFSAtom);
 	const [, setTimelineZoom] = useAtom(setTimelineZoomAtom);
 
@@ -224,21 +228,25 @@ export function DAWContainer() {
 		};
 	}, []);
 
-	// Playhead-follow: keep playhead within center band
+	// Playhead-follow: keep playhead within center band without fighting manual drags
 	useEffect(() => {
-		if (!timelineScrollRef.current || !trackGridScrollRef.current) return;
-		const x = playback.currentTime * viewport.pxPerMs;
+		const controller = gridControllerRef.current;
 		const grid = trackGridScrollRef.current;
-		const left = grid.scrollLeft;
-		const _right = left + grid.clientWidth;
-		const bandLeft = left + grid.clientWidth * 0.35;
-		const bandRight = left + grid.clientWidth * 0.65;
+		if (!controller || !grid) return;
+		if (isPlayheadDragging) return;
+		const x = playheadViewport.absolutePx;
+		if (!Number.isFinite(x)) return;
+		const width = grid.clientWidth;
+		if (width <= 0) return;
+		const left = controller.scrollLeft;
+		const bandLeft = left + width * 0.35;
+		const bandRight = left + width * 0.65;
 		if (x < bandLeft || x > bandRight) {
-			const target = Math.max(0, x - grid.clientWidth * 0.5);
-			grid.scrollTo({ left: target });
-			timelineScrollRef.current.scrollTo({ left: target });
+			const target = Math.max(0, x - width * 0.5);
+			if (Math.abs(target - controller.scrollLeft) < 0.5) return;
+			controller.setScroll(target, controller.scrollTop);
 		}
-	}, [playback.currentTime, viewport.pxPerMs]);
+	}, [isPlayheadDragging, playheadViewport.absolutePx]);
 
 	return (
 		<div className="h-screen flex flex-col bg-background">
