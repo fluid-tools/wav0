@@ -18,74 +18,179 @@ import {
 	volumeToDb,
 } from "@/lib/audio/volume";
 
-type TrackContextMenuProps = {
-	trackId: string;
+type TrackMenuHandlers = {
+	onRequestRename?: () => void;
+	onToggleSolo: () => void;
+	onResetVolume: () => void;
+	onSetVolumeDb: (db: number) => void;
+	onDeleteTrack: () => void;
+};
+
+type TrackMenuSharedProps = TrackMenuHandlers & {
 	trackName: string;
 	isMuted: boolean;
 	isSoloed: boolean;
-	volume: number;
-	onRequestRename?: () => void;
-	onToggleSolo: () => void;
-	onToggleMute: () => void;
-	onResetVolume: () => void;
-	onMuteHard: () => void;
-	onSetVolumeDb: (db: number) => void;
-	onDeleteTrack: () => void;
-	onSelectTrack: () => void;
-	children: React.ReactNode;
+	currentDb: number;
 };
 
+type TrackContextMenuProps = TrackMenuSharedProps & {
+	onSelectTrack: () => void;
+	children: React.ReactNode;
+	volume: number;
+};
+
+type MenuItemComponent = React.ComponentType<{
+	onClick?: () => void;
+	className?: string;
+	children: React.ReactNode;
+}>;
+
+type MenuSeparatorComponent = React.ComponentType<{ className?: string }>;
+
+type TrackMenuOptionsProps = TrackMenuSharedProps & {
+	MenuItem: MenuItemComponent;
+	MenuSeparator: MenuSeparatorComponent;
+};
+
+function formatDbForInput(value: number) {
+	return Number.isFinite(value) ? Number(value.toFixed(1)) : "";
+}
+
+export function TrackMenuOptions({
+	trackName,
+	isMuted,
+	isSoloed,
+	currentDb,
+	onRequestRename,
+	onToggleSolo,
+	onResetVolume,
+	onSetVolumeDb,
+	onDeleteTrack,
+	MenuItem,
+	MenuSeparator,
+}: TrackMenuOptionsProps) {
+	const [dbInput, setDbInput] = useState<string>("");
+
+	const effectiveDb = Number.isFinite(currentDb)
+		? clampDb(currentDb)
+		: VOLUME_MIN_DB;
+
+	useEffect(() => {
+		const next = formatDbForInput(currentDb);
+		setDbInput(next === "" ? "" : String(next));
+	}, [currentDb]);
+
+	const handleCommit = (value: string) => {
+		if (!value.trim()) return;
+		const parsed = Number(value);
+		if (!Number.isFinite(parsed)) return;
+		const clamped = clampDb(parsed);
+		onSetVolumeDb(clamped);
+		setDbInput(String(formatDbForInput(clamped)));
+	};
+
+	return (
+		<>
+			<div className="px-2 py-1.5 text-xs text-muted-foreground">
+				Track
+				<span className="ml-1 text-foreground">{trackName}</span>
+			</div>
+			<MenuSeparator />
+			<MenuItem onClick={onRequestRename}>Rename</MenuItem>
+			<MenuItem onClick={onToggleSolo}>{isSoloed ? "Unsolo" : "Solo"}</MenuItem>
+			<MenuItem
+				onClick={() => onSetVolumeDb(isMuted ? currentDb : clampDb(currentDb))}
+			>
+				{isMuted ? "Unmute" : "Mute"}
+			</MenuItem>
+			<MenuSeparator />
+			<div className="px-2 pb-2">
+				<div className="flex items-center justify-between text-xs text-muted-foreground">
+					<span>Volume (dB)</span>
+					<span className="font-medium text-foreground">
+						{isMuted || !Number.isFinite(currentDb)
+							? "Muted"
+							: formatDb(currentDb)}
+					</span>
+				</div>
+				<div className="mt-2 flex items-center gap-2">
+					<Input
+						type="number"
+						inputMode="decimal"
+						step={0.5}
+						min={VOLUME_MIN_DB}
+						max={VOLUME_MAX_DB}
+						value={dbInput}
+						placeholder={
+							isMuted || !Number.isFinite(currentDb)
+								? "Muted"
+								: String(formatDbForInput(currentDb))
+						}
+						onChange={(event) => setDbInput(event.target.value)}
+						onBlur={(event) => handleCommit(event.target.value)}
+						onKeyDown={(event) => {
+							if (event.key === "Enter") {
+								handleCommit((event.target as HTMLInputElement).value);
+							}
+						}}
+						className="h-8"
+					/>
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						onClick={() => {
+							onResetVolume();
+							setDbInput(String(formatDbForInput(0)));
+						}}
+					>
+						0 dB
+					</Button>
+				</div>
+				<input
+					type="range"
+					min={VOLUME_MIN_DB}
+					max={VOLUME_MAX_DB}
+					step={0.5}
+					value={
+						isMuted || !Number.isFinite(currentDb) ? VOLUME_MIN_DB : effectiveDb
+					}
+					onChange={(event) => {
+						const next = Number(event.target.value);
+						setDbInput(String(formatDbForInput(next)));
+						onSetVolumeDb(next);
+					}}
+					className="mt-3 h-1 w-full cursor-pointer appearance-none rounded bg-muted"
+				/>
+			</div>
+			<MenuSeparator />
+			<MenuItem onClick={onDeleteTrack} className="text-destructive">
+				Delete Track
+			</MenuItem>
+		</>
+	);
+}
+
 export function TrackContextMenu({
-	trackId,
 	trackName,
 	isMuted,
 	isSoloed,
 	volume,
 	onRequestRename,
 	onToggleSolo,
-	onToggleMute,
 	onResetVolume,
-	onMuteHard,
 	onSetVolumeDb,
 	onDeleteTrack,
 	onSelectTrack,
 	children,
 }: TrackContextMenuProps) {
-	const [menuOpen, setMenuOpen] = useState(false);
-	const [volumeDbInput, setVolumeDbInput] = useState<string>("");
+	const [_menuOpen, setMenuOpen] = useState(false);
 
 	const computedDb = useMemo(() => {
 		if (volume <= 0) return Number.NEGATIVE_INFINITY;
 		const db = volumeToDb(volume);
 		return clampDb(Number.isFinite(db) ? db : VOLUME_MIN_DB);
 	}, [volume]);
-
-	const displayDb =
-		computedDb === Number.NEGATIVE_INFINITY ? VOLUME_MIN_DB : computedDb;
-
-	useEffect(() => {
-		if (menuOpen) {
-			setVolumeDbInput(volume <= 0 ? "" : String(displayDb));
-		} else {
-			setVolumeDbInput("");
-		}
-	}, [menuOpen, volume, displayDb]);
-
-	const handleVolumeCommit = (dbValue: number) => {
-		if (!Number.isFinite(dbValue)) {
-			onMuteHard();
-			return;
-		}
-		const clamped = clampDb(dbValue);
-		onSetVolumeDb(clamped);
-	};
-
-	const handleRename = () => {
-		setMenuOpen(false);
-		onRequestRename?.();
-	};
-
-	const liveDb = volumeDbInput.length > 0 ? Number(volumeDbInput) : displayDb;
 
 	return (
 		<ContextMenu
@@ -98,111 +203,19 @@ export function TrackContextMenu({
 		>
 			<ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
 			<ContextMenuContent className="w-64" alignOffset={-4}>
-				<div className="px-2 py-1.5 text-xs text-muted-foreground">
-					Track
-					<span className="ml-1 text-foreground">{trackName}</span>
-				</div>
-				<ContextMenuSeparator />
-				<ContextMenuItem onClick={handleRename}>Rename</ContextMenuItem>
-				<ContextMenuItem onClick={onToggleSolo}>
-					{isSoloed ? "Unsolo" : "Solo"}
-				</ContextMenuItem>
-				<ContextMenuItem onClick={onToggleMute}>
-					{isMuted ? "Unmute" : "Mute"}
-				</ContextMenuItem>
-				<ContextMenuItem onClick={() => {
-					onResetVolume();
-					setVolumeDbInput("0");
-				}}>
-					Reset to 0 dB
-				</ContextMenuItem>
-				<ContextMenuItem onClick={() => {
-					onMuteHard();
-					setVolumeDbInput(String(VOLUME_MIN_DB));
-				}}>
-					Mute (−∞ dB)
-				</ContextMenuItem>
-				<ContextMenuSeparator />
-				<div className="px-2 pb-2">
-					<div className="flex items-center justify-between text-xs text-muted-foreground">
-						<span>Volume (dB)</span>
-						<span className="font-medium text-foreground">
-							{volume <= 0 || isMuted ? "Muted" : formatDb(liveDb)}
-						</span>
-					</div>
-					<div className="mt-2 flex items-center gap-2">
-						<Input
-							type="number"
-							inputMode="decimal"
-							step={0.5}
-							min={VOLUME_MIN_DB}
-							max={VOLUME_MAX_DB}
-							value={volumeDbInput}
-							placeholder={volume <= 0 || isMuted ? "Muted" : String(displayDb)}
-							onChange={(event) => {
-								setVolumeDbInput(event.target.value);
-							}}
-							onBlur={() => {
-								if (!volumeDbInput.trim()) return;
-								const parsed = Number(volumeDbInput);
-								if (Number.isFinite(parsed)) {
-									handleVolumeCommit(parsed);
-								}
-							}}
-							onKeyDown={(event) => {
-								if (event.key === "Enter") {
-									event.currentTarget.blur();
-								}
-							}}
-							className="h-8"
-						/>
-						<Button
-							type="button"
-							variant="outline"
-							size="sm"
-							onClick={() => {
-								onResetVolume();
-								setVolumeDbInput("0");
-							}}
-						>
-							0 dB
-						</Button>
-						<Button
-							type="button"
-							variant="outline"
-							size="sm"
-							onClick={() => {
-								onMuteHard();
-								setVolumeDbInput(String(VOLUME_MIN_DB));
-							}}
-						>
-							Mute
-						</Button>
-					</div>
-					<input
-						type="range"
-						min={VOLUME_MIN_DB}
-						max={VOLUME_MAX_DB}
-						step={0.5}
-						value={
-							volume <= 0 || isMuted
-								? VOLUME_MIN_DB
-								: volumeDbInput.trim().length > 0
-									? Number(volumeDbInput)
-									: displayDb
-						}
-						onChange={(event) => {
-							const next = Number(event.target.value);
-							setVolumeDbInput(String(next));
-							handleVolumeCommit(next);
-						}}
-						className="mt-3 h-1 w-full cursor-pointer appearance-none rounded bg-muted"
-					/>
-				</div>
-				<ContextMenuSeparator />
-				<ContextMenuItem onClick={onDeleteTrack} variant="destructive">
-					Delete Track
-				</ContextMenuItem>
+				<TrackMenuOptions
+					trackName={trackName}
+					isMuted={isMuted}
+					isSoloed={isSoloed}
+					currentDb={computedDb}
+					onRequestRename={onRequestRename}
+					onToggleSolo={onToggleSolo}
+					onResetVolume={onResetVolume}
+					onSetVolumeDb={onSetVolumeDb}
+					onDeleteTrack={onDeleteTrack}
+					MenuItem={ContextMenuItem}
+					MenuSeparator={ContextMenuSeparator}
+				/>
 			</ContextMenuContent>
 		</ContextMenu>
 	);
