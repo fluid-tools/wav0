@@ -336,6 +336,19 @@ export const timelinePxPerMsAtom = atom(
 	(get) => get(timelineViewportAtom).pxPerMs,
 );
 
+export const playheadDraggingAtom = atom<boolean>(false);
+
+export const playheadViewportAtom = atom((get) => {
+	const { pxPerMs, horizontalScroll } = get(timelineViewportAtom);
+	const playback = get(playbackAtom);
+	const rawX = playback.currentTime * pxPerMs;
+	return {
+		absolutePx: rawX,
+		viewportPx: rawX - horizontalScroll,
+		ms: playback.currentTime,
+	};
+});
+
 // Zoom limits and setter (single definition)
 export const zoomLimitsAtom = atom<{ min: number; max: number }>({
 	min: 0.05,
