@@ -83,17 +83,41 @@ export function DAWContainer() {
 				gridControllerRef.current?.cancelAnimation();
 			}
 		};
+
+		const handleScrollRequest = (event: Event) => {
+			const customEvent = event as CustomEvent<{
+				left?: number;
+				top?: number;
+			}>;
+			const detail = customEvent.detail || {};
+			const controller = gridControllerRef.current;
+			if (!controller) return;
+			const left =
+				detail.left !== undefined ? detail.left : controller.scrollLeft;
+			const top = detail.top !== undefined ? detail.top : controller.scrollTop;
+			controller.setScroll(left, top);
+			setHorizontalScroll(left);
+			setVerticalScroll(top);
+		};
 		window.addEventListener(
 			"wav0:grid-pan-lock",
 			handlePanLock as EventListener,
+		);
+		window.addEventListener(
+			"wav0:grid-scroll-request",
+			handleScrollRequest as EventListener,
 		);
 		return () => {
 			window.removeEventListener(
 				"wav0:grid-pan-lock",
 				handlePanLock as EventListener,
 			);
+			window.removeEventListener(
+				"wav0:grid-scroll-request",
+				handleScrollRequest as EventListener,
+			);
 		};
-	}, []);
+	}, [setHorizontalScroll, setVerticalScroll]);
 
 	// Initialize audio from OPFS on component mount
 	useEffect(() => {

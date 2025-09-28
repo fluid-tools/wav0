@@ -41,7 +41,9 @@ export class PlaybackEngine {
 	private animationFrameId: number | null = null;
 	private queuedAudioNodes = new Set<AudioBufferSourceNode>();
 	private nodeStartTimes = new WeakMap<AudioBufferSourceNode, number>();
+	private trackMuteState = new Map<string, boolean>();
 	private prevTrackVolumes = new Map<string, number>();
+	private lastSnapshot: Track[] = [];
 
 	private constructor() {}
 
@@ -87,6 +89,43 @@ export class PlaybackEngine {
 		}
 	}
 
+	private applySnapshot(tracks: Track[]): void {
+		if (!this.audioContext || !this.masterGainNode) return;
+		const soloEngaged = tracks.some((track) => track.soloed);
+		for (const track of tracks) {
+			const state = this.tracks.get(track.id);
+			if (!state) continue;
+			if (!state.gainNode) {
+				state.gainNode = this.audioContext.createGain();
+				state.gainNode.connect(this.masterGainNode);
+			}
+			const gain = state.gainNode;
+			const muted = Boolean(track.muted) || (soloEngaged && !track.soloed);
+			this.trackMuteState.set(track.id, muted);
+			if (muted) {
+				if (!this.prevTrackVolumes.has(track.id)) {
+					this.prevTrackVolumes.set(track.id, gain.gain.value);
+				}
+				gain.gain.value = 0;
+				state.isPlaying = false;
+				continue;
+			}
+			const cached = this.prevTrackVolumes.get(track.id);
+			const base = track.volume / 100;
+			gain.gain.value = cached ?? base;
+			if (cached !== undefined) {
+				this.prevTrackVolumes.delete(track.id);
+			}
+			state.isPlaying = true;
+		}
+		this.lastSnapshot = tracks.map((track) => ({ ...track }));
+	}
+
+	private refreshMix(): void {
+		if (this.lastSnapshot.length === 0) return;
+		this.applySnapshot(this.lastSnapshot);
+	}
+
 	// Initialize track state if it has any loaded audio (clip or legacy)
 	async initializeWithTracks(tracks: Track[]): Promise<void> {
 		await this.getAudioContext();
@@ -124,26 +163,15 @@ export class PlaybackEngine {
 		this.startTime = this.audioContext.currentTime;
 		this.isPlaying = true;
 
-		const hasAnyTracksInSolo = tracks.some((t) => t.soloed);
+		this.applySnapshot(tracks);
 
 		for (const track of tracks) {
-			if (track.muted) continue;
 			const trackState = this.tracks.get(track.id);
 			if (!trackState) continue;
-
-			// Create/update track gain
 			if (!trackState.gainNode) {
 				trackState.gainNode = this.audioContext.createGain();
 				trackState.gainNode.connect(this.masterGainNode);
 			}
-			const baseVolume = track.volume / 100;
-			trackState.gainNode.gain.value = hasAnyTracksInSolo
-				? track.soloed
-					? baseVolume
-					: 0
-				: baseVolume;
-
-			trackState.isPlaying = true;
 
 			const clips =
 				track.clips && track.clips.length > 0
@@ -630,40 +658,32 @@ export class PlaybackEngine {
 		if (trackState?.gainNode) {
 			trackState.gainNode.gain.value = volume / 100;
 		}
-	}
-
-	updateSoloStates(tracks: Track[]): void {
-		if (!this.audioContext || !this.masterGainNode) return;
-		const hasAnyTracksInSolo = tracks.some((t) => t.soloed);
-		for (const t of tracks) {
-			const state = this.tracks.get(t.id);
-			if (!state) continue;
-			if (!state.gainNode) {
-				state.gainNode = this.audioContext.createGain();
-				state.gainNode.connect(this.masterGainNode);
-			}
-			const baseVolume = t.volume / 100;
-			state.gainNode.gain.value = hasAnyTracksInSolo
-				? t.soloed
-					? baseVolume
-					: 0
-				: baseVolume;
-		}
+		this.refreshMix();
 	}
 
 	updateTrackMute(trackId: string, muted: boolean, volume?: number): void {
 		const trackState = this.tracks.get(trackId);
 		if (!trackState?.gainNode) return;
 		const gn = trackState.gainNode;
+		this.trackMuteState.set(trackId, muted);
 		if (muted) {
 			this.prevTrackVolumes.set(trackId, gn.gain.value);
 			gn.gain.value = 0;
 		} else {
 			const prev = this.prevTrackVolumes.get(trackId);
-			const target = typeof volume === "number" ? volume / 100 : (prev ?? 1);
-			gn.gain.value = target;
-			this.prevTrackVolumes.delete(trackId);
+			const target =
+				typeof volume === "number" ? volume / 100 : (prev ?? gn.gain.value);
+			const forcedMute = this.trackMuteState.get(trackId);
+			gn.gain.value = forcedMute ? 0 : target;
+			if (!forcedMute) {
+				this.prevTrackVolumes.delete(trackId);
+			}
 		}
+		this.refreshMix();
+	}
+
+	updateSoloStates(tracks: Track[]): void {
+		this.applySnapshot(tracks);
 	}
 
 	updateMasterVolume(volume: number): void {
@@ -680,6 +700,8 @@ export class PlaybackEngine {
 		}
 		this.tracks.clear();
 		this.prevTrackVolumes.clear();
+		this.trackMuteState.clear();
+		this.lastSnapshot = [];
 		if (this.audioContext) {
 			try {
 				await this.audioContext.close();
