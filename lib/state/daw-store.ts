@@ -403,6 +403,7 @@ export const updateTrackAtom = atom(
 
 		const updatedTrack = updatedTracks.find((t) => t.id === trackId);
 		if (!updatedTrack) return;
+		playbackEngine.synchronizeTracks(updatedTracks);
 
 		// Volume/mute/solo should reflect immediately without reschedule
 		if (typeof updates.volume === "number") {

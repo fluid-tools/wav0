@@ -43,7 +43,9 @@ export class PlaybackEngine {
 	private nodeStartTimes = new WeakMap<AudioBufferSourceNode, number>();
 	private trackMuteState = new Map<string, boolean>();
 	private prevTrackVolumes = new Map<string, number>();
+	// biome-ignore lint/correctness/noUnusedPrivateClassMembers: used by audio handler
 	private lastSnapshot: Track[] = [];
+	private currentTracks = new Map<string, Track>();
 
 	private constructor() {}
 
@@ -119,11 +121,19 @@ export class PlaybackEngine {
 			state.isPlaying = true;
 		}
 		this.lastSnapshot = tracks.map((track) => ({ ...track }));
+		this.currentTracks = new Map(tracks.map((track) => [track.id, track]));
 	}
 
 	private refreshMix(): void {
-		if (this.lastSnapshot.length === 0) return;
-		this.applySnapshot(this.lastSnapshot);
+		if (this.currentTracks.size === 0) return;
+		const tracks = Array.from(this.currentTracks.values()).map((track) => ({
+			...track,
+		}));
+		this.applySnapshot(tracks);
+	}
+
+	synchronizeTracks(tracks: Track[]): void {
+		this.applySnapshot(tracks);
 	}
 
 	// Initialize track state if it has any loaded audio (clip or legacy)
@@ -701,7 +711,7 @@ export class PlaybackEngine {
 		this.tracks.clear();
 		this.prevTrackVolumes.clear();
 		this.trackMuteState.clear();
-		this.lastSnapshot = [];
+		this.currentTracks.clear();
 		if (this.audioContext) {
 			try {
 				await this.audioContext.close();
