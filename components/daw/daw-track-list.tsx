@@ -15,7 +15,6 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { dbToVolume, formatDb, volumeToDb } from "@/lib/audio/volume";
 import {
 	DAW_BUTTONS,
@@ -132,9 +131,6 @@ export function DAWTrackList() {
 					const resetVolume = () => {
 						setVolumeFromDb(0);
 					};
-					const muteHard = () => {
-						updateTrack(track.id, { volume: 0, muted: true });
-					};
 					const toggleMuteAction = () => toggleMute(track.id, track.muted);
 					const toggleSoloAction = () => toggleSolo(track.id, track.soloed);
 					const selectTrack = () => setSelectedTrackId(track.id);
@@ -145,12 +141,11 @@ export function DAWTrackList() {
 							trackName={track.name}
 							isMuted={track.muted}
 							isSoloed={track.soloed}
-							volume={track.volume}
+							currentDb={dbValue}
 							onRequestRename={() => setEditingTrackId(track.id)}
 							onToggleSolo={toggleSoloAction}
 							onToggleMute={toggleMuteAction}
 							onResetVolume={resetVolume}
-							onMuteHard={muteHard}
 							onSetVolumeDb={setVolumeFromDb}
 							onDeleteTrack={() => removeTrack(track.id)}
 							onSelectTrack={selectTrack}
@@ -182,7 +177,7 @@ export function DAWTrackList() {
 											style={{ backgroundColor: track.color }}
 										/>
 										{editingTrackId === track.id ? (
-											<Input
+											<input
 												value={track.name}
 												onChange={(e) =>
 													handleTrackNameChange(track.id, e.target.value)
@@ -194,7 +189,6 @@ export function DAWTrackList() {
 													}
 												}}
 												className="h-6 text-sm"
-												autoFocus
 												onClick={(e) => e.stopPropagation()}
 											/>
 										) : (
@@ -218,6 +212,7 @@ export function DAWTrackList() {
 												currentDb={dbValue}
 												onRequestRename={() => setEditingTrackId(track.id)}
 												onToggleSolo={toggleSoloAction}
+												onToggleMute={toggleMuteAction}
 												onResetVolume={resetVolume}
 												onSetVolumeDb={setVolumeFromDb}
 												onDeleteTrack={() => removeTrack(track.id)}
