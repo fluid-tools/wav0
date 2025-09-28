@@ -1,7 +1,7 @@
 "use client";
 
 import { useAtom } from "jotai";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ClipContextMenu } from "@/components/daw/context-menus/clip-context-menu";
 import { DAW_HEIGHTS } from "@/lib/constants/daw-design";
 import type { Clip } from "@/lib/state/daw-store";
@@ -20,6 +20,7 @@ import {
 	updateTrackAtom,
 } from "@/lib/state/daw-store";
 import { formatDuration } from "@/lib/storage/opfs";
+import { cn } from "@/lib/utils";
 
 export function DAWTrackContent() {
 	const [tracks] = useAtom(tracksAtom);
@@ -60,6 +61,12 @@ export function DAWTrackContent() {
 	} | null>(null);
 
 	const containerRef = useRef<HTMLDivElement>(null);
+	const scrollRef = useRef<{ left: number; width: number }>({
+		left: 0,
+		width: 0,
+	});
+	const RAF = useRef(0);
+	const autoScrollActive = useRef(false);
 	const [_gridCount, setGridCount] = useState(0);
 
 	useEffect(() => {
@@ -67,6 +74,13 @@ export function DAWTrackContent() {
 			const width = containerRef.current?.getBoundingClientRect().width ?? 0;
 			const gridSpacing = 100;
 			setGridCount(Math.max(0, Math.ceil(width / gridSpacing)));
+			const scrollable = containerRef.current?.parentElement;
+			if (scrollable) {
+				scrollRef.current = {
+					left: scrollable.scrollLeft,
+					width: scrollable.clientWidth,
+				};
+			}
 		};
 		update();
 		const ro =
@@ -81,6 +95,56 @@ export function DAWTrackContent() {
 	const [dragOverTrackId, setDragOverTrackId] = useState<string | null>(null);
 
 	const pixelsPerMs = pxPerMs;
+
+	const ensureAutoScroll = useCallback(() => {
+		if (RAF.current) return;
+		autoScrollActive.current = true;
+		const tick = () => {
+			RAF.current = 0;
+			const scrollable = containerRef.current?.closest(
+				'[data-daw-grid-scroll="true"]',
+			) as HTMLDivElement | null;
+			const active = draggingClip || resizingClip || loopDragging;
+			if (!scrollable || !active) {
+				autoScrollActive.current = false;
+				return;
+			}
+			const width = scrollable.clientWidth;
+			if (width <= 0) {
+				RAF.current = requestAnimationFrame(tick);
+				return;
+			}
+			const threshold = Math.min(96, width * 0.15);
+			let delta = 0;
+			const pointer = lastPointer.current;
+			if (pointer) {
+				const { clientX } = pointer;
+				const rect = scrollable.getBoundingClientRect();
+				const offsetX = clientX - rect.left;
+				if (offsetX > width - threshold) {
+					delta = Math.min(60, offsetX - (width - threshold));
+				} else if (offsetX < threshold) {
+					delta = -Math.min(60, threshold - offsetX);
+				}
+			}
+			if (delta !== 0) {
+				const base = scrollable.scrollLeft + delta * 1.35;
+				const maxScroll = scrollable.scrollWidth - scrollable.clientWidth;
+				const next = Math.max(0, Math.min(base, maxScroll));
+				scrollable.scrollLeft = next;
+				scrollRef.current.left = next;
+				window.dispatchEvent(
+					new CustomEvent("wav0:grid-scroll-request", {
+						detail: { left: scrollable.scrollLeft, top: scrollable.scrollTop },
+					}),
+				);
+			}
+			RAF.current = requestAnimationFrame(tick);
+		};
+		RAF.current = requestAnimationFrame(tick);
+	}, [draggingClip, loopDragging, resizingClip]);
+
+	const lastPointer = useRef<{ clientX: number } | null>(null);
 
 	const handleTrackDrop = async (trackId: string, e: React.DragEvent) => {
 		e.preventDefault();
@@ -114,12 +178,19 @@ export function DAWTrackContent() {
 		window.dispatchEvent(
 			new CustomEvent("wav0:grid-pan-lock", { detail: interactionActive }),
 		);
+		if (interactionActive) ensureAutoScroll();
 		return () => {
 			window.dispatchEvent(
 				new CustomEvent("wav0:grid-pan-lock", { detail: false }),
 			);
+			if (RAF.current) {
+				cancelAnimationFrame(RAF.current);
+				RAF.current = 0;
+			}
+			autoScrollActive.current = false;
+			lastPointer.current = null;
 		};
-	}, [interactionActive]);
+	}, [interactionActive, ensureAutoScroll]);
 
 	// Attach document-level pointer listeners while resizing, dragging, or loop-dragging
 	useEffect(() => {
@@ -136,6 +207,7 @@ export function DAWTrackContent() {
 		};
 
 		const onMove = (e: MouseEvent) => {
+			lastPointer.current = { clientX: e.clientX };
 			lastX = e.clientX;
 			schedule(() => {
 				if (resizingClip) {
@@ -212,6 +284,7 @@ export function DAWTrackContent() {
 		};
 
 		const onUp = () => {
+			lastPointer.current = null;
 			setResizingClip(null);
 			setDraggingClip(null);
 			setLoopDragging(null);
@@ -271,9 +344,10 @@ export function DAWTrackContent() {
 				return (
 					<div
 						key={track.id}
-						className={`absolute border-b border-border/50 transition-colors ${
-							selectedTrackId === track.id ? "bg-muted/30" : ""
-						}`}
+						className={cn(
+							"absolute border-b border-border/50 transition-colors",
+							selectedTrackId === track.id ? "bg-muted/30 z-40" : "z-10",
+						)}
 						style={{
 							top: trackY,
 							height: trackHeight,
