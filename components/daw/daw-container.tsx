@@ -178,10 +178,10 @@ export function DAWContainer() {
 	);
 
 	useEffect(() => {
-	if (!timelineScrollRef.current || !trackGridScrollRef.current) return;
-	const timelineEl = timelineScrollRef.current;
-	const gridEl = trackGridScrollRef.current;
-	const listEl = trackListScrollRef.current;
+		if (!timelineScrollRef.current || !trackGridScrollRef.current) return;
+		const timelineEl = timelineScrollRef.current;
+		const gridEl = trackGridScrollRef.current;
+		const listEl = trackListScrollRef.current;
 
 		const controller: GridController = {
 			scrollLeft: gridEl.scrollLeft,
@@ -192,9 +192,9 @@ export function DAWContainer() {
 				this.rAF = requestAnimationFrame(() => {
 					this.rAF = 0;
 					if (timelineEl.scrollLeft !== left) timelineEl.scrollLeft = left;
-			if (gridEl.scrollLeft !== left) gridEl.scrollLeft = left;
-			if (gridEl.scrollTop !== top) gridEl.scrollTop = top;
-			if (listEl && listEl.scrollTop !== top) listEl.scrollTop = top;
+					if (gridEl.scrollLeft !== left) gridEl.scrollLeft = left;
+					if (gridEl.scrollTop !== top) gridEl.scrollTop = top;
+					if (listEl && listEl.scrollTop !== top) listEl.scrollTop = top;
 					this.scrollLeft = left;
 					this.scrollTop = top;
 				});
