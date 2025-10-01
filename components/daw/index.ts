@@ -17,6 +17,7 @@ export {
 } from "./inspectors/inspector-section";
 export { AudioTestPanel } from "./panels/audio-test-panel";
 // Panels
+export { AutomationLane } from "./panels/automation-lane";
 export { DAWTimeline } from "./panels/daw-timeline";
 export { DAWTrackContent } from "./panels/daw-track-content";
 export { DAWTrackList } from "./panels/daw-track-list";
