@@ -7,6 +7,7 @@ import {
 	TrackContextMenu,
 	TrackMenuOptions,
 } from "@/components/daw/context-menus/track-context-menu";
+import { LiveAutomationBadge } from "@/components/daw/controls/live-automation-badge";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -32,7 +33,6 @@ import {
 	tracksAtom,
 	updateTrackAtom,
 } from "@/lib/state/daw-store";
-import { formatDuration } from "@/lib/storage/opfs";
 import { cn } from "@/lib/utils";
 
 export function DAWTrackList() {
@@ -229,15 +229,8 @@ export function DAWTrackList() {
 									</DropdownMenu>
 								</div>
 
-								{/* Track Info */}
-								<div className="text-xs text-muted-foreground">
-									{track.duration > 0
-										? formatDuration(track.duration)
-										: "Empty"}
-								</div>
-
-								{/* Track Controls */}
-								<div className="flex items-center gap-2">
+								{/* Track Controls - Redesigned for breathing room */}
+								<div className="mt-2 flex items-center gap-3">
 									<Button
 										variant={track.muted ? "default" : "ghost"}
 										size="sm"
@@ -272,55 +265,45 @@ export function DAWTrackList() {
 										S
 									</button>
 
-									<div className="flex flex-1 flex-col gap-1">
-										<div className="flex items-center gap-2">
-											<div className="flex-1 min-w-0">
-												<input
-													type="range"
-													min={0}
-													max={100}
-													value={track.volume}
-													onChange={(e) =>
-														handleVolumeChange(
-															track.id,
-															parseInt(e.target.value, 10),
-														)
-													}
-													onClick={(e) => e.stopPropagation()}
-													className="w-full h-1 cursor-pointer appearance-none rounded-lg bg-muted"
-													title={
-														track.volumeEnvelope?.enabled
-															? `Base volume: ${volumeLabel} (envelope active)`
-															: `Volume: ${volumeLabel}`
-													}
-												/>
-											</div>
-
-											<span
-												className="text-xs text-muted-foreground w-12 text-right flex-shrink-0 tabular-nums"
+									{/* Volume Controls - More spacious layout */}
+									<div className="flex flex-1 items-center gap-2">
+										<div className="flex-1 min-w-0">
+											<input
+												type="range"
+												min={0}
+												max={100}
+												value={track.volume}
+												onChange={(e) =>
+													handleVolumeChange(
+														track.id,
+														parseInt(e.target.value, 10),
+													)
+												}
+												onClick={(e) => e.stopPropagation()}
+												className="w-full h-1.5 cursor-pointer appearance-none rounded-lg bg-muted hover:bg-muted/80 transition-colors"
 												title={
 													track.volumeEnvelope?.enabled
-														? "Base level · envelope shapes curve"
+														? `Base volume: ${volumeLabel} (envelope active)`
+														: `Volume: ${volumeLabel}`
+												}
+											/>
+										</div>
+
+										<div className="flex items-center gap-1.5 min-w-[80px]">
+											<span
+												className="text-xs font-mono text-muted-foreground tabular-nums"
+												title={
+													track.volumeEnvelope?.enabled
+														? "Base level"
 														: "Track volume"
 												}
 											>
 												{volumeLabel}
-												{track.volumeEnvelope?.enabled && (
-													<span className="ml-0.5 text-[9px] text-amber-500">●</span>
-												)}
 											</span>
+											{track.volumeEnvelope?.enabled && (
+												<LiveAutomationBadge trackId={track.id} />
+											)}
 										</div>
-										
-										{track.volumeEnvelope?.enabled && (
-											<div className="flex items-center gap-1 text-[10px] text-amber-500/80">
-												<span className="font-medium">Auto:</span>
-												<span className="font-mono">
-													{track.volumeEnvelope.points.length > 0
-														? `${track.volumeEnvelope.points.length} points`
-														: "No points"}
-												</span>
-											</div>
-										)}
 									</div>
 								</div>
 

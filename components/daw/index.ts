@@ -4,6 +4,7 @@
 export { DAWControls } from "./controls/daw-controls";
 export { DAWToolbar } from "./controls/daw-toolbar";
 export { GlobalShortcuts } from "./controls/global-shortcuts";
+export { LiveAutomationBadge } from "./controls/live-automation-badge";
 export { DAWContainer } from "./daw-container";
 export { ClipEditorDrawer } from "./inspectors/clip-editor-drawer";
 // Inspectors
