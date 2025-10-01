@@ -19,13 +19,12 @@ type EnvelopeEditorProps = {
 	clipStartTime: number;
 };
 
-const curveItems: Array<{ label: string; value: TrackEnvelopePoint["curve"] }> =
-	[
-		{ label: "Linear", value: "linear" },
-		{ label: "Ease in", value: "easeIn" },
-		{ label: "Ease out", value: "easeOut" },
-		{ label: "S-curve", value: "sCurve" },
-	];
+const curveItems = [
+	{ label: "Linear", value: "linear" as const },
+	{ label: "Ease in", value: "easeIn" as const },
+	{ label: "Ease out", value: "easeOut" as const },
+	{ label: "S-curve", value: "sCurve" as const },
+];
 
 export function EnvelopeEditor({
 	points,
@@ -69,18 +68,25 @@ export function EnvelopeEditor({
 					Envelope points · {points.length}
 				</div>
 				<div className="flex items-center gap-2">
-					<Button
-						variant="ghost"
-						size="icon-sm"
-						onClick={handlePointAdd}
-						title="Add envelope point"
-					>
-						<Plus className="size-4" />
-						<span className="sr-only">Add envelope point</span>
-					</Button>
-					<Button variant="outline" size="xs" onClick={onSave} title="Save envelope changes">
-						Save
-					</Button>
+				<Button
+					variant="ghost"
+					size="icon-sm"
+					onClick={handlePointAdd}
+					title="Add envelope point"
+					aria-label="Add envelope point"
+				>
+					<Plus className="size-4" />
+					<span className="sr-only">Add envelope point</span>
+				</Button>
+				<Button
+					variant="outline"
+					size="xs"
+					onClick={onSave}
+					title="Save envelope changes"
+					aria-label="Save envelope changes"
+				>
+					Save
+				</Button>
 				</div>
 			</header>
 
@@ -165,16 +171,17 @@ export function EnvelopeEditor({
 								</Select>
 							</div>
 							<div className="flex items-end justify-end">
-								<Button
-									variant="ghost"
-									size="icon-sm"
-									onClick={() => handlePointRemove(index)}
-									disabled={points.length <= 1}
-									title="Remove point"
-								>
-									<X className="size-4" />
-									<span className="sr-only">Remove point</span>
-								</Button>
+							<Button
+								variant="ghost"
+								size="icon-sm"
+								onClick={() => handlePointRemove(index)}
+								disabled={points.length <= 1}
+								title="Remove point"
+								aria-label={`Remove envelope point at ${Math.round(point.time)}ms`}
+							>
+								<X className="size-4" />
+								<span className="sr-only">Remove point</span>
+							</Button>
 							</div>
 						</div>
 					))

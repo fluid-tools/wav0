@@ -1,7 +1,5 @@
 "use client";
 
-import { useAtom } from "jotai";
-import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,54 +14,27 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from "@/components/ui/sheet";
-import {
-	clipInspectorOpenAtom,
-	clipInspectorTargetAtom,
-	type TrackEnvelopePoint,
-	tracksAtom,
-	updateClipAtom,
-	updateTrackAtom,
-} from "@/lib/state/daw-store";
 import { formatDuration } from "@/lib/storage/opfs";
+import { useClipInspector } from "@/lib/hooks/use-clip-inspector";
 import { EnvelopeEditor } from "./envelope-editor";
 import { InspectorCard, InspectorSection } from "./inspector-section";
 
-const MAX_FADE_MS = 120_000;
-
 export function ClipInspectorSheet() {
-	const [open, setOpen] = useAtom(clipInspectorOpenAtom);
-	const [target, setTarget] = useAtom(clipInspectorTargetAtom);
-	const [tracks] = useAtom(tracksAtom);
-	const [, updateTrack] = useAtom(updateTrackAtom);
-	const [, updateClip] = useAtom(updateClipAtom);
-
-	const [fadeInDraft, setFadeInDraft] = useState<number>(0);
-	const [fadeOutDraft, setFadeOutDraft] = useState<number>(0);
-	const [envelopeDraft, setEnvelopeDraft] = useState<TrackEnvelopePoint[]>([]);
-
-	const current = useMemo(() => {
-		if (!target) return null;
-		const track = tracks.find((candidate) => candidate.id === target.trackId);
-		const clip = track?.clips?.find(
-			(candidate) => candidate.id === target.clipId,
-		);
-		return track && clip ? { track, clip } : null;
-	}, [target, tracks]);
-
-	useEffect(() => {
-		if (!current) return;
-		setFadeInDraft(current.clip.fadeIn ?? 0);
-		setFadeOutDraft(current.clip.fadeOut ?? 0);
-		const points = current.track.volumeEnvelope?.points ?? [];
-		setEnvelopeDraft(points.map((point) => ({ ...point })));
-	}, [current]);
-
-	const close = (nextOpen: boolean) => {
-		setOpen(nextOpen);
-		if (!nextOpen) {
-			setTarget(null);
-		}
-	};
+	const {
+		open,
+		current,
+		fadeInDraft,
+		fadeOutDraft,
+		envelopeDraft,
+		setFadeInDraft,
+		setFadeOutDraft,
+		close,
+		handleToggleEnvelope,
+		handleEnvelopeChange,
+		handleEnvelopeSave,
+		commitFade,
+		MAX_FADE_MS,
+	} = useClipInspector();
 
 	if (!current) {
 		return (
@@ -77,65 +48,13 @@ export function ClipInspectorSheet() {
 	const envelope = track.volumeEnvelope;
 	const envelopeEnabled = Boolean(envelope?.enabled);
 
-	const handleToggleEnvelope = () => {
-		if (!current) return;
-		const existing = current.track.volumeEnvelope ?? {
-			enabled: false,
-			points: [
-				{
-					id: crypto.randomUUID(),
-					time: clip.startTime,
-					value: (track.volume ?? 100) / 100,
-					curve: "linear" as const,
-				},
-			],
-		};
-		updateTrack(current.track.id, {
-			volumeEnvelope: {
-				...existing,
-				enabled: !existing.enabled,
-			},
-		});
-	};
-
-	const handleEnvelopeChange = (points: TrackEnvelopePoint[]) => {
-		setEnvelopeDraft(points);
-	};
-
-	const handleEnvelopeSave = () => {
-		if (!current) return;
-		const normalized = envelopeDraft
-			.map((point) => ({
-				...point,
-				time: Math.max(0, Math.round(point.time)),
-				value: Math.min(4, Math.max(0, point.value)),
-			}))
-			.sort((a, b) => a.time - b.time);
-
-		updateTrack(current.track.id, {
-			volumeEnvelope: {
-				enabled: true,
-				points: normalized,
-			},
-		});
-	};
-
-	const commitFade = (key: "fadeIn" | "fadeOut", raw: number) => {
-		const clamped = Number.isFinite(raw)
-			? Math.max(0, Math.min(MAX_FADE_MS, Math.round(raw)))
-			: 0;
-		updateClip(current.track.id, current.clip.id, { [key]: clamped });
-		if (key === "fadeIn") setFadeInDraft(clamped);
-		if (key === "fadeOut") setFadeOutDraft(clamped);
-	};
-
 	return (
 		<Sheet open={open} onOpenChange={close}>
 			<SheetContent
 				side="right"
-				className="flex h-full w-full flex-col gap-0 border-l border-border/60 bg-background/95 px-0 pb-0 pt-0 backdrop-blur sm:w-[520px]"
+				className="flex h-full w-full flex-col gap-0 border-l border-border/60 bg-background/95 p-0 backdrop-blur sm:w-[520px]"
 			>
-				<SheetHeader className="space-y-1 border-b border-border/60 px-6 py-5 text-left">
+				<SheetHeader className="shrink-0 space-y-1 border-b border-border/60 px-6 py-5 text-left">
 					<SheetTitle className="text-lg font-semibold tracking-tight">
 						Clip Inspector
 					</SheetTitle>
@@ -145,8 +64,8 @@ export function ClipInspectorSheet() {
 					</SheetDescription>
 				</SheetHeader>
 
-				<ScrollArea className="flex-1">
-					<div className="space-y-8 px-6 py-6">
+				<ScrollArea className="flex-1 overflow-hidden">
+					<div className="space-y-8 px-6 py-6 pb-4">
 						<InspectorSection
 							title="Clip"
 							action={
@@ -269,6 +188,7 @@ export function ClipInspectorSheet() {
 										onKeyDown={(event) => {
 											if (event.key === "Enter") event.currentTarget.blur();
 										}}
+										aria-label="Fade in duration in milliseconds"
 									/>
 								</div>
 								<div className="space-y-1">
@@ -291,6 +211,7 @@ export function ClipInspectorSheet() {
 										onKeyDown={(event) => {
 											if (event.key === "Enter") event.currentTarget.blur();
 										}}
+										aria-label="Fade out duration in milliseconds"
 									/>
 								</div>
 							</div>
@@ -321,13 +242,21 @@ export function ClipInspectorSheet() {
 
 						<InspectorSection title="AI Toolkit (prototype)">
 							<div className="grid gap-2 sm:grid-cols-2">
-								<Button variant="secondary" className="justify-start gap-2">
+								<Button
+									variant="secondary"
+									className="justify-start gap-2"
+									aria-label="Suggest mix move (coming soon)"
+								>
 									<span>Suggest mix move</span>
 									<span className="text-xs text-muted-foreground">
 										Coming soon
 									</span>
 								</Button>
-								<Button variant="secondary" className="justify-start gap-2">
+								<Button
+									variant="secondary"
+									className="justify-start gap-2"
+									aria-label="Generate variation (coming soon)"
+								>
 									<span>Generate variation</span>
 									<span className="text-xs text-muted-foreground">
 										Coming soon
@@ -338,9 +267,9 @@ export function ClipInspectorSheet() {
 					</div>
 				</ScrollArea>
 
-				<SheetFooter className="flex items-center justify-between border-t border-border/60 bg-background/80 px-6 py-4">
+				<SheetFooter className="shrink-0 flex items-center justify-between border-t border-border/60 bg-background/80 px-6 py-4">
 					<div className="text-xs text-muted-foreground">
-						Changes apply instantly. Envelope edits require “Save envelope”.
+						Changes apply instantly. Envelope edits require "Save envelope".
 					</div>
 					<SheetClose asChild>
 						<Button variant="outline">Close</Button>

@@ -31,14 +31,14 @@ import {
 	tracksAtom,
 	verticalScrollAtom,
 } from "@/lib/state/daw-store";
-import { AudioTestPanel } from "./audio-test-panel";
-import { ClipInspectorSheet } from "./clip-inspector-sheet";
-import { DAWControls } from "./daw-controls";
-import { DAWTimeline } from "./daw-timeline";
-import { DAWToolbar } from "./daw-toolbar";
-import { DAWTrackContent } from "./daw-track-content";
-import { DAWTrackList } from "./daw-track-list";
-import { GlobalShortcuts } from "./global-shortcuts";
+import { DAWControls } from "./controls/daw-controls";
+import { DAWToolbar } from "./controls/daw-toolbar";
+import { GlobalShortcuts } from "./controls/global-shortcuts";
+import { ClipInspectorSheet } from "./inspectors/clip-inspector-sheet";
+import { AudioTestPanel } from "./panels/audio-test-panel";
+import { DAWTimeline } from "./panels/daw-timeline";
+import { DAWTrackContent } from "./panels/daw-track-content";
+import { DAWTrackList } from "./panels/daw-track-list";
 import { UnifiedOverlay } from "./unified-overlay";
 
 export function DAWContainer() {
@@ -281,7 +281,7 @@ export function DAWContainer() {
 			<DAWToolbar />
 			{/* Global keyboard shortcuts */}
 			<GlobalShortcuts />
- 			<ClipInspectorSheet />
+			<ClipInspectorSheet />
 
 			{/* Main DAW Interface */}
 			<div className="flex-1 flex flex-col overflow-hidden">
