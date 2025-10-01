@@ -1,19 +1,11 @@
 "use client";
 
 import { useAtom } from "jotai";
-import { Plus, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import {
 	Sheet,
@@ -33,17 +25,10 @@ import {
 	updateTrackAtom,
 } from "@/lib/state/daw-store";
 import { formatDuration } from "@/lib/storage/opfs";
+import { EnvelopeEditor } from "./envelope-editor";
+import { InspectorCard, InspectorSection } from "./inspector-section";
 
 const MAX_FADE_MS = 120_000;
-const DEFAULT_ENVELOPE_GAIN = 100; // percent
-
-const curveItems: Array<{ label: string; value: TrackEnvelopePoint["curve"] }> =
-	[
-		{ label: "Linear", value: "linear" },
-		{ label: "Ease in", value: "easeIn" },
-		{ label: "Ease out", value: "easeOut" },
-		{ label: "S-curve", value: "sCurve" },
-	];
 
 export function ClipInspectorSheet() {
 	const [open, setOpen] = useAtom(clipInspectorOpenAtom);
@@ -71,12 +56,7 @@ export function ClipInspectorSheet() {
 		setFadeOutDraft(current.clip.fadeOut ?? 0);
 		const points = current.track.volumeEnvelope?.points ?? [];
 		setEnvelopeDraft(points.map((point) => ({ ...point })));
-	}, [
-		current?.clip.id,
-		current?.clip.fadeIn,
-		current?.clip.fadeOut,
-		current?.track.volumeEnvelope?.points,
-	]);
+	}, [current]);
 
 	const close = (nextOpen: boolean) => {
 		setOpen(nextOpen);
@@ -118,38 +98,11 @@ export function ClipInspectorSheet() {
 		});
 	};
 
-	const handleEnvelopePointChange = (
-		index: number,
-		updates: Partial<TrackEnvelopePoint>,
-	) => {
-		setEnvelopeDraft((prev) =>
-			prev.map((point, idx) =>
-				idx === index ? { ...point, ...updates } : point,
-			),
-		);
+	const handleEnvelopeChange = (points: TrackEnvelopePoint[]) => {
+		setEnvelopeDraft(points);
 	};
 
-	const handleEnvelopePointRemove = (index: number) => {
-		setEnvelopeDraft((prev) => prev.filter((_, idx) => idx !== index));
-	};
-
-	const handleEnvelopePointAdd = () => {
-		setEnvelopeDraft((prev) => {
-			const last = prev.at(-1);
-			const nextTime = last ? last.time + 500 : clip.startTime;
-			return [
-				...prev,
-				{
-					id: crypto.randomUUID(),
-					time: nextTime,
-					value: DEFAULT_ENVELOPE_GAIN / 100,
-					curve: "linear",
-				},
-			];
-		});
-	};
-
-	const persistEnvelope = () => {
+	const handleEnvelopeSave = () => {
 		if (!current) return;
 		const normalized = envelopeDraft
 			.map((point) => ({
@@ -194,19 +147,18 @@ export function ClipInspectorSheet() {
 
 				<ScrollArea className="flex-1">
 					<div className="space-y-8 px-6 py-6">
-						<section className="space-y-3">
-							<div className="flex items-center justify-between">
-								<span className="text-[13px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-									Clip
-								</span>
+						<InspectorSection
+							title="Clip"
+							action={
 								<Badge
 									variant="outline"
 									className="font-mono text-[11px] uppercase"
 								>
 									{clip.audioFileType ?? "source"}
 								</Badge>
-							</div>
-							<div className="rounded-2xl border border-border/70 bg-muted/10 p-4 shadow-sm">
+							}
+						>
+							<InspectorCard>
 								<div className="flex flex-col gap-1">
 									<span className="text-base font-semibold leading-tight text-foreground">
 										{clip.name || "Untitled clip"}
@@ -242,14 +194,12 @@ export function ClipInspectorSheet() {
 										</dd>
 									</div>
 								</dl>
-							</div>
-						</section>
+							</InspectorCard>
+						</InspectorSection>
 
-						<section className="space-y-3">
-							<div className="flex items-center justify-between">
-								<span className="text-[13px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-									Track
-								</span>
+						<InspectorSection
+							title="Track"
+							action={
 								<Button
 									variant="secondary"
 									size="sm"
@@ -257,8 +207,9 @@ export function ClipInspectorSheet() {
 								>
 									{envelopeEnabled ? "Disable Envelope" : "Enable Envelope"}
 								</Button>
-							</div>
-							<div className="rounded-2xl border border-border/70 bg-muted/10 p-4 shadow-sm space-y-4">
+							}
+						>
+							<InspectorCard className="space-y-4">
 								<div className="flex items-start justify-between gap-3">
 									<div className="flex flex-col gap-1">
 										<span className="text-base font-semibold leading-tight text-foreground">
@@ -275,134 +226,28 @@ export function ClipInspectorSheet() {
 								</div>
 
 								{envelopeEnabled ? (
-									<div className="space-y-3 rounded-xl border border-dashed border-primary/40 bg-background/40 p-4">
-										<header className="flex items-center justify-between">
-											<div className="text-xs font-medium text-muted-foreground">
-												Envelope points · {envelopeDraft.length}
-											</div>
-											<div className="flex items-center gap-2">
-												<Button
-													variant="ghost"
-													size="icon-sm"
-													onClick={handleEnvelopePointAdd}
-												>
-													<Plus className="size-4" />
-													<span className="sr-only">Add envelope point</span>
-												</Button>
-												<Button
-													variant="outline"
-													size="xs"
-													onClick={persistEnvelope}
-												>
-													Save envelope
-												</Button>
-											</div>
-										</header>
-
-										<div className="space-y-3">
-											{envelopeDraft.length === 0 ? (
-												<p className="text-xs text-muted-foreground">
-													No points yet. Add one to begin shaping the gain
-													curve.
-												</p>
-											) : (
-												envelopeDraft.map((point, index) => (
-													<div
-														key={point.id}
-														className="grid gap-2 rounded-lg border border-border/50 bg-background/70 px-3 py-3 sm:grid-cols-[1fr_1fr_1fr_auto]"
-													>
-														<div className="space-y-1">
-															<label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-																Time (ms)
-															</label>
-															<Input
-																type="number"
-																min={0}
-																value={Math.round(point.time)}
-																onChange={(event) =>
-																	handleEnvelopePointChange(index, {
-																		time: Number(event.target.value) || 0,
-																	})
-																}
-															/>
-														</div>
-														<div className="space-y-1">
-															<label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-																Gain (%)
-															</label>
-															<Input
-																type="number"
-																min={0}
-																max={400}
-																value={Math.round(point.value * 100)}
-																onChange={(event) =>
-																	handleEnvelopePointChange(index, {
-																		value:
-																			(Number(event.target.value) || 0) / 100,
-																	})
-																}
-															/>
-														</div>
-														<div className="space-y-1">
-															<label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-																Curve
-															</label>
-															<Select
-																value={point.curve ?? "linear"}
-																onValueChange={(value) =>
-																	handleEnvelopePointChange(index, {
-																		curve: value as TrackEnvelopePoint["curve"],
-																	})
-																}
-															>
-																<SelectTrigger className="h-9 text-sm">
-																	<SelectValue placeholder="Curve" />
-																</SelectTrigger>
-																<SelectContent>
-																	{curveItems.map((item) => (
-																		<SelectItem
-																			key={item.value}
-																			value={item.value}
-																		>
-																			{item.label}
-																		</SelectItem>
-																	))}
-																</SelectContent>
-															</Select>
-														</div>
-														<div className="flex items-end justify-end">
-															<Button
-																variant="ghost"
-																size="icon-sm"
-																onClick={() => handleEnvelopePointRemove(index)}
-																disabled={envelopeDraft.length <= 1}
-															>
-																<X className="size-4" />
-																<span className="sr-only">Remove point</span>
-															</Button>
-														</div>
-													</div>
-												))
-											)}
-										</div>
-									</div>
+									<EnvelopeEditor
+										points={envelopeDraft}
+										onChange={handleEnvelopeChange}
+										onSave={handleEnvelopeSave}
+										clipStartTime={clip.startTime}
+									/>
 								) : (
 									<p className="rounded-xl border border-dashed border-border/60 bg-background/40 p-4 text-xs text-muted-foreground">
 										Envelope disabled — enable to author dynamic volume ramps.
 									</p>
 								)}
-							</div>
-						</section>
+							</InspectorCard>
+						</InspectorSection>
 
-						<section className="space-y-3">
-							<div className="flex items-center justify-between">
-								<span className="text-[13px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-									Fades
-								</span>
+						<InspectorSection
+							title="Fades"
+							action={
 								<span className="text-xs text-muted-foreground">
 									Values in milliseconds
 								</span>
-							</div>
+							}
+						>
 							<div className="grid gap-3 sm:grid-cols-2">
 								<div className="space-y-1">
 									<label
@@ -449,16 +294,11 @@ export function ClipInspectorSheet() {
 									/>
 								</div>
 							</div>
-						</section>
+						</InspectorSection>
 
-						<section className="space-y-3">
-							<div className="flex items-center justify-between">
-								<span className="text-[13px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-									File metadata
-								</span>
-							</div>
-							<div className="rounded-2xl border border-border/70 bg-muted/10 p-4 shadow-sm text-sm">
-								<div className="flex justify-between">
+						<InspectorSection title="File metadata">
+							<InspectorCard className="space-y-2 text-sm">
+								<div className="flex justify-between gap-4">
 									<span className="text-muted-foreground">OPFS ID</span>
 									<span className="font-mono text-xs break-all text-foreground">
 										{clip.opfsFileId}
@@ -474,15 +314,12 @@ export function ClipInspectorSheet() {
 									<span className="text-muted-foreground">Status</span>
 									<span className="text-foreground">Stored in OPFS</span>
 								</div>
-							</div>
-						</section>
+							</InspectorCard>
+						</InspectorSection>
 
 						<Separator />
 
-						<section className="space-y-2">
-							<span className="text-[13px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-								AI Toolkit (prototype)
-							</span>
+						<InspectorSection title="AI Toolkit (prototype)">
 							<div className="grid gap-2 sm:grid-cols-2">
 								<Button variant="secondary" className="justify-start gap-2">
 									<span>Suggest mix move</span>
@@ -497,7 +334,7 @@ export function ClipInspectorSheet() {
 									</span>
 								</Button>
 							</div>
-						</section>
+						</InspectorSection>
 					</div>
 				</ScrollArea>
 
