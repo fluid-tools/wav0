@@ -1,9 +1,9 @@
 "use client";
 
+import { useAtom } from "jotai";
 import { formatDb } from "@/lib/audio/volume";
 import { useLiveAutomationGain } from "@/lib/hooks/use-live-automation-gain";
 import { playbackAtom } from "@/lib/state/daw-store";
-import { useAtom } from "jotai";
 
 type LiveAutomationBadgeProps = {
 	trackId: string;
@@ -32,4 +32,3 @@ export function LiveAutomationBadge({ trackId }: LiveAutomationBadgeProps) {
 		</div>
 	);
 }
-

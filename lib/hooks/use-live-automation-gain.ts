@@ -3,8 +3,8 @@
 import { useAtom } from "jotai";
 import { useEffect, useState } from "react";
 import { getEffectiveDb, multiplierToDb } from "@/lib/audio/volume";
-import { playbackAtom, tracksAtom } from "@/lib/state/daw-store";
 import type { TrackEnvelopePoint } from "@/lib/state/daw-store";
+import { playbackAtom, tracksAtom } from "@/lib/state/daw-store";
 
 /**
  * Hook to get the current automated gain value for a track during playback
@@ -29,7 +29,11 @@ export function useLiveAutomationGain(trackId: string): {
 		}
 
 		const envelope = track.volumeEnvelope;
-		if (!envelope?.enabled || !envelope.points || envelope.points.length === 0) {
+		if (
+			!envelope?.enabled ||
+			!envelope.points ||
+			envelope.points.length === 0
+		) {
 			setCurrentDb(null);
 			setEnvelopeDb(null);
 			return;
@@ -123,4 +127,3 @@ function interpolateValue(
 			return start + (end - start) * progress;
 	}
 }
-

@@ -28,7 +28,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { DAW_HEIGHTS, DAW_ICONS, DAW_TEXT } from "@/lib/constants/daw-design";
-import { eventListOpenAtom, projectNameAtom, tracksAtom } from "@/lib/state/daw-store";
+import {
+	eventListOpenAtom,
+	projectNameAtom,
+	tracksAtom,
+} from "@/lib/state/daw-store";
 
 export function DAWToolbar() {
 	const [projectName, setProjectName] = useAtom(projectNameAtom);
@@ -101,9 +105,9 @@ export function DAWToolbar() {
 			</div>
 
 			<div className="flex items-center gap-2">
-				<Button 
-					variant="ghost" 
-					size="sm" 
+				<Button
+					variant="ghost"
+					size="sm"
 					onClick={() => setEventListOpen(true)}
 					title="Event List (E)"
 				>
