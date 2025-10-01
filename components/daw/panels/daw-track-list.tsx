@@ -57,14 +57,23 @@ export function DAWTrackList() {
 		trackAutomationTypeAtom,
 	);
 	const [editingTrackId, setEditingTrackId] = useState<string | null>(null);
+	const [editingTrackName, setEditingTrackName] = useState<string>("");
 	const [resizingTrack, setResizingTrack] = useState<{
 		startY: number;
 		startZoom: number;
 	} | null>(null);
 
-	const handleTrackNameChange = (trackId: string, name: string) => {
-		updateTrack(trackId, { name });
+	const startEditingTrack = (trackId: string, currentName: string) => {
+		setEditingTrackId(trackId);
+		setEditingTrackName(currentName);
+	};
+
+	const finishEditingTrack = (trackId: string) => {
+		if (editingTrackName.trim()) {
+			updateTrack(trackId, { name: editingTrackName.trim() });
+		}
 		setEditingTrackId(null);
+		setEditingTrackName("");
 	};
 
 	const handleVolumeChange = (trackId: string, volume: number) => {
@@ -184,7 +193,7 @@ export function DAWTrackList() {
 										type="button"
 										className={`flex items-center gap-2 flex-1 min-w-0 cursor-pointer ${DAW_BUTTONS.TRANSPARENT} text-left`}
 										onClick={selectTrack}
-										onDoubleClick={() => setEditingTrackId(track.id)}
+										onDoubleClick={() => startEditingTrack(track.id, track.name)}
 									>
 										<div
 											className={`${DAW_ICONS.XS} rounded-full flex-shrink-0`}
@@ -192,18 +201,20 @@ export function DAWTrackList() {
 										/>
 										{editingTrackId === track.id ? (
 											<input
-												value={track.name}
-												onChange={(e) =>
-													handleTrackNameChange(track.id, e.target.value)
-												}
-												onBlur={() => setEditingTrackId(null)}
+												value={editingTrackName}
+												onChange={(e) => setEditingTrackName(e.target.value)}
+												onBlur={() => finishEditingTrack(track.id)}
 												onKeyDown={(e) => {
 													if (e.key === "Enter") {
+														finishEditingTrack(track.id);
+													} else if (e.key === "Escape") {
 														setEditingTrackId(null);
+														setEditingTrackName("");
 													}
 												}}
-												className="h-6 text-sm"
+												className="h-6 text-sm px-1 border border-primary rounded"
 												onClick={(e) => e.stopPropagation()}
+												autoFocus
 											/>
 										) : (
 											<span className={`${DAW_TEXT.TRACK_NAME} select-none`}>
@@ -224,7 +235,7 @@ export function DAWTrackList() {
 												isMuted={track.muted}
 												isSoloed={track.soloed}
 												currentDb={dbValue}
-												onRequestRename={() => setEditingTrackId(track.id)}
+												onRequestRename={() => startEditingTrack(track.id, track.name)}
 												onToggleSolo={toggleSoloAction}
 												onToggleMute={toggleMuteAction}
 												onResetVolume={resetVolume}
