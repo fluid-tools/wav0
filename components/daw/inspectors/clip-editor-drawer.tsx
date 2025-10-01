@@ -46,15 +46,16 @@ export function ClipEditorDrawer() {
 
 	return (
 		<Drawer open={open} onOpenChange={close}>
-			<DrawerContent className="flex max-h-[90vh] flex-col overflow-hidden">
-				<DrawerHeader className="shrink-0 text-left">
+			<DrawerContent className="flex h-[80vh] flex-col">
+				<DrawerHeader className="shrink-0 border-b border-border/60 text-left">
 					<DrawerTitle>Edit Clip</DrawerTitle>
 					<DrawerDescription>
 						Adjust envelope automation, fades, and clip properties
 					</DrawerDescription>
 				</DrawerHeader>
 
-				<ScrollArea className="flex-1 overflow-hidden px-4">
+				<div className="flex-1 overflow-hidden">
+					<ScrollArea className="h-full px-4">
 					<div className="mx-auto max-w-4xl space-y-6 pb-6">
 						{/* Clip Overview */}
 						<InspectorSection
@@ -222,9 +223,10 @@ export function ClipEditorDrawer() {
 							)}
 						</InspectorSection>
 					</div>
-				</ScrollArea>
+					</ScrollArea>
+				</div>
 
-				<DrawerFooter className="shrink-0">
+				<DrawerFooter className="shrink-0 border-t border-border/60">
 					<div className="flex w-full items-center justify-between gap-3">
 						<p className="text-xs text-muted-foreground">
 							Changes apply instantly. Save envelope to persist automation.

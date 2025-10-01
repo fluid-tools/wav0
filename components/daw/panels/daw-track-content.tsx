@@ -540,7 +540,9 @@ export function DAWTrackContent() {
 													{clip.name}
 												</div>
 												<div className="text-[11px] text-muted-foreground tabular-nums">
-													{formatDuration(clip.trimEnd - clip.trimStart)}
+													{formatDuration(clip.trimEnd - clip.trimStart, {
+														pxPerMs: pixelsPerMs,
+													})}
 												</div>
 											</div>
 											{/* Reserved center area for waveform */}

@@ -287,11 +287,26 @@ export function DAWTrackList() {
 												}
 												onClick={(e) => e.stopPropagation()}
 												className="w-full h-1 cursor-pointer appearance-none rounded-lg bg-muted"
+												title={
+													track.volumeEnvelope?.enabled
+														? `Base volume: ${volumeLabel} (envelope active)`
+														: `Volume: ${volumeLabel}`
+												}
 											/>
 										</div>
 
-										<span className="text-xs text-muted-foreground w-12 text-right flex-shrink-0 tabular-nums">
+										<span
+											className="text-xs text-muted-foreground w-12 text-right flex-shrink-0 tabular-nums"
+											title={
+												track.volumeEnvelope?.enabled
+													? "Base level · envelope shapes curve"
+													: "Track volume"
+											}
+										>
 											{volumeLabel}
+											{track.volumeEnvelope?.enabled && (
+												<span className="ml-0.5 text-[9px] text-amber-500">●</span>
+											)}
 										</span>
 									</div>
 								</div>
