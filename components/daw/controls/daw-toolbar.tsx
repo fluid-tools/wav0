@@ -5,6 +5,7 @@ import {
 	Download,
 	FolderOpen,
 	HelpCircle,
+	List,
 	MoreHorizontal,
 	Save,
 	Settings,
@@ -27,11 +28,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { DAW_HEIGHTS, DAW_ICONS, DAW_TEXT } from "@/lib/constants/daw-design";
-import { projectNameAtom, tracksAtom } from "@/lib/state/daw-store";
+import { eventListOpenAtom, projectNameAtom, tracksAtom } from "@/lib/state/daw-store";
 
 export function DAWToolbar() {
 	const [projectName, setProjectName] = useAtom(projectNameAtom);
 	const [tracks] = useAtom(tracksAtom);
+	const [, setEventListOpen] = useAtom(eventListOpenAtom);
 
 	const handleImportAudio = () => {
 		const input = document.createElement("input");
@@ -99,6 +101,16 @@ export function DAWToolbar() {
 			</div>
 
 			<div className="flex items-center gap-2">
+				<Button 
+					variant="ghost" 
+					size="sm" 
+					onClick={() => setEventListOpen(true)}
+					title="Event List (E)"
+				>
+					<List className={DAW_ICONS.MD} />
+					<span className="ml-1 text-xs">Events</span>
+				</Button>
+
 				<Button variant="ghost" size="sm" onClick={handleImportAudio}>
 					<Upload className={DAW_ICONS.MD} />
 					<span className="ml-1 text-xs">Import</span>

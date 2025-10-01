@@ -21,7 +21,8 @@ type ClipPlaybackState = {
 
 type TrackPlaybackState = {
 	clipStates: Map<string, ClipPlaybackState>;
-	gainNode: GainNode | null; // track-level gain (volume/solo/mute)
+	envelopeGainNode: GainNode | null; // envelope automation (volume curve)
+	muteSoloGainNode: GainNode | null; // mute/solo control (0 or 1)
 	isPlaying: boolean;
 };
 
@@ -94,18 +95,18 @@ export class PlaybackEngine {
 	private scheduleTrackEnvelope(track: Track): void {
 		if (!this.audioContext || !this.masterGainNode) return;
 		const state = this.tracks.get(track.id);
-		if (!state?.gainNode) return;
+		if (!state?.envelopeGainNode) return;
 		const envelope = track.volumeEnvelope;
-		const gainNode = state.gainNode;
+		const envelopeGain = state.envelopeGainNode;
 		const now = this.audioContext.currentTime;
-		this.cancelGainAutomation(gainNode.gain, now);
+		this.cancelGainAutomation(envelopeGain.gain, now);
 
 		// Base volume from track slider (0-1 range)
 		const baseVolume = track.volume / 100;
 
 		if (!envelope || !envelope.enabled || envelope.points.length === 0) {
 			// No envelope: just use base volume
-			gainNode.gain.setValueAtTime(baseVolume, now);
+			envelopeGain.gain.setValueAtTime(baseVolume, now);
 			return;
 		}
 
@@ -121,7 +122,7 @@ export class PlaybackEngine {
 
 		// Apply: base volume × envelope multiplier
 		const currentGain = baseVolume * currentMultiplier;
-		gainNode.gain.setValueAtTime(currentGain, now);
+		envelopeGain.gain.setValueAtTime(currentGain, now);
 
 		const futurePoints = sorted.filter(
 			(point) => point.time >= playbackStartMs,
@@ -141,7 +142,7 @@ export class PlaybackEngine {
 
 			switch (point.curve) {
 				case "easeIn":
-					gainNode.gain.exponentialRampToValueAtTime(
+					envelopeGain.gain.exponentialRampToValueAtTime(
 						Math.max(targetGain, 0.0001), // Avoid 0 for exponential
 						Math.max(at, now),
 					);
@@ -149,7 +150,7 @@ export class PlaybackEngine {
 				case "easeOut":
 				case "sCurve":
 				default:
-					gainNode.gain.linearRampToValueAtTime(targetGain, Math.max(at, now));
+					envelopeGain.gain.linearRampToValueAtTime(targetGain, Math.max(at, now));
 					break;
 			}
 			lastMultiplier = multiplier;
@@ -162,29 +163,27 @@ export class PlaybackEngine {
 		for (const track of tracks) {
 			const state = this.tracks.get(track.id);
 			if (!state) continue;
-			if (!state.gainNode) {
-				state.gainNode = this.audioContext.createGain();
-				state.gainNode.connect(this.masterGainNode);
+
+			// Setup gain node chain: envelopeGain → muteSoloGain → master
+			if (!state.envelopeGainNode) {
+				state.envelopeGainNode = this.audioContext.createGain();
 			}
-			const gain = state.gainNode;
+			if (!state.muteSoloGainNode) {
+				state.muteSoloGainNode = this.audioContext.createGain();
+				state.envelopeGainNode.connect(state.muteSoloGainNode);
+				state.muteSoloGainNode.connect(this.masterGainNode);
+			}
+
 			const muted = Boolean(track.muted) || (soloEngaged && !track.soloed);
 			this.trackMuteState.set(track.id, muted);
-			if (muted) {
-				if (!this.prevTrackVolumes.has(track.id)) {
-					this.prevTrackVolumes.set(track.id, gain.gain.value);
-				}
-				gain.gain.value = 0;
-				state.isPlaying = false;
-				continue;
-			}
-			const cached = this.prevTrackVolumes.get(track.id);
-			const base = track.volume / 100;
-			gain.gain.value = cached ?? base;
-			if (cached !== undefined) {
-				this.prevTrackVolumes.delete(track.id);
-			}
+
+			// Mute/solo is binary: 0 or 1
+			state.muteSoloGainNode.gain.value = muted ? 0 : 1;
+
+			// Envelope scheduling happens regardless of mute state
 			this.scheduleTrackEnvelope(track);
-			state.isPlaying = true;
+
+			state.isPlaying = !muted;
 		}
 		this.lastSnapshot = tracks.map((track) => ({ ...track }));
 		this.currentTracks = new Map(tracks.map((track) => [track.id, track]));
@@ -215,7 +214,8 @@ export class PlaybackEngine {
 			if (hasClipRef || hasLegacyRef) {
 				this.tracks.set(track.id, {
 					clipStates: new Map(),
-					gainNode: null,
+					envelopeGainNode: null,
+					muteSoloGainNode: null,
 					isPlaying: false,
 				});
 			}
@@ -244,9 +244,15 @@ export class PlaybackEngine {
 		for (const track of tracks) {
 			const trackState = this.tracks.get(track.id);
 			if (!trackState) continue;
-			if (!trackState.gainNode) {
-				trackState.gainNode = this.audioContext.createGain();
-				trackState.gainNode.connect(this.masterGainNode);
+
+			// Setup gain chain if needed
+			if (!trackState.envelopeGainNode) {
+				trackState.envelopeGainNode = this.audioContext.createGain();
+			}
+			if (!trackState.muteSoloGainNode) {
+				trackState.muteSoloGainNode = this.audioContext.createGain();
+				trackState.envelopeGainNode.connect(trackState.muteSoloGainNode);
+				trackState.muteSoloGainNode.connect(this.masterGainNode);
 			}
 
 			const clips =
@@ -322,8 +328,8 @@ export class PlaybackEngine {
 						audioSources: [],
 						generation: 0,
 					};
-					if (cps.gainNode && trackState.gainNode) {
-						cps.gainNode.connect(trackState.gainNode);
+					if (cps.gainNode && trackState.envelopeGainNode) {
+						cps.gainNode.connect(trackState.envelopeGainNode);
 					}
 					trackState.clipStates.set(clip.id, cps);
 				}
@@ -544,7 +550,12 @@ export class PlaybackEngine {
 		if (!this.audioContext) return;
 		let trackState = this.tracks.get(updatedTrack.id);
 		if (!trackState) {
-			trackState = { clipStates: new Map(), gainNode: null, isPlaying: true };
+			trackState = {
+				clipStates: new Map(),
+				envelopeGainNode: null,
+				muteSoloGainNode: null,
+				isPlaying: true,
+			};
 			this.tracks.set(updatedTrack.id, trackState);
 		}
 
@@ -562,13 +573,17 @@ export class PlaybackEngine {
 			cps.audioSources = [];
 		}
 
-		// Ensure track gain exists
-		if (!trackState.gainNode) {
-			trackState.gainNode = this.audioContext.createGain();
+		// Ensure track gain chain exists
+		if (!trackState.envelopeGainNode) {
+			trackState.envelopeGainNode = this.audioContext.createGain();
+		}
+		if (!trackState.muteSoloGainNode) {
+			trackState.muteSoloGainNode = this.audioContext.createGain();
+			trackState.envelopeGainNode.connect(trackState.muteSoloGainNode);
 			if (this.masterGainNode) {
-				trackState.gainNode.connect(this.masterGainNode);
+				trackState.muteSoloGainNode.connect(this.masterGainNode);
 			} else if (this.audioContext) {
-				trackState.gainNode.connect(this.audioContext.destination);
+				trackState.muteSoloGainNode.connect(this.audioContext.destination);
 			}
 		}
 
@@ -644,8 +659,8 @@ export class PlaybackEngine {
 					audioSources: [],
 					generation: 0,
 				};
-				if (cps.gainNode && trackState.gainNode) {
-					cps.gainNode.connect(trackState.gainNode);
+				if (cps.gainNode && trackState.envelopeGainNode) {
+					cps.gainNode.connect(trackState.envelopeGainNode);
 				} else if (cps.gainNode) {
 					(cps.gainNode as GainNode).connect(
 						this.masterGainNode ?? this.audioContext.destination,
@@ -729,32 +744,13 @@ export class PlaybackEngine {
 		}
 	}
 
-	updateTrackVolume(trackId: string, volume: number): void {
-		const trackState = this.tracks.get(trackId);
-		if (trackState?.gainNode) {
-			trackState.gainNode.gain.value = volume / 100;
-		}
+	updateTrackVolume(_trackId: string, _volume: number): void {
+		// Volume changes are reflected through refreshMix → scheduleTrackEnvelope
 		this.refreshMix();
 	}
 
-	updateTrackMute(trackId: string, muted: boolean, volume?: number): void {
-		const trackState = this.tracks.get(trackId);
-		if (!trackState?.gainNode) return;
-		const gn = trackState.gainNode;
-		this.trackMuteState.set(trackId, muted);
-		if (muted) {
-			this.prevTrackVolumes.set(trackId, gn.gain.value);
-			gn.gain.value = 0;
-		} else {
-			const prev = this.prevTrackVolumes.get(trackId);
-			const target =
-				typeof volume === "number" ? volume / 100 : (prev ?? gn.gain.value);
-			const forcedMute = this.trackMuteState.get(trackId);
-			gn.gain.value = forcedMute ? 0 : target;
-			if (!forcedMute) {
-				this.prevTrackVolumes.delete(trackId);
-			}
-		}
+	updateTrackMute(_trackId: string, _muted: boolean, _volume?: number): void {
+		// Mute/unmute is handled through refreshMix → applySnapshot → muteSoloGainNode
 		this.refreshMix();
 	}
 
