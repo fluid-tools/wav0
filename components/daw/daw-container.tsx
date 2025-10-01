@@ -34,7 +34,8 @@ import {
 import { DAWControls } from "./controls/daw-controls";
 import { DAWToolbar } from "./controls/daw-toolbar";
 import { GlobalShortcuts } from "./controls/global-shortcuts";
-import { ClipInspectorSheet } from "./inspectors/clip-inspector-sheet";
+import { ClipEditorDrawer } from "./inspectors/clip-editor-drawer";
+import { EventListSheet } from "./inspectors/event-list-sheet";
 import { AudioTestPanel } from "./panels/audio-test-panel";
 import { DAWTimeline } from "./panels/daw-timeline";
 import { DAWTrackContent } from "./panels/daw-track-content";
@@ -281,7 +282,8 @@ export function DAWContainer() {
 			<DAWToolbar />
 			{/* Global keyboard shortcuts */}
 			<GlobalShortcuts />
-			<ClipInspectorSheet />
+			<ClipEditorDrawer />
+			<EventListSheet />
 
 			{/* Main DAW Interface */}
 			<div className="flex-1 flex flex-col overflow-hidden">

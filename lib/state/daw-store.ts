@@ -139,6 +139,7 @@ export const selectedTrackIdAtom = atom<string | null>(null);
 export const selectedClipIdAtom = atom<string | null>(null);
 export const clipInspectorOpenAtom = atom(false);
 export const clipInspectorTargetAtom = atom<ClipInspectorTarget>(null);
+export const eventListOpenAtom = atom(false);
 export const activeToolAtom = atom<Tool>("pointer");
 export const projectNameAtom = atomWithStorage<string>(
 	"daw-project-name",
