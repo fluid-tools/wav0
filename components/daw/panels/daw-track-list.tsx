@@ -272,42 +272,55 @@ export function DAWTrackList() {
 										S
 									</button>
 
-									<div className="flex flex-1 items-center gap-2">
-										<div className="flex-1 min-w-0">
-											<input
-												type="range"
-												min={0}
-												max={100}
-												value={track.volume}
-												onChange={(e) =>
-													handleVolumeChange(
-														track.id,
-														parseInt(e.target.value, 10),
-													)
-												}
-												onClick={(e) => e.stopPropagation()}
-												className="w-full h-1 cursor-pointer appearance-none rounded-lg bg-muted"
+									<div className="flex flex-1 flex-col gap-1">
+										<div className="flex items-center gap-2">
+											<div className="flex-1 min-w-0">
+												<input
+													type="range"
+													min={0}
+													max={100}
+													value={track.volume}
+													onChange={(e) =>
+														handleVolumeChange(
+															track.id,
+															parseInt(e.target.value, 10),
+														)
+													}
+													onClick={(e) => e.stopPropagation()}
+													className="w-full h-1 cursor-pointer appearance-none rounded-lg bg-muted"
+													title={
+														track.volumeEnvelope?.enabled
+															? `Base volume: ${volumeLabel} (envelope active)`
+															: `Volume: ${volumeLabel}`
+													}
+												/>
+											</div>
+
+											<span
+												className="text-xs text-muted-foreground w-12 text-right flex-shrink-0 tabular-nums"
 												title={
 													track.volumeEnvelope?.enabled
-														? `Base volume: ${volumeLabel} (envelope active)`
-														: `Volume: ${volumeLabel}`
+														? "Base level · envelope shapes curve"
+														: "Track volume"
 												}
-											/>
+											>
+												{volumeLabel}
+												{track.volumeEnvelope?.enabled && (
+													<span className="ml-0.5 text-[9px] text-amber-500">●</span>
+												)}
+											</span>
 										</div>
-
-										<span
-											className="text-xs text-muted-foreground w-12 text-right flex-shrink-0 tabular-nums"
-											title={
-												track.volumeEnvelope?.enabled
-													? "Base level · envelope shapes curve"
-													: "Track volume"
-											}
-										>
-											{volumeLabel}
-											{track.volumeEnvelope?.enabled && (
-												<span className="ml-0.5 text-[9px] text-amber-500">●</span>
-											)}
-										</span>
+										
+										{track.volumeEnvelope?.enabled && (
+											<div className="flex items-center gap-1 text-[10px] text-amber-500/80">
+												<span className="font-medium">Auto:</span>
+												<span className="font-mono">
+													{track.volumeEnvelope.points.length > 0
+														? `${track.volumeEnvelope.points.length} points`
+														: "No points"}
+												</span>
+											</div>
+										)}
 									</div>
 								</div>
 
