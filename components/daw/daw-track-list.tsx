@@ -231,9 +231,9 @@ export function DAWTrackList() {
 
 								{/* Track Info */}
 								<div className="text-xs text-muted-foreground">
-									{track.duration > 0
-										? formatDuration(track.duration / 1000)
-										: "Empty"}
+				{track.duration > 0
+					? formatDuration(track.duration)
+					: "Empty"}
 								</div>
 
 								{/* Track Controls */}

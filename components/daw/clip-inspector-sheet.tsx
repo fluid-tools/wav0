@@ -28,6 +28,7 @@ import { formatDuration } from "@/lib/storage/opfs";
 const MAX_FADE_MS = 120000;
 const ENVELOPE_PREVIEW_LIMIT = 6;
 
+
 export function ClipInspectorSheet() {
 	const [open, setOpen] = useAtom(clipInspectorOpenAtom);
 	const [target, setTarget] = useAtom(clipInspectorTargetAtom);
@@ -49,9 +50,9 @@ export function ClipInspectorSheet() {
 
 	useEffect(() => {
 		if (!current) return;
-		setFadeInDraft(current.clip.fadeIn ?? 0);
-		setFadeOutDraft(current.clip.fadeOut ?? 0);
-	}, [current?.clip.id, current?.clip.fadeIn, current?.clip.fadeOut, current]);
+	setFadeInDraft(current.clip.fadeIn ?? 0);
+	setFadeOutDraft(current.clip.fadeOut ?? 0);
+}, [current?.clip.id, current?.clip.fadeIn, current?.clip.fadeOut]);
 
 	const close = (nextOpen: boolean) => {
 		setOpen(nextOpen);
@@ -83,14 +84,16 @@ export function ClipInspectorSheet() {
 
 	const commitFade = (key: "fadeIn" | "fadeOut", raw: number) => {
 		if (!current) return;
-		const clamped = Math.max(0, Math.min(MAX_FADE_MS, Math.round(raw)));
+	const clamped = Number.isFinite(raw)
+		? Math.max(0, Math.min(MAX_FADE_MS, Math.round(raw)))
+		: 0;
 		updateClip(current.track.id, current.clip.id, { [key]: clamped });
 		if (key === "fadeIn") setFadeInDraft(clamped);
 		if (key === "fadeOut") setFadeOutDraft(clamped);
 	};
 
-	const fadeValueToString = (value: number) =>
-		Number.isFinite(value) ? value.toString() : "0";
+const fadeValueToString = (value: number) =>
+	Number.isFinite(value) ? value.toString() : "0";
 
 	if (!current) {
 		return (

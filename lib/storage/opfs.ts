@@ -202,10 +202,15 @@ export function formatBytes(bytes: number): string {
 	return `${parseFloat((bytes / k ** i).toFixed(2))} ${sizes[i]}`;
 }
 
-export function formatDuration(seconds: number): string {
-	const mins = Math.floor(seconds / 60);
-	const secs = Math.floor(seconds % 60);
-	return `${mins}:${secs.toString().padStart(2, "0")}`;
+export function formatDuration(durationMs: number): string {
+	if (!Number.isFinite(durationMs)) return "0:00.000";
+	const totalMs = Math.max(0, Math.round(durationMs));
+	const minutes = Math.floor(totalMs / 60000);
+	const seconds = Math.floor((totalMs % 60000) / 1000)
+		.toString()
+		.padStart(2, "0");
+	const milliseconds = (totalMs % 1000).toString().padStart(3, "0");
+	return `${minutes}:${seconds}.${milliseconds}`;
 }
 
 // Export singleton instance
