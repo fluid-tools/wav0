@@ -30,6 +30,38 @@ export type Clip = {
 	color?: string;
 };
 
+export type TrackEnvelopeCurve = "linear" | "easeIn" | "easeOut" | "sCurve";
+
+export type TrackEnvelopePoint = {
+	id: string;
+	time: number; // absolute timeline ms
+	value: number; // 0-4 linear gain multiplier
+	curve?: TrackEnvelopeCurve;
+};
+
+export type TrackEnvelope = {
+	enabled: boolean;
+	points: TrackEnvelopePoint[];
+};
+
+const ENVELOPE_GAIN_MIN = 0;
+const ENVELOPE_GAIN_MAX = 4;
+
+const clampEnvelopeGain = (value: number) =>
+	Math.min(ENVELOPE_GAIN_MAX, Math.max(ENVELOPE_GAIN_MIN, value));
+
+const createDefaultEnvelope = (volume: number): TrackEnvelope => ({
+	enabled: false,
+	points: [
+		{
+			id: crypto.randomUUID(),
+			time: 0,
+			value: clampEnvelopeGain(volume / 100),
+			curve: "linear",
+		},
+	],
+});
+
 export type Track = {
 	id: string;
 	name: string;
@@ -51,6 +83,7 @@ export type Track = {
 	clips?: Clip[];
 	// Cached audio data from MediaBunny
 	mediaBunnyInput?: unknown; // Will be typed properly in the audio handler
+	volumeEnvelope?: TrackEnvelope;
 };
 
 export type PlaybackState = {
@@ -373,6 +406,15 @@ export const addTrackAtom = atom(null, (get, set, track: Omit<Track, "id">) => {
 	const newTrack: Track = {
 		...track,
 		id: crypto.randomUUID(),
+	volumeEnvelope: track.volumeEnvelope
+		? {
+			...track.volumeEnvelope,
+			points: track.volumeEnvelope.points.map((point) => ({
+				...point,
+				value: clampEnvelopeGain(point.value),
+			})),
+		}
+		: createDefaultEnvelope(track.volume),
 	};
 	set(tracksAtom, [...tracks, newTrack]);
 	return newTrack.id;
@@ -396,14 +438,28 @@ export const updateTrackAtom = atom(
 	async (get, set, trackId: string, updates: Partial<Track>) => {
 		const tracks = get(tracksAtom);
 		const playback = get(playbackAtom);
-		const updatedTracks = tracks.map((track) =>
-			track.id === trackId ? { ...track, ...updates } : track,
-		);
+		const updatedTracks = tracks.map((track) => {
+			if (track.id !== trackId) return track;
+			if (updates.volumeEnvelope && updates.volumeEnvelope.points) {
+				const normalizedEnvelope: TrackEnvelope = {
+					...track.volumeEnvelope,
+					...updates.volumeEnvelope,
+					points: updates.volumeEnvelope.points
+						.map((point) => ({
+							...point,
+							value: clampEnvelopeGain(point.value),
+						}))
+						.sort((a, b) => a.time - b.time),
+				};
+				return { ...track, ...updates, volumeEnvelope: normalizedEnvelope };
+			}
+			return { ...track, ...updates };
+		});
 		set(tracksAtom, updatedTracks);
 
 		const updatedTrack = updatedTracks.find((t) => t.id === trackId);
-		if (!updatedTrack) return;
-		playbackEngine.synchronizeTracks(updatedTracks);
+	if (!updatedTrack) return;
+	playbackEngine.synchronizeTracks(updatedTracks);
 
 		// Volume/mute/solo should reflect immediately without reschedule
 		if (typeof updates.volume === "number") {
