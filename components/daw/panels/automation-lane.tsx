@@ -29,7 +29,9 @@ export function AutomationLane({
 	const [automationViewEnabled] = useAtom(automationViewEnabledAtom);
 	const [draggingPoint, setDraggingPoint] = useState<{
 		pointId: string;
+		startX: number;
 		startY: number;
+		startTime: number;
 		startValue: number;
 		pointerId: number;
 	} | null>(null);
@@ -55,7 +57,9 @@ export function AutomationLane({
 			
 			setDraggingPoint({
 				pointId: point.id,
+				startX: e.clientX,
 				startY: e.clientY,
+				startTime: point.time,
 				startValue: point.value,
 				pointerId: e.pointerId,
 			});
@@ -80,16 +84,22 @@ export function AutomationLane({
 			// Calculate delta Y and map to multiplier change
 			const deltaY = e.clientY - draggingPoint.startY;
 			const deltaValue = -(deltaY / usableHeight) * 4; // Inverted, scaled to 0-4 range
-
 			const newValue = Math.max(
 				0,
 				Math.min(4, draggingPoint.startValue + deltaValue),
 			);
 
+			// Calculate delta X and map to time change (horizontal drag)
+			const deltaX = e.clientX - draggingPoint.startX;
+			const deltaTime = deltaX / pxPerMs;
+			const newTime = Math.max(0, draggingPoint.startTime + deltaTime);
+
 			// Update point in envelope
 			if (!envelope) return;
 			const updatedPoints = envelope.points.map((p) =>
-				p.id === draggingPoint.pointId ? { ...p, value: newValue } : p,
+				p.id === draggingPoint.pointId 
+					? { ...p, value: newValue, time: newTime } 
+					: p,
 			);
 
 			updateTrack(track.id, {
@@ -99,7 +109,7 @@ export function AutomationLane({
 				},
 			});
 		},
-		[draggingPoint, trackHeight, envelope, track.id, updateTrack],
+		[draggingPoint, trackHeight, envelope, track.id, updateTrack, pxPerMs],
 	);
 
 	const handlePointerUp = useCallback((e: React.PointerEvent) => {
@@ -145,6 +155,40 @@ export function AutomationLane({
 			setSelectedSegment(null);
 		},
 		[selectedSegment, envelope, track.id, updateTrack],
+	);
+
+	// Add new automation point on double-click
+	const handleSvgDoubleClick = useCallback(
+		(e: React.MouseEvent<SVGSVGElement>) => {
+			if (!svgRef.current || !envelope) return;
+			
+			const rect = svgRef.current.getBoundingClientRect();
+			const x = e.clientX - rect.left;
+			const y = e.clientY - rect.top;
+			
+			// Convert pixel position to time and value
+			const time = x / pxPerMs;
+			const padding = 20;
+			const usableHeight = trackHeight - padding * 2;
+			const normalizedY = (trackHeight - padding - y) / usableHeight;
+			const value = Math.max(0, Math.min(4, normalizedY * 4));
+			
+			// Create new point
+			const newPoint: TrackEnvelopePoint = {
+				id: `point-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+				time,
+				value,
+				curve: "linear",
+			};
+			
+			updateTrack(track.id, {
+				volumeEnvelope: {
+					...envelope,
+					points: [...envelope.points, newPoint],
+				},
+			});
+		},
+		[envelope, pxPerMs, trackHeight, track.id, updateTrack],
 	);
 
 	// Lock scroll while dragging automation point
@@ -270,6 +314,17 @@ export function AutomationLane({
 		playheadY = trackHeight - padding - normalizedValue * usableHeight;
 	}
 
+	// Derive automation color from track color (lighter version)
+	const automationColor = (() => {
+		const hex = track.color.replace("#", "");
+		const r = Number.parseInt(hex.substring(0, 2), 16);
+		const g = Number.parseInt(hex.substring(2, 4), 16);
+		const b = Number.parseInt(hex.substring(4, 6), 16);
+		// Lighten by mixing with white (70% track color + 30% white)
+		const lighten = (c: number) => Math.round(c * 0.7 + 255 * 0.3);
+		return `rgb(${lighten(r)}, ${lighten(g)}, ${lighten(b)})`;
+	})();
+
 	return (
 		<>
 		<svg
@@ -279,15 +334,16 @@ export function AutomationLane({
 			height={trackHeight}
 			style={{ zIndex: 10 }}
 			aria-label={`Volume automation for ${track.name}`}
+			onDoubleClick={handleSvgDoubleClick}
 		>
-			<title>{`Volume automation: ${sorted.length} points`}</title>
+			<title>{`Volume automation: ${sorted.length} points (double-click to add)`}</title>
 			{/* Automation curve path */}
 			<path
 				d={path}
 				fill="none"
-				stroke="rgb(251, 191, 36)" // amber-400
+				stroke={automationColor}
 				strokeWidth={2}
-				strokeOpacity={0.8}
+				strokeOpacity={0.85}
 				vectorEffect="non-scaling-stroke"
 			/>
 
@@ -359,8 +415,8 @@ export function AutomationLane({
 							cx={x}
 							cy={y}
 							r={4}
-							fill="rgb(251, 191, 36)"
-							stroke="rgb(245, 158, 11)" // amber-500
+							fill={automationColor}
+							stroke={track.color}
 							strokeWidth={2}
 							className="pointer-events-none"
 						/>
