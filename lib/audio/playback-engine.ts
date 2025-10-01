@@ -91,6 +91,52 @@ export class PlaybackEngine {
 		}
 	}
 
+	private scheduleTrackEnvelope(track: Track): void {
+		if (!this.audioContext || !this.masterGainNode) return;
+		const state = this.tracks.get(track.id);
+		if (!state?.gainNode) return;
+		const envelope = track.volumeEnvelope;
+		const gainNode = state.gainNode;
+		const now = this.audioContext.currentTime;
+		this.cancelGainAutomation(gainNode.gain, now);
+		if (!envelope || !envelope.enabled || envelope.points.length === 0) {
+			const base = track.volume / 100;
+			gainNode.gain.setValueAtTime(base, now);
+			return;
+		}
+		const sorted = [...envelope.points].sort((a, b) => a.time - b.time);
+		const playbackStartMs = this.playbackTimeAtStart * 1000;
+		let currentValue = track.volume / 100;
+		for (const point of sorted) {
+			if (point.time <= playbackStartMs) currentValue = point.value;
+			else break;
+		}
+		gainNode.gain.setValueAtTime(currentValue, now);
+		const futurePoints = sorted.filter((point) => point.time >= playbackStartMs);
+		let lastValue = currentValue;
+		for (const point of futurePoints) {
+			const offsetSec = (point.time - playbackStartMs) / 1000;
+			if (offsetSec < 0) continue;
+			const at = this.startTime + offsetSec;
+			const value = point.value;
+			if (value === lastValue) continue;
+			switch (point.curve) {
+				case "easeIn":
+					gainNode.gain.exponentialRampToValueAtTime(
+						Math.max(value, 0.0001),
+						Math.max(at, now),
+					);
+					break;
+				case "easeOut":
+				case "sCurve":
+				default:
+					gainNode.gain.linearRampToValueAtTime(value, Math.max(at, now));
+					break;
+			}
+			lastValue = value;
+		}
+	}
+
 	private applySnapshot(tracks: Track[]): void {
 		if (!this.audioContext || !this.masterGainNode) return;
 		const soloEngaged = tracks.some((track) => track.soloed);
@@ -118,6 +164,7 @@ export class PlaybackEngine {
 			if (cached !== undefined) {
 				this.prevTrackVolumes.delete(track.id);
 			}
+			this.scheduleTrackEnvelope(track);
 			state.isPlaying = true;
 		}
 		this.lastSnapshot = tracks.map((track) => ({ ...track }));
