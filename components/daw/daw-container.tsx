@@ -68,6 +68,7 @@ export function DAWContainer() {
 		rAF: number;
 	};
 	const gridControllerRef = useRef<GridController | null>(null);
+	const automationDragActiveRef = useRef(false);
 	const panLockRef = useRef(false);
 
 	/**
@@ -221,20 +222,33 @@ export function DAWContainer() {
 		const handlePointerMove = (event: PointerEvent) => {
 			if (!(event.buttons & 1)) return;
 			if (panLockRef.current) return;
+			if (automationDragActiveRef.current) return; // Don't scroll during automation drag
 			controller.setScroll(
 				controller.scrollLeft - event.movementX,
 				controller.scrollTop - event.movementY,
 			);
 		};
 
+		// Listen for automation drag events
+		const handleAutomationDragStart = () => {
+			automationDragActiveRef.current = true;
+		};
+		const handleAutomationDragEnd = () => {
+			automationDragActiveRef.current = false;
+		};
+
 		gridEl.addEventListener("wheel", handleWheel, { passive: false });
 		gridEl.addEventListener("pointermove", handlePointerMove);
+		window.addEventListener("wav0:automation-drag-start", handleAutomationDragStart);
+		window.addEventListener("wav0:automation-drag-end", handleAutomationDragEnd);
 
 		return () => {
 			gridControllerRef.current = null;
 			controller.cancelAnimation();
 			gridEl.removeEventListener("wheel", handleWheel);
 			gridEl.removeEventListener("pointermove", handlePointerMove);
+			window.removeEventListener("wav0:automation-drag-start", handleAutomationDragStart);
+			window.removeEventListener("wav0:automation-drag-end", handleAutomationDragEnd);
 		};
 	}, [viewport, setTimelineZoom]);
 
