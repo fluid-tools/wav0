@@ -141,6 +141,15 @@ export const clipInspectorOpenAtom = atom(false);
 export const clipInspectorTargetAtom = atom<ClipInspectorTarget>(null);
 export const eventListOpenAtom = atom(false);
 export const activeToolAtom = atom<Tool>("pointer");
+
+// Automation view toggle
+export const automationViewEnabledAtom = atom(false);
+
+// Active automation type per track (volume, pan, etc.)
+export type AutomationType = "volume" | "pan";
+export const trackAutomationTypeAtom = atom<Map<string, AutomationType>>(
+	new Map(),
+);
 export const projectNameAtom = atomWithStorage<string>(
 	"daw-project-name",
 	"Untitled Project",

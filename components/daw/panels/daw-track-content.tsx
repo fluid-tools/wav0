@@ -312,7 +312,7 @@ export function DAWTrackContent() {
 	]);
 
 	return (
-		<div ref={containerRef} className="relative w-full h-full">
+		<div ref={containerRef} className="relative w-full h-full" data-daw-grid>
 			{tracks.map((track, index) => {
 				// Track row layout
 				const trackHeight = Math.round(DAW_HEIGHTS.TRACK_ROW * trackHeightZoom);

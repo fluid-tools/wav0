@@ -3,6 +3,7 @@
 import { useAtom } from "jotai";
 import { useEffect } from "react";
 import {
+	automationViewEnabledAtom,
 	playbackAtom,
 	projectEndOverrideAtom,
 	selectedClipIdAtom,
@@ -28,6 +29,9 @@ export function GlobalShortcuts() {
 	const [selectedClipId, setSelectedClipId] = useAtom(selectedClipIdAtom);
 	const [, splitAtPlayhead] = useAtom(splitClipAtPlayheadAtom);
 	const [, updateClip] = useAtom(updateClipAtom);
+	const [automationViewEnabled, setAutomationViewEnabled] = useAtom(
+		automationViewEnabledAtom,
+	);
 
 	useEffect(() => {
 		const ensureSelection = () => {
@@ -93,6 +97,19 @@ export function GlobalShortcuts() {
 			if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === " ") {
 				e.preventDefault();
 				togglePlayback();
+				return;
+			}
+
+			// A: Toggle automation view
+			if (
+				!e.ctrlKey &&
+				!e.metaKey &&
+				!e.altKey &&
+				!e.shiftKey &&
+				e.key.toLowerCase() === "a"
+			) {
+				e.preventDefault();
+				setAutomationViewEnabled(!automationViewEnabled);
 				return;
 			}
 
