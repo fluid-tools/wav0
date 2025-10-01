@@ -3,6 +3,7 @@
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ClipContextMenu } from "@/components/daw/context-menus/clip-context-menu";
+import { AutomationLane } from "@/components/daw/panels/automation-lane";
 import { DAW_HEIGHTS } from "@/lib/constants/daw-design";
 import type { Clip } from "@/lib/state/daw-store";
 import {
@@ -651,6 +652,15 @@ export function DAWTrackContent() {
 										Drop audio file here
 									</div>
 								)}
+
+							{/* Automation Lane Overlay */}
+							<AutomationLane
+								track={track}
+								trackHeight={trackHeight}
+								trackWidth={
+									containerRef.current?.getBoundingClientRect().width ?? 2000
+								}
+							/>
 						</div>
 					</div>
 				);
