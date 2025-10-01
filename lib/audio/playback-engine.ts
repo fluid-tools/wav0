@@ -99,41 +99,60 @@ export class PlaybackEngine {
 		const gainNode = state.gainNode;
 		const now = this.audioContext.currentTime;
 		this.cancelGainAutomation(gainNode.gain, now);
+
+		// Base volume from track slider (0-1 range)
+		const baseVolume = track.volume / 100;
+
 		if (!envelope || !envelope.enabled || envelope.points.length === 0) {
-			const base = track.volume / 100;
-			gainNode.gain.setValueAtTime(base, now);
+			// No envelope: just use base volume
+			gainNode.gain.setValueAtTime(baseVolume, now);
 			return;
 		}
+
 		const sorted = [...envelope.points].sort((a, b) => a.time - b.time);
 		const playbackStartMs = this.playbackTimeAtStart * 1000;
-		let currentValue = track.volume / 100;
+
+		// Find current multiplier based on playback position
+		let currentMultiplier = 1.0; // Default to 100% of base
 		for (const point of sorted) {
-			if (point.time <= playbackStartMs) currentValue = point.value;
+			if (point.time <= playbackStartMs) currentMultiplier = point.value;
 			else break;
 		}
-		gainNode.gain.setValueAtTime(currentValue, now);
-		const futurePoints = sorted.filter((point) => point.time >= playbackStartMs);
-		let lastValue = currentValue;
+
+		// Apply: base volume × envelope multiplier
+		const currentGain = baseVolume * currentMultiplier;
+		gainNode.gain.setValueAtTime(currentGain, now);
+
+		const futurePoints = sorted.filter(
+			(point) => point.time >= playbackStartMs,
+		);
+		let lastMultiplier = currentMultiplier;
+
 		for (const point of futurePoints) {
 			const offsetSec = (point.time - playbackStartMs) / 1000;
 			if (offsetSec < 0) continue;
 			const at = this.startTime + offsetSec;
-			const value = point.value;
-			if (value === lastValue) continue;
+			const multiplier = point.value;
+
+			if (multiplier === lastMultiplier) continue;
+
+			// Target gain = base volume × envelope multiplier
+			const targetGain = baseVolume * multiplier;
+
 			switch (point.curve) {
 				case "easeIn":
 					gainNode.gain.exponentialRampToValueAtTime(
-						Math.max(value, 0.0001),
+						Math.max(targetGain, 0.0001), // Avoid 0 for exponential
 						Math.max(at, now),
 					);
 					break;
 				case "easeOut":
 				case "sCurve":
 				default:
-					gainNode.gain.linearRampToValueAtTime(value, Math.max(at, now));
+					gainNode.gain.linearRampToValueAtTime(targetGain, Math.max(at, now));
 					break;
 			}
-			lastValue = value;
+			lastMultiplier = multiplier;
 		}
 	}
 

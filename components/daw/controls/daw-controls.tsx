@@ -185,7 +185,7 @@ export function DAWControls() {
 					className={`flex items-center gap-3 ${DAW_BUTTONS.PANEL} px-3 py-1.5`}
 				>
 					<span className={`${DAW_TEXT.MONO_TIME} min-w-14`}>
-			{formatDuration(playback.currentTime)}
+						{formatDuration(playback.currentTime)}
 					</span>
 					<div className="relative flex-1">
 						<input
@@ -205,7 +205,7 @@ export function DAWControls() {
 						/>
 					</div>
 					<span className={`${DAW_TEXT.MONO_TIME} min-w-14`}>
-			{formatDuration(totalDuration)}
+						{formatDuration(totalDuration)}
 					</span>
 				</div>
 			</div>
