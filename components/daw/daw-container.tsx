@@ -32,6 +32,7 @@ import {
 	verticalScrollAtom,
 } from "@/lib/state/daw-store";
 import { AudioTestPanel } from "./audio-test-panel";
+import { ClipInspectorSheet } from "./clip-inspector-sheet";
 import { DAWControls } from "./daw-controls";
 import { DAWTimeline } from "./daw-timeline";
 import { DAWToolbar } from "./daw-toolbar";
@@ -280,6 +281,7 @@ export function DAWContainer() {
 			<DAWToolbar />
 			{/* Global keyboard shortcuts */}
 			<GlobalShortcuts />
+ 			<ClipInspectorSheet />
 
 			{/* Main DAW Interface */}
 			<div className="flex-1 flex flex-col overflow-hidden">

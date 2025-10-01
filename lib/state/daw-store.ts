@@ -44,6 +44,11 @@ export type TrackEnvelope = {
 	points: TrackEnvelopePoint[];
 };
 
+export type ClipInspectorTarget = {
+	trackId: string;
+	clipId: string;
+} | null;
+
 const ENVELOPE_GAIN_MIN = 0;
 const ENVELOPE_GAIN_MAX = 4;
 
@@ -132,6 +137,8 @@ export const trackHeightZoomAtom = atom(1.0); // Track height zoom level (1.0 = 
 
 export const selectedTrackIdAtom = atom<string | null>(null);
 export const selectedClipIdAtom = atom<string | null>(null);
+export const clipInspectorOpenAtom = atom(false);
+export const clipInspectorTargetAtom = atom<ClipInspectorTarget>(null);
 export const activeToolAtom = atom<Tool>("pointer");
 export const projectNameAtom = atomWithStorage<string>(
 	"daw-project-name",

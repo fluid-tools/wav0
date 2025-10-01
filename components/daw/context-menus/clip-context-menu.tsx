@@ -9,6 +9,10 @@ import {
 	ContextMenuSeparator,
 	ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import {
+	clipInspectorOpenAtom,
+	clipInspectorTargetAtom,
+} from "@/lib/state/daw-store";
 import { Input } from "@/components/ui/input";
 import {
 	removeClipAtom,
@@ -36,6 +40,8 @@ export function ClipContextMenu({
 	const [, setSelectedClipId] = useAtom(selectedClipIdAtom);
 	const [, renameClip] = useAtom(renameClipAtom);
 	const [, removeClip] = useAtom(removeClipAtom);
+const [, setInspectorOpen] = useAtom(clipInspectorOpenAtom);
+const [, setInspectorTarget] = useAtom(clipInspectorTargetAtom);
 	const [editing, setEditing] = useState(false);
 	const [draftName, setDraftName] = useState(clipName);
 
@@ -92,6 +98,15 @@ export function ClipContextMenu({
 					</ContextMenuItem>
 				)}
 				<ContextMenuSeparator />
+			<ContextMenuItem
+				onClick={() => {
+					setInspectorTarget({ trackId, clipId });
+					setInspectorOpen(true);
+				}}
+			>
+				Info…
+			</ContextMenuItem>
+			<ContextMenuSeparator />
 				<ContextMenuItem
 					onClick={() => removeClip(trackId, clipId)}
 					variant="destructive"
