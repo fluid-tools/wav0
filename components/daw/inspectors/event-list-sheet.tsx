@@ -1,11 +1,18 @@
 "use client";
 
 import { useAtom } from "jotai";
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import {
 	Sheet,
 	SheetClose,
@@ -15,21 +22,14 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from "@/components/ui/sheet";
+import type { Clip, Track } from "@/lib/state/daw-store";
 import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
-import { 
-	clipInspectorOpenAtom, 
+	clipInspectorOpenAtom,
 	clipInspectorTargetAtom,
 	eventListOpenAtom,
-	tracksAtom 
+	tracksAtom,
 } from "@/lib/state/daw-store";
 import { formatDuration } from "@/lib/storage/opfs";
-import type { Clip, Track } from "@/lib/state/daw-store";
 
 type EventRow = {
 	trackId: string;
@@ -43,7 +43,7 @@ export function EventListSheet() {
 	const [tracks] = useAtom(tracksAtom);
 	const [, setClipInspectorOpen] = useAtom(clipInspectorOpenAtom);
 	const [, setClipInspectorTarget] = useAtom(clipInspectorTargetAtom);
-	
+
 	const [filterTrack, setFilterTrack] = useState<string>("all");
 	const [searchTerm, setSearchTerm] = useState("");
 
@@ -68,8 +68,9 @@ export function EventListSheet() {
 	// Apply filters
 	const filteredEvents = useMemo(() => {
 		return allEvents.filter((event) => {
-			const matchesTrack = filterTrack === "all" || event.trackId === filterTrack;
-			const matchesSearch = 
+			const matchesTrack =
+				filterTrack === "all" || event.trackId === filterTrack;
+			const matchesSearch =
 				searchTerm === "" ||
 				event.clip.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
 				event.trackName.toLowerCase().includes(searchTerm.toLowerCase());
@@ -84,7 +85,11 @@ export function EventListSheet() {
 
 	const totalDuration = useMemo(() => {
 		if (allEvents.length === 0) return 0;
-		return Math.max(...allEvents.map(e => e.clip.startTime + (e.clip.trimEnd - e.clip.trimStart)));
+		return Math.max(
+			...allEvents.map(
+				(e) => e.clip.startTime + (e.clip.trimEnd - e.clip.trimStart),
+			),
+		);
 	}, [allEvents]);
 
 	return (
@@ -98,7 +103,8 @@ export function EventListSheet() {
 						Event List
 					</SheetTitle>
 					<SheetDescription className="text-sm text-muted-foreground">
-						View all clips and events in your project. Click any event to edit it.
+						View all clips and events in your project. Click any event to edit
+						it.
 					</SheetDescription>
 				</SheetHeader>
 
@@ -137,9 +143,7 @@ export function EventListSheet() {
 					<div className="px-6 py-4">
 						{filteredEvents.length === 0 ? (
 							<div className="flex flex-col items-center justify-center py-12 text-center">
-								<p className="text-sm text-muted-foreground">
-									No events found
-								</p>
+								<p className="text-sm text-muted-foreground">No events found</p>
 								<p className="mt-1 text-xs text-muted-foreground">
 									{searchTerm || filterTrack !== "all"
 										? "Try adjusting your filters"
@@ -161,11 +165,13 @@ export function EventListSheet() {
 								{/* Table Rows */}
 								{filteredEvents.map((event) => {
 									const length = event.clip.trimEnd - event.clip.trimStart;
-									
+
 									return (
 										<button
 											key={`${event.trackId}-${event.clip.id}`}
-											onClick={() => handleEditClip(event.trackId, event.clip.id)}
+											onClick={() =>
+												handleEditClip(event.trackId, event.clip.id)
+											}
 											className="grid w-full grid-cols-[140px_160px_1fr_100px_100px_80px] gap-3 rounded-md border border-transparent px-3 py-2.5 text-left text-sm transition-colors hover:border-primary/40 hover:bg-accent/30"
 										>
 											<div className="font-mono text-foreground">
@@ -217,4 +223,3 @@ export function EventListSheet() {
 		</Sheet>
 	);
 }
-

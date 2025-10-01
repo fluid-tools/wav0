@@ -113,7 +113,8 @@ export function EnvelopeEditor({
 						Base: {formatDb(volumeToDb(trackVolume), 1)}
 					</span>
 					<span className="text-muted-foreground">
-						{sortedPoints.length} automation point{sortedPoints.length !== 1 ? "s" : ""}
+						{sortedPoints.length} automation point
+						{sortedPoints.length !== 1 ? "s" : ""}
 					</span>
 				</div>
 
@@ -210,7 +211,9 @@ export function EnvelopeEditor({
 													const db = Number(event.target.value) || 0;
 													const clamped = clampAutomationDb(db);
 													const multiplier = dbToMultiplier(clamped);
-													handlePointChange(originalIndex, { value: multiplier });
+													handlePointChange(originalIndex, {
+														value: multiplier,
+													});
 												}}
 												className="h-9 font-mono text-xs"
 												aria-label="Gain in decibels"

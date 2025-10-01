@@ -150,7 +150,10 @@ export class PlaybackEngine {
 				case "easeOut":
 				case "sCurve":
 				default:
-					envelopeGain.gain.linearRampToValueAtTime(targetGain, Math.max(at, now));
+					envelopeGain.gain.linearRampToValueAtTime(
+						targetGain,
+						Math.max(at, now),
+					);
 					break;
 			}
 			lastMultiplier = multiplier;
