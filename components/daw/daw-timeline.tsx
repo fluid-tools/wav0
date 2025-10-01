@@ -64,10 +64,11 @@ export function DAWTimeline() {
 			time * pixelsPerSecond < timelineWidth;
 			time += secondsPerMarker
 		) {
+			const timestampMs = time * 1000;
 			markers.push({
-				time: time * 1000, // Convert to ms
+				time: timestampMs,
 				position: time * pixelsPerSecond,
-				label: formatDuration(time),
+				label: formatDuration(timestampMs),
 			});
 		}
 
