@@ -10,6 +10,14 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import {
+	clampAutomationDb,
+	dbToMultiplier,
+	formatDb,
+	getEffectiveDb,
+	multiplierToDb,
+	volumeToDb,
+} from "@/lib/audio/volume";
 import type { TrackEnvelopePoint } from "@/lib/state/daw-store";
 import { formatDuration } from "@/lib/storage/opfs";
 
@@ -100,9 +108,13 @@ export function EnvelopeEditor({
 			</header>
 
 			<div className="rounded-lg border border-border/50 bg-background/50 p-3">
-				<div className="mb-3 flex items-center justify-between text-xs text-muted-foreground">
-					<span>Base volume: {trackVolume}%</span>
-					<span>{sortedPoints.length} automation points</span>
+				<div className="mb-3 flex items-center justify-between text-xs">
+					<span className="text-muted-foreground">
+						Base: {formatDb(volumeToDb(trackVolume), 1)}
+					</span>
+					<span className="text-muted-foreground">
+						{sortedPoints.length} automation point{sortedPoints.length !== 1 ? "s" : ""}
+					</span>
 				</div>
 
 				{sortedPoints.length === 0 ? (
@@ -116,9 +128,11 @@ export function EnvelopeEditor({
 					</div>
 				) : (
 					<div className="space-y-2">
-						{sortedPoints.map((point, index) => {
+						{sortedPoints.map((point) => {
 							const originalIndex = points.findIndex((p) => p.id === point.id);
-							const effectiveVolume = Math.round(trackVolume * point.value);
+							const envelopeDb = multiplierToDb(point.value);
+							const effectiveDb = getEffectiveDb(trackVolume, point.value);
+							const isUnity = Math.abs(point.value - 1.0) < 0.01;
 
 							return (
 								<div
@@ -131,14 +145,14 @@ export function EnvelopeEditor({
 												<span className="font-mono text-sm font-medium text-foreground">
 													{formatDuration(point.time)}
 												</span>
-												<span className="text-xs text-muted-foreground">
-													→ {effectiveVolume}%
+												<span className="text-sm font-semibold text-foreground">
+													→ {formatDb(effectiveDb, 1)}
 												</span>
 											</div>
 											<div className="mt-0.5 text-xs text-muted-foreground">
-												{point.value === 1.0
-													? "Base volume"
-													: `${Math.round(point.value * 100)}% of base (${trackVolume}%)`}
+												{isUnity
+													? "Unity gain (no change)"
+													: `${formatDb(envelopeDb, 1)} envelope`}
 											</div>
 										</div>
 										<Button
@@ -174,31 +188,33 @@ export function EnvelopeEditor({
 														time: Number(event.target.value) || 0,
 													})
 												}
-												className="h-9"
+												className="h-9 font-mono text-xs"
 												aria-label="Time in milliseconds"
 											/>
 										</div>
 										<div className="space-y-1.5">
 											<label
 												className="text-xs font-medium text-muted-foreground"
-												htmlFor={`envelope-gain-${point.id}`}
+												htmlFor={`envelope-db-${point.id}`}
 											>
-												Multiplier (%)
+												Gain (dB)
 											</label>
 											<Input
-												id={`envelope-gain-${point.id}`}
+												id={`envelope-db-${point.id}`}
 												type="number"
-												min={0}
-												max={400}
-												step={5}
-												value={Math.round(point.value * 100)}
-												onChange={(event) =>
-													handlePointChange(originalIndex, {
-														value: (Number(event.target.value) || 0) / 100,
-													})
-												}
-												className="h-9"
-												aria-label="Volume multiplier percentage"
+												min={-60}
+												max={12}
+												step={0.5}
+												value={Number(multiplierToDb(point.value).toFixed(1))}
+												onChange={(event) => {
+													const db = Number(event.target.value) || 0;
+													const clamped = clampAutomationDb(db);
+													const multiplier = dbToMultiplier(clamped);
+													handlePointChange(originalIndex, { value: multiplier });
+												}}
+												className="h-9 font-mono text-xs"
+												aria-label="Gain in decibels"
+												title={`${formatDb(envelopeDb, 1)} envelope · ${formatDb(effectiveDb, 1)} effective`}
 											/>
 										</div>
 										<div className="space-y-1.5">
