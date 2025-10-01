@@ -2,6 +2,7 @@
 
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { getEffectiveDb, multiplierToDb } from "@/lib/audio/volume";
 import type { Track, TrackEnvelopePoint } from "@/lib/state/daw-store";
 import {
@@ -30,28 +31,48 @@ export function AutomationLane({
 		pointId: string;
 		startY: number;
 		startValue: number;
+		pointerId: number;
+	} | null>(null);
+	const [selectedSegment, setSelectedSegment] = useState<{
+		fromPointId: string;
+		toPointId: string;
+		x: number;
+		y: number;
 	} | null>(null);
 	const svgRef = useRef<SVGSVGElement>(null);
+	const isDraggingRef = useRef(false);
 
 	const envelope = track.volumeEnvelope;
 
 	// Hooks must be called unconditionally
 	const handlePointPointerDown = useCallback(
 		(point: TrackEnvelopePoint, e: React.PointerEvent) => {
+			e.preventDefault();
 			e.stopPropagation();
+			
+			isDraggingRef.current = true;
 			e.currentTarget.setPointerCapture(e.pointerId);
+			
 			setDraggingPoint({
 				pointId: point.id,
 				startY: e.clientY,
 				startValue: point.value,
+				pointerId: e.pointerId,
 			});
+
+			// Emit event to lock grid drag
+			window.dispatchEvent(new CustomEvent("wav0:automation-drag-start"));
 		},
 		[],
 	);
 
 	const handlePointerMove = useCallback(
 		(e: React.PointerEvent) => {
-			if (!draggingPoint || !svgRef.current) return;
+			if (!draggingPoint || !isDraggingRef.current) return;
+			if (e.pointerId !== draggingPoint.pointerId) return;
+
+			e.preventDefault();
+			e.stopPropagation();
 
 			const padding = 20;
 			const usableHeight = trackHeight - padding * 2;
@@ -81,32 +102,85 @@ export function AutomationLane({
 		[draggingPoint, trackHeight, envelope, track.id, updateTrack],
 	);
 
-	const handlePointerUp = useCallback(() => {
-		setDraggingPoint(null);
-	}, []);
+	const handlePointerUp = useCallback((e: React.PointerEvent) => {
+		if (draggingPoint && e.pointerId === draggingPoint.pointerId) {
+			isDraggingRef.current = false;
+			setDraggingPoint(null);
+			// Emit event to unlock grid drag
+			window.dispatchEvent(new CustomEvent("wav0:automation-drag-end"));
+		}
+	}, [draggingPoint]);
+
+	// Handle segment right-click for curve type selection
+	const handleSegmentContextMenu = useCallback(
+		(fromPointId: string, toPointId: string, e: React.MouseEvent) => {
+			e.preventDefault();
+			e.stopPropagation();
+			setSelectedSegment({
+				fromPointId,
+				toPointId,
+				x: e.clientX,
+				y: e.clientY,
+			});
+		},
+		[],
+	);
+
+	// Change curve type for selected segment
+	const setCurveType = useCallback(
+		(curveType: TrackEnvelopePoint["curve"]) => {
+			if (!selectedSegment || !envelope) return;
+
+			const updatedPoints = envelope.points.map((p) =>
+				p.id === selectedSegment.toPointId ? { ...p, curve: curveType } : p,
+			);
+
+			updateTrack(track.id, {
+				volumeEnvelope: {
+					...envelope,
+					points: updatedPoints,
+				},
+			});
+
+			setSelectedSegment(null);
+		},
+		[selectedSegment, envelope, track.id, updateTrack],
+	);
 
 	// Lock scroll while dragging automation point
 	useEffect(() => {
 		if (!draggingPoint) return;
 
+		// Prevent all scroll/touch events during drag
 		const preventScroll = (e: Event) => {
 			e.preventDefault();
+			e.stopPropagation();
 		};
 
-		// Prevent scroll on the grid container
-		const gridContainer = document.querySelector("[data-daw-grid]");
-		if (gridContainer) {
-			gridContainer.addEventListener("wheel", preventScroll, {
-				passive: false,
-			});
-		}
+		// Add global event listeners to prevent scroll
+		document.addEventListener("wheel", preventScroll, { passive: false });
+		document.addEventListener("touchmove", preventScroll, { passive: false });
+
+		// Prevent default drag behavior
+		document.body.style.overflow = "hidden";
+		document.body.style.userSelect = "none";
 
 		return () => {
-			if (gridContainer) {
-				gridContainer.removeEventListener("wheel", preventScroll);
-			}
+			document.removeEventListener("wheel", preventScroll);
+			document.removeEventListener("touchmove", preventScroll);
+			document.body.style.overflow = "";
+			document.body.style.userSelect = "";
 		};
 	}, [draggingPoint]);
+
+	// Close context menu on click away
+	useEffect(() => {
+		if (!selectedSegment) return;
+
+		const closeMenu = () => setSelectedSegment(null);
+		document.addEventListener("click", closeMenu);
+		return () => document.removeEventListener("click", closeMenu);
+	}, [selectedSegment]);
 
 	// Don't render if automation view disabled
 	if (!automationViewEnabled) {
@@ -197,6 +271,7 @@ export function AutomationLane({
 	}
 
 	return (
+		<>
 		<svg
 			ref={svgRef}
 			className="pointer-events-auto absolute inset-0"
@@ -215,6 +290,45 @@ export function AutomationLane({
 				strokeOpacity={0.8}
 				vectorEffect="non-scaling-stroke"
 			/>
+
+			{/* Interactive segments for curve type selection */}
+			{sorted.map((point, index) => {
+				if (index === 0) return null; // No segment before first point
+
+				const prevPoint = sorted[index - 1];
+				const x1 = prevPoint.time * pxPerMs;
+				const y1 =
+					trackHeight -
+					padding -
+					(Math.max(0, Math.min(4, prevPoint.value)) / 4) * usableHeight;
+				const x2 = point.time * pxPerMs;
+				const y2 =
+					trackHeight -
+					padding -
+					(Math.max(0, Math.min(4, point.value)) / 4) * usableHeight;
+
+				// Create a thick invisible path for easier clicking
+				return (
+					<g
+						key={`segment-${prevPoint.id}-${point.id}`}
+						onContextMenu={(e) =>
+							handleSegmentContextMenu(prevPoint.id, point.id, e)
+						}
+						className="cursor-context-menu"
+					>
+						<line
+							x1={x1}
+							y1={y1}
+							x2={x2}
+							y2={y2}
+							stroke="transparent"
+							strokeWidth={12}
+							style={{ pointerEvents: "stroke" }}
+						/>
+						<title>Right-click to change curve type</title>
+					</g>
+				);
+			})}
 
 			{/* Automation points (draggable) */}
 			{sorted.map((point) => {
@@ -271,6 +385,61 @@ export function AutomationLane({
 					style={{ filter: "drop-shadow(0 0 4px rgba(239, 68, 68, 0.8))" }}
 				/>
 			)}
+
 		</svg>
+		{/* Curve type context menu - rendered as portal */}
+		{selectedSegment &&
+			typeof document !== "undefined" &&
+			createPortal(
+				<div
+					className="fixed"
+					style={{
+						left: selectedSegment.x,
+						top: selectedSegment.y,
+						zIndex: 9999,
+					}}
+					onClick={(e) => e.stopPropagation()}
+				>
+					<div className="rounded-lg border border-border bg-popover p-1 shadow-xl">
+						<div className="text-xs font-medium text-muted-foreground px-2 py-1 border-b border-border/50 mb-1">
+							Curve Type
+						</div>
+						<button
+							type="button"
+							onClick={() => setCurveType("linear")}
+							className="w-full rounded px-3 py-1.5 text-left text-sm hover:bg-accent transition-colors flex items-center gap-2"
+						>
+							<span className="text-xs opacity-50">—</span>
+							<span>Linear</span>
+						</button>
+						<button
+							type="button"
+							onClick={() => setCurveType("easeIn")}
+							className="w-full rounded px-3 py-1.5 text-left text-sm hover:bg-accent transition-colors flex items-center gap-2"
+						>
+							<span className="text-xs opacity-50">↗</span>
+							<span>Ease In</span>
+						</button>
+						<button
+							type="button"
+							onClick={() => setCurveType("easeOut")}
+							className="w-full rounded px-3 py-1.5 text-left text-sm hover:bg-accent transition-colors flex items-center gap-2"
+						>
+							<span className="text-xs opacity-50">↘</span>
+							<span>Ease Out</span>
+						</button>
+						<button
+							type="button"
+							onClick={() => setCurveType("sCurve")}
+							className="w-full rounded px-3 py-1.5 text-left text-sm hover:bg-accent transition-colors flex items-center gap-2"
+						>
+							<span className="text-xs opacity-50">~</span>
+							<span>S-Curve</span>
+						</button>
+					</div>
+				</div>,
+				document.body,
+			)}
+	</>
 	);
 }

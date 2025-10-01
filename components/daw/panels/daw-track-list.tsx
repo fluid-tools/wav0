@@ -289,12 +289,17 @@ export function DAWTrackList() {
 												setTrackAutomationTypes(newMap);
 											}}
 										>
-											<SelectTrigger className="h-7 w-20 text-xs" aria-label="Automation type">
+											<SelectTrigger
+												className="h-7 w-20 text-xs"
+												aria-label="Automation type"
+											>
 												<SelectValue />
 											</SelectTrigger>
 											<SelectContent>
 												<SelectItem value="volume">Vol</SelectItem>
-												<SelectItem value="pan" disabled>Pan</SelectItem>
+												<SelectItem value="pan" disabled>
+													Pan
+												</SelectItem>
 											</SelectContent>
 										</Select>
 									)}
