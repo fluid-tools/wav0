@@ -14,8 +14,8 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from "@/components/ui/sheet";
-import { formatDuration } from "@/lib/storage/opfs";
 import { useClipInspector } from "@/lib/hooks/use-clip-inspector";
+import { formatDuration } from "@/lib/storage/opfs";
 import { EnvelopeEditor } from "./envelope-editor";
 import { InspectorCard, InspectorSection } from "./inspector-section";
 
@@ -150,6 +150,7 @@ export function ClipInspectorSheet() {
 										onChange={handleEnvelopeChange}
 										onSave={handleEnvelopeSave}
 										clipStartTime={clip.startTime}
+										trackVolume={track.volume}
 									/>
 								) : (
 									<p className="rounded-xl border border-dashed border-border/60 bg-background/40 p-4 text-xs text-muted-foreground">

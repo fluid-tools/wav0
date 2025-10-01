@@ -44,4 +44,3 @@ export function InspectorCard({ children, className }: InspectorCardProps) {
 		</div>
 	);
 }
-

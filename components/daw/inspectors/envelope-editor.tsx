@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, X } from "lucide-react";
+import { MoveVertical, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -11,12 +11,14 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import type { TrackEnvelopePoint } from "@/lib/state/daw-store";
+import { formatDuration } from "@/lib/storage/opfs";
 
 type EnvelopeEditorProps = {
 	points: TrackEnvelopePoint[];
 	onChange: (points: TrackEnvelopePoint[]) => void;
 	onSave: () => void;
 	clipStartTime: number;
+	trackVolume: number;
 };
 
 const curveItems = [
@@ -31,6 +33,7 @@ export function EnvelopeEditor({
 	onChange,
 	onSave,
 	clipStartTime,
+	trackVolume,
 }: EnvelopeEditorProps) {
 	const handlePointChange = (
 		index: number,
@@ -48,146 +51,207 @@ export function EnvelopeEditor({
 	};
 
 	const handlePointAdd = () => {
-		const last = points.at(-1);
-		const nextTime = last ? last.time + 500 : clipStartTime;
+		const sortedPoints = [...points].sort((a, b) => a.time - b.time);
+		const last = sortedPoints.at(-1);
+		const nextTime = last ? last.time + 1000 : clipStartTime;
 		onChange([
 			...points,
 			{
 				id: crypto.randomUUID(),
 				time: nextTime,
-				value: 1.0,
+				value: 1.0, // 100% = no change from base volume
 				curve: "linear",
 			},
 		]);
 	};
 
+	const sortedPoints = [...points].sort((a, b) => a.time - b.time);
+
 	return (
-		<div className="space-y-3 rounded-xl border border-dashed border-primary/40 bg-background/40 p-4">
+		<div className="space-y-4 rounded-xl border border-dashed border-primary/40 bg-background/40 p-4">
 			<header className="flex items-center justify-between">
-				<div className="text-xs font-medium text-muted-foreground">
-					Envelope points · {points.length}
+				<div className="flex items-center gap-2">
+					<MoveVertical className="size-4 text-muted-foreground" />
+					<div className="text-sm font-medium text-foreground">
+						Volume Automation
+					</div>
 				</div>
 				<div className="flex items-center gap-2">
-				<Button
-					variant="ghost"
-					size="icon-sm"
-					onClick={handlePointAdd}
-					title="Add envelope point"
-					aria-label="Add envelope point"
-				>
-					<Plus className="size-4" />
-					<span className="sr-only">Add envelope point</span>
-				</Button>
-				<Button
-					variant="outline"
-					size="xs"
-					onClick={onSave}
-					title="Save envelope changes"
-					aria-label="Save envelope changes"
-				>
-					Save
-				</Button>
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						onClick={handlePointAdd}
+						title="Add envelope point"
+						aria-label="Add envelope point"
+					>
+						<Plus className="size-4" />
+						<span className="sr-only">Add envelope point</span>
+					</Button>
+					<Button
+						variant="outline"
+						size="xs"
+						onClick={onSave}
+						title="Save envelope changes"
+						aria-label="Save envelope changes"
+					>
+						Save
+					</Button>
 				</div>
 			</header>
 
-			<div className="space-y-3">
-				{points.length === 0 ? (
-					<p className="text-xs text-muted-foreground">
-						No points yet. Add one to begin shaping the gain curve.
-					</p>
+			<div className="rounded-lg border border-border/50 bg-background/50 p-3">
+				<div className="mb-3 flex items-center justify-between text-xs text-muted-foreground">
+					<span>Base volume: {trackVolume}%</span>
+					<span>{sortedPoints.length} automation points</span>
+				</div>
+
+				{sortedPoints.length === 0 ? (
+					<div className="py-8 text-center">
+						<p className="text-sm text-muted-foreground">
+							No automation points yet
+						</p>
+						<p className="mt-1 text-xs text-muted-foreground">
+							Click + to add points and shape your volume curve
+						</p>
+					</div>
 				) : (
-					points.map((point, index) => (
-						<div
-							key={point.id}
-							className="grid gap-2 rounded-lg border border-border/50 bg-background/70 px-3 py-3 sm:grid-cols-[1fr_1fr_1fr_auto]"
-						>
-							<div className="space-y-1">
-								<label
-									className="text-[10px] uppercase tracking-wide text-muted-foreground"
-									htmlFor={`envelope-time-${point.id}`}
+					<div className="space-y-2">
+						{sortedPoints.map((point, index) => {
+							const originalIndex = points.findIndex((p) => p.id === point.id);
+							const effectiveVolume = Math.round(trackVolume * point.value);
+
+							return (
+								<div
+									key={point.id}
+									className="group relative rounded-lg border border-border/40 bg-background p-3 transition-colors hover:border-primary/40 hover:bg-accent/30"
 								>
-									Time (ms)
-								</label>
-								<Input
-									id={`envelope-time-${point.id}`}
-									type="number"
-									min={0}
-									value={Math.round(point.time)}
-									onChange={(event) =>
-										handlePointChange(index, {
-											time: Number(event.target.value) || 0,
-										})
-									}
-								/>
-							</div>
-							<div className="space-y-1">
-								<label
-									className="text-[10px] uppercase tracking-wide text-muted-foreground"
-									htmlFor={`envelope-gain-${point.id}`}
-								>
-									Gain (%)
-								</label>
-								<Input
-									id={`envelope-gain-${point.id}`}
-									type="number"
-									min={0}
-									max={400}
-									value={Math.round(point.value * 100)}
-									onChange={(event) =>
-										handlePointChange(index, {
-											value: (Number(event.target.value) || 0) / 100,
-										})
-									}
-								/>
-							</div>
-							<div className="space-y-1">
-								<label
-									className="text-[10px] uppercase tracking-wide text-muted-foreground"
-									htmlFor={`envelope-curve-${point.id}`}
-								>
-									Curve
-								</label>
-								<Select
-									value={point.curve ?? "linear"}
-									onValueChange={(value) =>
-										handlePointChange(index, {
-											curve: value as TrackEnvelopePoint["curve"],
-										})
-									}
-								>
-									<SelectTrigger
-										className="h-9 text-sm"
-										id={`envelope-curve-${point.id}`}
-									>
-										<SelectValue placeholder="Curve" />
-									</SelectTrigger>
-									<SelectContent>
-										{curveItems.map((item) => (
-											<SelectItem key={item.value} value={item.value}>
-												{item.label}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-							</div>
-							<div className="flex items-end justify-end">
-							<Button
-								variant="ghost"
-								size="icon-sm"
-								onClick={() => handlePointRemove(index)}
-								disabled={points.length <= 1}
-								title="Remove point"
-								aria-label={`Remove envelope point at ${Math.round(point.time)}ms`}
-							>
-								<X className="size-4" />
-								<span className="sr-only">Remove point</span>
-							</Button>
-							</div>
-						</div>
-					))
+									<div className="mb-2 flex items-start justify-between gap-2">
+										<div className="flex-1">
+											<div className="flex items-baseline gap-2">
+												<span className="font-mono text-sm font-medium text-foreground">
+													{formatDuration(point.time)}
+												</span>
+												<span className="text-xs text-muted-foreground">
+													→ {effectiveVolume}%
+												</span>
+											</div>
+											<div className="mt-0.5 text-xs text-muted-foreground">
+												{point.value === 1.0
+													? "Base volume"
+													: `${Math.round(point.value * 100)}% of base (${trackVolume}%)`}
+											</div>
+										</div>
+										<Button
+											variant="ghost"
+											size="icon-sm"
+											onClick={() => handlePointRemove(originalIndex)}
+											disabled={points.length <= 1}
+											title="Remove point"
+											aria-label={`Remove envelope point at ${formatDuration(point.time)}`}
+											className="opacity-0 transition-opacity group-hover:opacity-100"
+										>
+											<X className="size-4" />
+											<span className="sr-only">Remove point</span>
+										</Button>
+									</div>
+
+									<div className="grid gap-3 sm:grid-cols-3">
+										<div className="space-y-1.5">
+											<label
+												className="text-xs font-medium text-muted-foreground"
+												htmlFor={`envelope-time-${point.id}`}
+											>
+												Time
+											</label>
+											<Input
+												id={`envelope-time-${point.id}`}
+												type="number"
+												min={0}
+												step={100}
+												value={Math.round(point.time)}
+												onChange={(event) =>
+													handlePointChange(originalIndex, {
+														time: Number(event.target.value) || 0,
+													})
+												}
+												className="h-9"
+												aria-label="Time in milliseconds"
+											/>
+										</div>
+										<div className="space-y-1.5">
+											<label
+												className="text-xs font-medium text-muted-foreground"
+												htmlFor={`envelope-gain-${point.id}`}
+											>
+												Multiplier (%)
+											</label>
+											<Input
+												id={`envelope-gain-${point.id}`}
+												type="number"
+												min={0}
+												max={400}
+												step={5}
+												value={Math.round(point.value * 100)}
+												onChange={(event) =>
+													handlePointChange(originalIndex, {
+														value: (Number(event.target.value) || 0) / 100,
+													})
+												}
+												className="h-9"
+												aria-label="Volume multiplier percentage"
+											/>
+										</div>
+										<div className="space-y-1.5">
+											<label
+												className="text-xs font-medium text-muted-foreground"
+												htmlFor={`envelope-curve-${point.id}`}
+											>
+												Curve
+											</label>
+											<Select
+												value={point.curve ?? "linear"}
+												onValueChange={(value) =>
+													handlePointChange(originalIndex, {
+														curve: value as TrackEnvelopePoint["curve"],
+													})
+												}
+											>
+												<SelectTrigger
+													className="h-9 text-sm"
+													id={`envelope-curve-${point.id}`}
+												>
+													<SelectValue placeholder="Curve" />
+												</SelectTrigger>
+												<SelectContent>
+													{curveItems.map((item) => (
+														<SelectItem key={item.value} value={item.value}>
+															{item.label}
+														</SelectItem>
+													))}
+												</SelectContent>
+											</Select>
+										</div>
+									</div>
+								</div>
+							);
+						})}
+					</div>
 				)}
+			</div>
+
+			<div className="rounded-md bg-muted/30 p-3 text-xs text-muted-foreground">
+				<p className="font-medium text-foreground">How automation works:</p>
+				<ul className="mt-2 space-y-1 ml-4 list-disc">
+					<li>
+						Base volume is <strong>{trackVolume}%</strong> (set by main slider)
+					</li>
+					<li>
+						Each point is a <strong>multiplier</strong> of base volume
+					</li>
+					<li>100% = no change, 50% = half volume, 200% = double volume</li>
+					<li>Points are sorted by time automatically</li>
+				</ul>
 			</div>
 		</div>
 	);
 }
-

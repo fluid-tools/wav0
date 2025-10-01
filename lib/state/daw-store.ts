@@ -61,7 +61,7 @@ const createDefaultEnvelope = (volume: number): TrackEnvelope => ({
 		{
 			id: crypto.randomUUID(),
 			time: 0,
-			value: clampEnvelopeGain(volume / 100),
+			value: 1.0, // 100% multiplier = no change from base volume
 			curve: "linear",
 		},
 	],
@@ -413,15 +413,15 @@ export const addTrackAtom = atom(null, (get, set, track: Omit<Track, "id">) => {
 	const newTrack: Track = {
 		...track,
 		id: crypto.randomUUID(),
-	volumeEnvelope: track.volumeEnvelope
-		? {
-			...track.volumeEnvelope,
-			points: track.volumeEnvelope.points.map((point) => ({
-				...point,
-				value: clampEnvelopeGain(point.value),
-			})),
-		}
-		: createDefaultEnvelope(track.volume),
+		volumeEnvelope: track.volumeEnvelope
+			? {
+					...track.volumeEnvelope,
+					points: track.volumeEnvelope.points.map((point) => ({
+						...point,
+						value: clampEnvelopeGain(point.value),
+					})),
+				}
+			: createDefaultEnvelope(track.volume),
 	};
 	set(tracksAtom, [...tracks, newTrack]);
 	return newTrack.id;
@@ -465,8 +465,8 @@ export const updateTrackAtom = atom(
 		set(tracksAtom, updatedTracks);
 
 		const updatedTrack = updatedTracks.find((t) => t.id === trackId);
-	if (!updatedTrack) return;
-	playbackEngine.synchronizeTracks(updatedTracks);
+		if (!updatedTrack) return;
+		playbackEngine.synchronizeTracks(updatedTracks);
 
 		// Volume/mute/solo should reflect immediately without reschedule
 		if (typeof updates.volume === "number") {

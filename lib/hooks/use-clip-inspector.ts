@@ -54,7 +54,7 @@ export function useClipInspector() {
 				{
 					id: crypto.randomUUID(),
 					time: current.clip.startTime,
-					value: (current.track.volume ?? 100) / 100,
+					value: 1.0, // 100% multiplier = no change from base volume
 					curve: "linear" as const,
 				},
 			],
@@ -115,4 +115,3 @@ export function useClipInspector() {
 		MAX_FADE_MS,
 	};
 }
-
