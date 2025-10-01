@@ -16,6 +16,13 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import { dbToVolume, formatDb, volumeToDb } from "@/lib/audio/volume";
 import {
 	DAW_BUTTONS,
@@ -25,10 +32,13 @@ import {
 	DAW_SPACING,
 	DAW_TEXT,
 } from "@/lib/constants/daw-design";
+import type { AutomationType } from "@/lib/state/daw-store";
 import {
+	automationViewEnabledAtom,
 	removeTrackAtom,
 	selectedTrackIdAtom,
 	setTrackHeightZoomAtom,
+	trackAutomationTypeAtom,
 	trackHeightZoomAtom,
 	tracksAtom,
 	updateTrackAtom,
@@ -42,6 +52,10 @@ export function DAWTrackList() {
 	const [, setTrackHeightZoom] = useAtom(setTrackHeightZoomAtom);
 	const [, removeTrack] = useAtom(removeTrackAtom);
 	const [, updateTrack] = useAtom(updateTrackAtom);
+	const [automationViewEnabled] = useAtom(automationViewEnabledAtom);
+	const [trackAutomationTypes, setTrackAutomationTypes] = useAtom(
+		trackAutomationTypeAtom,
+	);
 	const [editingTrackId, setEditingTrackId] = useState<string | null>(null);
 	const [resizingTrack, setResizingTrack] = useState<{
 		startY: number;
@@ -264,6 +278,26 @@ export function DAWTrackList() {
 									>
 										S
 									</button>
+
+									{/* Automation Type Selector - Only show when automation view enabled */}
+									{automationViewEnabled && (
+										<Select
+											value={trackAutomationTypes.get(track.id) || "volume"}
+											onValueChange={(value: AutomationType) => {
+												const newMap = new Map(trackAutomationTypes);
+												newMap.set(track.id, value);
+												setTrackAutomationTypes(newMap);
+											}}
+										>
+											<SelectTrigger className="h-7 w-20 text-xs" aria-label="Automation type">
+												<SelectValue />
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value="volume">Vol</SelectItem>
+												<SelectItem value="pan" disabled>Pan</SelectItem>
+											</SelectContent>
+										</Select>
+									)}
 
 									{/* Volume Controls - More spacious layout */}
 									<div className="flex flex-1 items-center gap-2">

@@ -1,10 +1,11 @@
 "use client";
 
 import { useAtom } from "jotai";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getEffectiveDb, multiplierToDb } from "@/lib/audio/volume";
 import type { Track, TrackEnvelopePoint } from "@/lib/state/daw-store";
 import {
+	automationViewEnabledAtom,
 	playbackAtom,
 	timelinePxPerMsAtom,
 	updateTrackAtom,
@@ -24,6 +25,7 @@ export function AutomationLane({
 	const [pxPerMs] = useAtom(timelinePxPerMsAtom);
 	const [playback] = useAtom(playbackAtom);
 	const [, updateTrack] = useAtom(updateTrackAtom);
+	const [automationViewEnabled] = useAtom(automationViewEnabledAtom);
 	const [draggingPoint, setDraggingPoint] = useState<{
 		pointId: string;
 		startY: number;
@@ -82,6 +84,34 @@ export function AutomationLane({
 	const handlePointerUp = useCallback(() => {
 		setDraggingPoint(null);
 	}, []);
+
+	// Lock scroll while dragging automation point
+	useEffect(() => {
+		if (!draggingPoint) return;
+
+		const preventScroll = (e: Event) => {
+			e.preventDefault();
+		};
+
+		// Prevent scroll on the grid container
+		const gridContainer = document.querySelector("[data-daw-grid]");
+		if (gridContainer) {
+			gridContainer.addEventListener("wheel", preventScroll, {
+				passive: false,
+			});
+		}
+
+		return () => {
+			if (gridContainer) {
+				gridContainer.removeEventListener("wheel", preventScroll);
+			}
+		};
+	}, [draggingPoint]);
+
+	// Don't render if automation view disabled
+	if (!automationViewEnabled) {
+		return null;
+	}
 
 	// Don't render if automation disabled or no points
 	if (!envelope?.enabled || !envelope.points || envelope.points.length === 0) {

@@ -2,6 +2,7 @@
 
 import { useAtom } from "jotai";
 import {
+	Activity,
 	Download,
 	FolderOpen,
 	HelpCircle,
@@ -29,6 +30,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { DAW_HEIGHTS, DAW_ICONS, DAW_TEXT } from "@/lib/constants/daw-design";
 import {
+	automationViewEnabledAtom,
 	eventListOpenAtom,
 	projectNameAtom,
 	tracksAtom,
@@ -38,6 +40,9 @@ export function DAWToolbar() {
 	const [projectName, setProjectName] = useAtom(projectNameAtom);
 	const [tracks] = useAtom(tracksAtom);
 	const [, setEventListOpen] = useAtom(eventListOpenAtom);
+	const [automationViewEnabled, setAutomationViewEnabled] = useAtom(
+		automationViewEnabledAtom,
+	);
 
 	const handleImportAudio = () => {
 		const input = document.createElement("input");
@@ -113,6 +118,21 @@ export function DAWToolbar() {
 				>
 					<List className={DAW_ICONS.MD} />
 					<span className="ml-1 text-xs">Events</span>
+				</Button>
+
+				<Button
+					variant={automationViewEnabled ? "default" : "ghost"}
+					size="sm"
+					onClick={() => setAutomationViewEnabled(!automationViewEnabled)}
+					title="Toggle Automation View (A)"
+					aria-label={
+						automationViewEnabled
+							? "Hide automation curves"
+							: "Show automation curves"
+					}
+				>
+					<Activity className={DAW_ICONS.MD} />
+					<span className="ml-1 text-xs">Auto</span>
 				</Button>
 
 				<Button variant="ghost" size="sm" onClick={handleImportAudio}>
