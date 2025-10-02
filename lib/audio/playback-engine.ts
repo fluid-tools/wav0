@@ -2,7 +2,7 @@
 
 import type { Clip, Track } from "@/lib/state/daw-store";
 import { audioManager } from "./audio-manager";
-import { type CurveType, evaluateCurve } from "./curve-functions";
+import { evaluateCurve } from "./curve-functions";
 
 export interface PlaybackOptions {
 	startTime?: number; // seconds
@@ -118,25 +118,6 @@ export class PlaybackEngine {
 		this.stopClip(trackId, clipId);
 	}
 
-	private transferClipState(
-		sourceTrackId: string,
-		destinationTrackId: string,
-		clipId: string,
-	): ClipPlaybackState | null {
-		const preserved = this.stopClipState(sourceTrackId, clipId);
-		if (!preserved) return null;
-		const dest = this.tracks.get(destinationTrackId);
-		if (!dest) return null;
-		const state = {
-			iterator: null,
-			gainNode: null,
-			audioSources: [],
-			generation: preserved.generation,
-		};
-		dest.clipStates.set(clipId, state);
-		return state;
-	}
-
 	// Safely cancel gain automation from a point in time
 	private cancelGainAutomation(gain: AudioParam, atTime: number): void {
 		gain.cancelScheduledValues(atTime);
@@ -183,7 +164,9 @@ export class PlaybackEngine {
 
 		let lastMultiplier = currentMultiplier;
 		let lastTime = playbackStartMs;
-		const sampleRate = this.audioContext.sampleRate;
+
+		// Track cumulative audio context time to prevent overlaps
+		let cumulativeACTime = now;
 
 		for (const point of futurePoints) {
 			const segmentStart = Math.max(lastTime, playbackStartMs);
@@ -202,8 +185,6 @@ export class PlaybackEngine {
 				continue;
 			}
 
-			const startTimeSec =
-				this.startTime + (segmentStart - playbackStartMs) / 1000;
 			const steps = Math.max(2, Math.ceil(durationSec * 60)); // 60Hz sampling
 			const values = new Float32Array(steps);
 			const previousPoint =
@@ -218,8 +199,16 @@ export class PlaybackEngine {
 					(lastMultiplier + (point.value - lastMultiplier) * curveValue);
 				values[i] = gainValue;
 			}
-			envelopeGain.gain.setValueCurveAtTime(values, startTimeSec, durationSec);
 
+			// Schedule segment starting at cumulative time (prevents overlaps)
+			envelopeGain.gain.setValueCurveAtTime(
+				values,
+				cumulativeACTime,
+				durationSec,
+			);
+
+			// Advance cumulative time for next segment
+			cumulativeACTime += durationSec;
 			lastTime = point.time;
 			lastMultiplier = point.value;
 		}
