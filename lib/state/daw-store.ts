@@ -106,6 +106,14 @@ export type TimelineState = {
 	gridSize: number; // in milliseconds
 };
 
+export type TimelineSection = {
+	id: string;
+	name: string;
+	startTime: number; // milliseconds
+	endTime: number; // milliseconds
+	color: string;
+};
+
 export type Tool = "pointer" | "trim" | "razor";
 
 export type DAWState = {
@@ -131,6 +139,42 @@ export const timelineAtom = atom<TimelineState>({
 	scrollPosition: 0,
 	snapToGrid: true,
 	gridSize: 500, // 0.5s grid for better granularity
+});
+
+export const timelineSectionsAtom = atom<TimelineSection[]>([]);
+
+// Add a new section
+export const addSectionAtom = atom(
+	null,
+	(get, set, section: Omit<TimelineSection, "id">) => {
+		const sections = get(timelineSectionsAtom);
+		const newSection: TimelineSection = {
+			...section,
+			id: crypto.randomUUID(),
+		};
+		set(timelineSectionsAtom, [...sections, newSection]);
+	},
+);
+
+// Update a section
+export const updateSectionAtom = atom(
+	null,
+	(get, set, sectionId: string, updates: Partial<TimelineSection>) => {
+		const sections = get(timelineSectionsAtom);
+		set(
+			timelineSectionsAtom,
+			sections.map((s) => (s.id === sectionId ? { ...s, ...updates } : s)),
+		);
+	},
+);
+
+// Remove a section
+export const removeSectionAtom = atom(null, (get, set, sectionId: string) => {
+	const sections = get(timelineSectionsAtom);
+	set(
+		timelineSectionsAtom,
+		sections.filter((s) => s.id !== sectionId),
+	);
 });
 
 export const trackHeightZoomAtom = atom(1.0); // Track height zoom level (1.0 = 100px default)
