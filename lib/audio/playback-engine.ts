@@ -2,6 +2,7 @@
 
 import type { Clip, Track } from "@/lib/state/daw-store";
 import { audioManager } from "./audio-manager";
+import { applyCurveToParam } from "./curve-functions";
 
 export interface PlaybackOptions {
 	startTime?: number; // seconds
@@ -128,6 +129,7 @@ export class PlaybackEngine {
 			(point) => point.time >= playbackStartMs,
 		);
 		let lastMultiplier = currentMultiplier;
+		let lastTime = playbackStartMs;
 
 		for (const point of futurePoints) {
 			const offsetSec = (point.time - playbackStartMs) / 1000;
@@ -135,26 +137,38 @@ export class PlaybackEngine {
 			const at = this.startTime + offsetSec;
 			const multiplier = point.value;
 
-			if (multiplier === lastMultiplier) continue;
-
-			// Target gain = base volume × envelope multiplier
-			const targetGain = baseVolume * multiplier;
-
-			switch (point.curve) {
-				case "easeIn":
-					envelopeGain.gain.exponentialRampToValueAtTime(
-						Math.max(targetGain, 0.0001), // Avoid 0 for exponential
-						Math.max(at, now),
-					);
-					break;
-				default:
-					envelopeGain.gain.linearRampToValueAtTime(
-						targetGain,
-						Math.max(at, now),
-					);
-					break;
+			if (multiplier === lastMultiplier) {
+				lastTime = point.time;
+				continue;
 			}
+
+			// Calculate duration for curve
+			const duration = (point.time - lastTime) / 1000;
+
+			// Values are gain multipliers (base volume × envelope multiplier)
+			const startValue = baseVolume * lastMultiplier;
+			const endValue = baseVolume * multiplier;
+
+			// Get curve type and shape from previous point (defines transition TO current point)
+			const curveType =
+				sorted[Math.max(0, sorted.indexOf(point) - 1)]?.curve || "linear";
+			const curveShape =
+				sorted[Math.max(0, sorted.indexOf(point) - 1)]?.curveShape ?? 0.5;
+
+			// Apply curve using new system
+			applyCurveToParam(
+				envelopeGain.gain,
+				curveType,
+				startValue,
+				endValue,
+				Math.max(at - duration, now),
+				duration,
+				curveShape,
+				this.audioContext,
+			);
+
 			lastMultiplier = multiplier;
+			lastTime = point.time;
 		}
 	}
 
