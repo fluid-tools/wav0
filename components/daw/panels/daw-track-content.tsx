@@ -3,6 +3,7 @@
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ClipContextMenu } from "@/components/daw/context-menus/clip-context-menu";
+import { ClipFadeHandles } from "@/components/daw/controls/clip-fade-handles";
 import { AutomationLane } from "@/components/daw/panels/automation-lane";
 import { DAW_HEIGHTS } from "@/lib/constants/daw-design";
 import type { Clip } from "@/lib/state/daw-store";
@@ -51,7 +52,9 @@ export function DAWTrackContent() {
 		trackId: string;
 		clipId: string;
 		startX: number;
+		startY: number;
 		startTime: number;
+		originalTrackIndex: number;
 	} | null>(null);
 
 	const [loopDragging, setLoopDragging] = useState<{
@@ -199,6 +202,7 @@ export function DAWTrackContent() {
 
 		let raf = 0;
 		let lastX = 0;
+		let lastY = 0;
 		const schedule = (cb: () => void) => {
 			if (raf) return;
 			raf = requestAnimationFrame(() => {
@@ -210,6 +214,7 @@ export function DAWTrackContent() {
 		const onMove = (e: MouseEvent) => {
 			lastPointer.current = { clientX: e.clientX };
 			lastX = e.clientX;
+			lastY = e.clientY;
 			schedule(() => {
 				if (resizingClip) {
 					const deltaX = lastX - resizingClip.startX;
@@ -251,9 +256,53 @@ export function DAWTrackContent() {
 				}
 
 				if (draggingClip) {
+					// Horizontal movement (time)
 					const deltaX = lastX - draggingClip.startX;
 					const deltaTime = deltaX / pixelsPerMs;
 					const newStartTime = Math.max(0, draggingClip.startTime + deltaTime);
+
+					// Vertical movement (track switching)
+					const deltaY = lastY - draggingClip.startY;
+					const trackHeight = Math.round(DAW_HEIGHTS.TRACK_ROW * trackHeightZoom);
+					const trackIndexOffset = Math.round(deltaY / trackHeight);
+					const newTrackIndex = Math.max(
+						0,
+						Math.min(tracks.length - 1, draggingClip.originalTrackIndex + trackIndexOffset),
+					);
+
+					// Check if we need to move to a different track
+					if (newTrackIndex !== draggingClip.originalTrackIndex) {
+						const newTrack = tracks[newTrackIndex];
+						const oldTrack = tracks.find((t) => t.id === draggingClip.trackId);
+						
+						if (newTrack && oldTrack) {
+							// Find the clip
+							const clip = oldTrack.clips?.find((c) => c.id === draggingClip.clipId);
+							if (clip) {
+								// Remove from old track
+								const updatedOldClips = oldTrack.clips?.filter(
+									(c) => c.id !== draggingClip.clipId,
+								) ?? [];
+								_updateTrack(draggingClip.trackId, { clips: updatedOldClips });
+
+								// Add to new track with updated time
+								const updatedClip = { ...clip, startTime: newStartTime };
+								const updatedNewClips = [...(newTrack.clips ?? []), updatedClip];
+								_updateTrack(newTrack.id, { clips: updatedNewClips });
+
+								// Update dragging state to track new location
+								setDraggingClip({
+									...draggingClip,
+									trackId: newTrack.id,
+									startTime: newStartTime,
+								});
+								setSelectedTrackId(newTrack.id);
+								return;
+							}
+						}
+					}
+
+					// Normal horizontal-only update
 					updateClip(draggingClip.trackId, draggingClip.clipId, {
 						startTime: newStartTime,
 					});
@@ -448,7 +497,9 @@ export function DAWTrackContent() {
 															trackId: track.id,
 															clipId: clip.id,
 															startX: e.clientX,
+															startY: e.clientY,
 															startTime: clip.startTime,
+															originalTrackIndex: index,
 														});
 													}
 												}}
@@ -488,7 +539,9 @@ export function DAWTrackContent() {
 														trackId: track.id,
 														clipId: clip.id,
 														startX: e.clientX,
+														startY: e.clientY,
 														startTime: clip.startTime,
+														originalTrackIndex: index,
 													});
 												}}
 												aria-label="Drag clip"
@@ -536,7 +589,7 @@ export function DAWTrackContent() {
 											/>
 
 											{/* Clip label (Logic-style: top bar with name/duration) */}
-											<div className="absolute left-2 right-2 top-1 flex items-center justify-between gap-2 pointer-events-none">
+											<div className="absolute left-2 right-2 top-1 flex items-center justify-between gap-2 pointer-events-none z-10">
 												<div className="text-[11px] font-medium truncate">
 													{clip.name}
 												</div>
@@ -546,6 +599,18 @@ export function DAWTrackContent() {
 													})}
 												</div>
 											</div>
+
+											{/* Fade Handles */}
+											<ClipFadeHandles
+												clip={clip}
+												clipWidth={clipWidth}
+												pixelsPerMs={pixelsPerMs}
+												isSelected={isSelected}
+												onFadeChange={(clipId, fade, value) => {
+													updateClip(track.id, clipId, { [fade]: value });
+												}}
+											/>
+
 											{/* Reserved center area for waveform */}
 											<div className="absolute inset-x-2 top-5 bottom-2 rounded-sm bg-background/20 pointer-events-none" />
 										</div>
