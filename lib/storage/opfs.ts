@@ -240,7 +240,6 @@ export function formatDuration(
 			return `${minutes}:${secStr}.${msStr}`;
 		case "deciseconds":
 			return `${minutes}:${secStr}.${deciseconds}`;
-		case "seconds":
 		default:
 			return `${minutes}:${secStr}`;
 	}

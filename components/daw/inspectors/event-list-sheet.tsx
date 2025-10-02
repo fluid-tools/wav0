@@ -18,7 +18,6 @@ import {
 	SheetClose,
 	SheetContent,
 	SheetDescription,
-	SheetFooter,
 	SheetHeader,
 	SheetTitle,
 } from "@/components/ui/sheet";
@@ -168,6 +167,7 @@ export function EventListSheet() {
 
 									return (
 										<button
+											type="button"
 											key={`${event.trackId}-${event.clip.id}`}
 											onClick={() =>
 												handleEditClip(event.trackId, event.clip.id)

@@ -44,7 +44,13 @@ export const ClipFadeHandles = memo(function ClipFadeHandles({
 			e.preventDefault();
 			setDraggingFade(fade);
 			dragStartXRef.current = e.clientX;
-			dragStartValueRef.current = clip[fade] ?? 0;
+
+			// Start from the VISUAL value (enforcing minimum)
+			const actualValue = clip[fade] ?? 0;
+			const visualValue =
+				actualValue === 0 ? 0 : Math.max(actualValue, VISUAL_MIN_FADE_MS);
+			dragStartValueRef.current = visualValue;
+
 			(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 
 			// Lock grid panning
@@ -73,10 +79,18 @@ export const ClipFadeHandles = memo(function ClipFadeHandles({
 				newFadeMs = dragStartValueRef.current - deltaMs;
 			}
 
+			// Clamp to valid range first
 			newFadeMs = Math.max(0, Math.min(newFadeMs, maxFadeMs));
 
+			// Enforce visual minimum: snap to 0 or VISUAL_MIN_FADE_MS
 			if (newFadeMs > 0 && newFadeMs < VISUAL_MIN_FADE_MS) {
-				newFadeMs = newFadeMs <= SNAP_THRESHOLD_MS ? 0 : VISUAL_MIN_FADE_MS;
+				// If very close to zero, snap to zero, otherwise enforce minimum
+				if (newFadeMs <= SNAP_THRESHOLD_MS) {
+					newFadeMs = 0;
+				} else {
+					// Enforce minimum: prevent any value between 0 and 500ms
+					newFadeMs = VISUAL_MIN_FADE_MS;
+				}
 			}
 
 			onFadeChange(clip.id, draggingFade, Math.round(newFadeMs));

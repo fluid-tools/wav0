@@ -291,6 +291,8 @@ export function GlobalShortcuts() {
 		updateClip,
 		setSelectedClipId,
 		setSelectedTrackId,
+		automationViewEnabled,
+		setAutomationViewEnabled,
 	]);
 
 	return null;

@@ -147,8 +147,6 @@ export class PlaybackEngine {
 						Math.max(at, now),
 					);
 					break;
-				case "easeOut":
-				case "sCurve":
 				default:
 					envelopeGain.gain.linearRampToValueAtTime(
 						targetGain,

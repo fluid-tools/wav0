@@ -216,7 +216,6 @@ export function DAWTrackList() {
 												}}
 												className="h-6 text-sm px-1 border border-primary rounded"
 												onClick={(e) => e.stopPropagation()}
-												autoFocus
 											/>
 										) : (
 											<span className={`${DAW_TEXT.TRACK_NAME} select-none`}>
