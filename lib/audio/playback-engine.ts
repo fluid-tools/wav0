@@ -2,7 +2,7 @@
 
 import type { Clip, Track } from "@/lib/state/daw-store";
 import { audioManager } from "./audio-manager";
-import { applyCurveToParam } from "./curve-functions";
+import { type CurveType, evaluateCurve } from "./curve-functions";
 
 export interface PlaybackOptions {
 	startTime?: number; // seconds
@@ -80,17 +80,68 @@ export class PlaybackEngine {
 		}
 	}
 
+	private stopClipState(
+		trackId: string,
+		clipId: string,
+	): ClipPlaybackState | null {
+		const trackState = this.tracks.get(trackId);
+		if (!trackState) return null;
+		const clipState = trackState.clipStates.get(clipId);
+		if (!clipState) return null;
+
+		try {
+			clipState.iterator?.return?.(undefined);
+		} catch (error) {
+			console.warn("Failed to close clip iterator", trackId, clipId, error);
+		}
+		clipState.iterator = null;
+		clipState.generation = (clipState.generation ?? 0) + 1;
+
+		for (const node of clipState.audioSources) {
+			try {
+				node.stop();
+			} catch (error) {
+				console.warn("Failed to stop clip source", trackId, clipId, error);
+			}
+		}
+		clipState.audioSources = [];
+		clipState.gainNode?.disconnect?.();
+		trackState.clipStates.delete(clipId);
+		return clipState;
+	}
+
+	stopClip(trackId: string, clipId: string): void {
+		this.stopClipState(trackId, clipId);
+	}
+
+	async stopClipAsync(trackId: string, clipId: string): Promise<void> {
+		this.stopClip(trackId, clipId);
+	}
+
+	private transferClipState(
+		sourceTrackId: string,
+		destinationTrackId: string,
+		clipId: string,
+	): ClipPlaybackState | null {
+		const preserved = this.stopClipState(sourceTrackId, clipId);
+		if (!preserved) return null;
+		const dest = this.tracks.get(destinationTrackId);
+		if (!dest) return null;
+		const state = {
+			iterator: null,
+			gainNode: null,
+			audioSources: [],
+			generation: preserved.generation,
+		};
+		dest.clipStates.set(clipId, state);
+		return state;
+	}
+
 	// Safely cancel gain automation from a point in time
 	private cancelGainAutomation(gain: AudioParam, atTime: number): void {
-		const g = gain as AudioParam & {
-			cancelAndHoldAtTime?: (time: number) => void;
-		};
-		if (typeof g.cancelAndHoldAtTime === "function") {
-			g.cancelAndHoldAtTime(atTime);
-		} else {
-			gain.cancelScheduledValues(atTime);
-			gain.setValueAtTime(gain.value, atTime);
-		}
+		gain.cancelScheduledValues(atTime);
+		// Lock in current value to prevent discontinuities
+		gain.setValueAtTime(gain.value, atTime);
 	}
 
 	private scheduleTrackEnvelope(track: Track): void {
@@ -128,47 +179,49 @@ export class PlaybackEngine {
 		const futurePoints = sorted.filter(
 			(point) => point.time >= playbackStartMs,
 		);
+		if (futurePoints.length === 0) return;
+
 		let lastMultiplier = currentMultiplier;
 		let lastTime = playbackStartMs;
+		const sampleRate = this.audioContext.sampleRate;
 
 		for (const point of futurePoints) {
-			const offsetSec = (point.time - playbackStartMs) / 1000;
-			if (offsetSec < 0) continue;
-			const at = this.startTime + offsetSec;
-			const multiplier = point.value;
-
-			if (multiplier === lastMultiplier) {
+			const segmentStart = Math.max(lastTime, playbackStartMs);
+			const segmentEnd = point.time;
+			if (segmentEnd <= segmentStart) {
 				lastTime = point.time;
+				lastMultiplier = point.value;
 				continue;
 			}
 
-			// Calculate duration for curve
-			const duration = (point.time - lastTime) / 1000;
+			const durationSec = (segmentEnd - segmentStart) / 1000;
+			// Skip zero or near-zero duration segments to avoid overlap errors
+			if (durationSec < 0.001) {
+				lastTime = point.time;
+				lastMultiplier = point.value;
+				continue;
+			}
 
-			// Values are gain multipliers (base volume × envelope multiplier)
-			const startValue = baseVolume * lastMultiplier;
-			const endValue = baseVolume * multiplier;
+			const startTimeSec =
+				this.startTime + (segmentStart - playbackStartMs) / 1000;
+			const steps = Math.max(2, Math.ceil(durationSec * 60)); // 60Hz sampling
+			const values = new Float32Array(steps);
+			const previousPoint =
+				sorted.find((p) => p.time === lastTime) ?? sorted[0];
+			const curveType = previousPoint?.curve ?? "linear";
+			const curveShape = previousPoint?.curveShape ?? 0.5;
+			for (let i = 0; i < steps; i++) {
+				const t = i / (steps - 1);
+				const curveValue = evaluateCurve(curveType, t, curveShape);
+				const gainValue =
+					baseVolume *
+					(lastMultiplier + (point.value - lastMultiplier) * curveValue);
+				values[i] = gainValue;
+			}
+			envelopeGain.gain.setValueCurveAtTime(values, startTimeSec, durationSec);
 
-			// Get curve type and shape from previous point (defines transition TO current point)
-			const curveType =
-				sorted[Math.max(0, sorted.indexOf(point) - 1)]?.curve || "linear";
-			const curveShape =
-				sorted[Math.max(0, sorted.indexOf(point) - 1)]?.curveShape ?? 0.5;
-
-			// Apply curve using new system
-			applyCurveToParam(
-				envelopeGain.gain,
-				curveType,
-				startValue,
-				endValue,
-				Math.max(at - duration, now),
-				duration,
-				curveShape,
-				this.audioContext,
-			);
-
-			lastMultiplier = multiplier;
 			lastTime = point.time;
+			lastMultiplier = point.value;
 		}
 	}
 
@@ -574,18 +627,9 @@ export class PlaybackEngine {
 			this.tracks.set(updatedTrack.id, trackState);
 		}
 
-		// Stop all existing clip iterators/nodes
-		trackState.isPlaying = false;
-		for (const cps of trackState.clipStates.values()) {
-			await cps.iterator?.return?.(undefined);
-			cps.iterator = null;
-			cps.generation = (cps.generation ?? 0) + 1; // invalidate any in-flight schedulers
-			for (const node of [...cps.audioSources]) {
-				try {
-					node.stop();
-				} catch {}
-			}
-			cps.audioSources = [];
+		// Stop all existing clips on this track before rescheduling
+		for (const [clipId] of trackState.clipStates) {
+			this.stopClipState(updatedTrack.id, clipId);
 		}
 
 		// Ensure track gain chain exists
