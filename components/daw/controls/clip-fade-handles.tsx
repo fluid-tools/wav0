@@ -159,7 +159,8 @@ export const ClipFadeHandles = memo(function ClipFadeHandles({
 	// Render fade handle (always visible, even at 0)
 	const renderFadeHandle = (fade: "fadeIn" | "fadeOut") => {
 		const fadeValue = clip[fade] ?? 0;
-		const effectiveFadeMs = fadeValue === 0 ? 0 : Math.max(fadeValue, VISUAL_MIN_FADE_MS);
+		const effectiveFadeMs =
+			fadeValue === 0 ? 0 : Math.max(fadeValue, VISUAL_MIN_FADE_MS);
 		const fadePx = effectiveFadeMs * pixelsPerMs;
 		const hasNoFade = fadeValue === 0;
 		const isDrawerOnly = !hasNoFade && fadeValue < VISUAL_MIN_FADE_MS;
@@ -169,7 +170,7 @@ export const ClipFadeHandles = memo(function ClipFadeHandles({
 		return (
 			<>
 				{/* Overlay & Curve (only if fade > 0) */}
-			{fadeValue > 0 && (
+				{fadeValue > 0 && (
 					<div
 						className="absolute top-0 bottom-0 pointer-events-none z-10"
 						style={{
@@ -209,20 +210,20 @@ export const ClipFadeHandles = memo(function ClipFadeHandles({
 				{/* Draggable handle - always visible */}
 				<button
 					type="button"
-				className={cn(
-					"absolute top-0 bottom-0 cursor-ew-resize pointer-events-auto",
-					"bg-primary transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-					"hover:shadow-[0_0_8px_rgba(var(--primary),0.5)]",
-					hasNoFade &&
-						"border-2 border-dashed border-primary bg-transparent opacity-30",
-					isDrawerOnly &&
-						"after:absolute after:-top-7 after:left-1/2 after:-translate-x-1/2 after:rounded after:bg-amber-500/90 after:px-2 after:py-0.5 after:text-[10px] after:font-medium after:text-black after:content-[\"Drawer-only\"]",
-					isDragging &&
-						"scale-x-150 opacity-100 shadow-[0_0_12px_rgba(var(--primary),0.8)]",
-					!isDragging && !hasNoFade && "opacity-70 hover:opacity-90",
-				)}
+					className={cn(
+						"absolute top-0 bottom-0 cursor-ew-resize pointer-events-auto",
+						"bg-primary transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+						"hover:shadow-[0_0_8px_rgba(var(--primary),0.5)]",
+						hasNoFade &&
+							"border-2 border-dashed border-primary bg-transparent opacity-30",
+						isDrawerOnly &&
+							'after:absolute after:-top-7 after:left-1/2 after:-translate-x-1/2 after:rounded after:bg-amber-500/90 after:px-2 after:py-0.5 after:text-[10px] after:font-medium after:text-black after:content-["Drawer-only"]',
+						isDragging &&
+							"scale-x-150 opacity-100 shadow-[0_0_12px_rgba(var(--primary),0.8)]",
+						!isDragging && !hasNoFade && "opacity-70 hover:opacity-90",
+					)}
 					style={{
-					[isLeft ? "left" : "right"]: hasNoFade ? 0 : fadePx,
+						[isLeft ? "left" : "right"]: hasNoFade ? 0 : fadePx,
 						width: hasNoFade ? "8px" : isDragging ? "4px" : "3px",
 						transform: hasNoFade
 							? `translateX(${isLeft ? "-4px" : "4px"})`
@@ -241,7 +242,7 @@ export const ClipFadeHandles = memo(function ClipFadeHandles({
 					</div>
 
 					{/* Tooltip during drag */}
-				{isDragging && (
+					{isDragging && (
 						<div
 							className="absolute -top-10 left-1/2 -translate-x-1/2 
 						                bg-popover text-popover-foreground px-3 py-1.5 
