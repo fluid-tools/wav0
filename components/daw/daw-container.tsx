@@ -372,9 +372,9 @@ export function DAWContainer() {
 				<DAWControls />
 
 				{/* Temporary Audio Test Panel */}
-				<div className="border-b p-2">
+				{/* <div className="border-b p-2">
 					<AudioTestPanel />
-				</div>
+				</div> */}
 
 				{/* Timeline + Tracks Layout */}
 				<div className="flex-1 flex overflow-hidden">
