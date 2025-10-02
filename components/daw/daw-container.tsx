@@ -21,6 +21,7 @@ import {
 	horizontalScrollAtom,
 	initializeAudioFromOPFSAtom,
 	playbackAtom,
+	playheadAutoFollowEnabledAtom,
 	playheadDraggingAtom,
 	playheadViewportAtom,
 	setTimelineZoomAtom,
@@ -29,6 +30,7 @@ import {
 	timelineWidthAtom,
 	trackHeightZoomAtom,
 	tracksAtom,
+	userIsManuallyScrollingAtom,
 	verticalScrollAtom,
 } from "@/lib/state/daw-store";
 import { DAWControls } from "./controls/daw-controls";
@@ -49,13 +51,19 @@ export function DAWContainer() {
 	const [, addTrack] = useAtom(addTrackAtom);
 	const [, setHorizontalScroll] = useAtom(horizontalScrollAtom);
 	const [, setVerticalScroll] = useAtom(verticalScrollAtom);
-	const [_playback] = useAtom(playbackAtom);
+	const [playback] = useAtom(playbackAtom);
 	const [_timeline] = useAtom(timelineAtom);
 	const [viewport] = useAtom(timelineViewportAtom);
 	const [playheadViewport] = useAtom(playheadViewportAtom);
 	const [isPlayheadDragging] = useAtom(playheadDraggingAtom);
 	const [, initializeAudioFromOPFS] = useAtom(initializeAudioFromOPFSAtom);
 	const [, setTimelineZoom] = useAtom(setTimelineZoomAtom);
+	const [userIsScrolling, setUserIsScrolling] = useAtom(
+		userIsManuallyScrollingAtom,
+	);
+	const [autoFollowEnabled, setAutoFollowEnabled] = useAtom(
+		playheadAutoFollowEnabledAtom,
+	);
 
 	const timelineScrollRef = useRef<HTMLDivElement>(null);
 	const trackListScrollRef = useRef<HTMLDivElement>(null);
@@ -167,7 +175,8 @@ export function DAWContainer() {
 		[scheduleScrollSync, setVerticalScroll],
 	);
 
-	// Track grid scroll handler
+	// Track grid scroll handler with user scroll detection
+	const scrollDebounceRef = useRef<NodeJS.Timeout | null>(null);
 	const onTrackGridScroll = useCallback(
 		(e: React.UIEvent<HTMLDivElement>) => {
 			const target = e.target as HTMLDivElement;
@@ -176,8 +185,44 @@ export function DAWContainer() {
 			scheduleScrollSync(left, top);
 			setHorizontalScroll(left);
 			setVerticalScroll(top);
+
+			// Mark user as scrolling
+			setUserIsScrolling(true);
+			setAutoFollowEnabled(false);
+
+			// Clear existing debounce
+			if (scrollDebounceRef.current) {
+				clearTimeout(scrollDebounceRef.current);
+			}
+
+			// After 500ms of no scrolling, check if playhead is visible
+			scrollDebounceRef.current = setTimeout(() => {
+				setUserIsScrolling(false);
+				
+				// Re-enable auto-follow if playhead is within viewport
+				const controller = gridControllerRef.current;
+				const grid = trackGridScrollRef.current;
+				if (controller && grid) {
+					const x = playheadViewport.absolutePx;
+					const width = grid.clientWidth;
+					const viewportLeft = controller.scrollLeft;
+					const viewportRight = viewportLeft + width;
+					
+					// If playhead is visible, re-enable auto-follow
+					if (x >= viewportLeft && x <= viewportRight) {
+						setAutoFollowEnabled(true);
+					}
+				}
+			}, 500);
 		},
-		[scheduleScrollSync, setHorizontalScroll, setVerticalScroll],
+		[
+			scheduleScrollSync,
+			setHorizontalScroll,
+			setVerticalScroll,
+			setUserIsScrolling,
+			setAutoFollowEnabled,
+			playheadViewport.absolutePx,
+		],
 	);
 
 	useEffect(() => {
@@ -270,25 +315,47 @@ export function DAWContainer() {
 		};
 	}, []);
 
-	// Playhead-follow: keep playhead within center band without fighting manual drags
+	// Smart playhead-follow with user scroll detection
 	useEffect(() => {
 		const controller = gridControllerRef.current;
 		const grid = trackGridScrollRef.current;
 		if (!controller || !grid) return;
+		
+		// Don't auto-scroll if user is dragging playhead
 		if (isPlayheadDragging) return;
+		
+		// Don't auto-scroll if user is manually scrolling
+		if (userIsScrolling) return;
+		
+		// Don't auto-scroll if auto-follow is disabled
+		if (!autoFollowEnabled) return;
+		
+		// Don't auto-scroll if not playing
+		if (!playback.isPlaying) return;
+
 		const x = playheadViewport.absolutePx;
 		if (!Number.isFinite(x)) return;
 		const width = grid.clientWidth;
 		if (width <= 0) return;
 		const left = controller.scrollLeft;
+		
+		// Define center band (35-65% of viewport)
 		const bandLeft = left + width * 0.35;
 		const bandRight = left + width * 0.65;
+		
+		// Auto-scroll to keep playhead centered when it exits the band
 		if (x < bandLeft || x > bandRight) {
 			const target = Math.max(0, x - width * 0.5);
 			if (Math.abs(target - controller.scrollLeft) < 0.5) return;
 			controller.setScroll(target, controller.scrollTop);
 		}
-	}, [isPlayheadDragging, playheadViewport.absolutePx]);
+	}, [
+		isPlayheadDragging,
+		playheadViewport.absolutePx,
+		userIsScrolling,
+		autoFollowEnabled,
+		playback.isPlaying,
+	]);
 
 	return (
 		<div className="h-screen flex flex-col bg-background">

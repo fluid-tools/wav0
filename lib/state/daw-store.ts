@@ -55,7 +55,7 @@ const ENVELOPE_GAIN_MAX = 4;
 const clampEnvelopeGain = (value: number) =>
 	Math.min(ENVELOPE_GAIN_MAX, Math.max(ENVELOPE_GAIN_MIN, value));
 
-const createDefaultEnvelope = (volume: number): TrackEnvelope => ({
+const createDefaultEnvelope = (_volume: number): TrackEnvelope => ({
 	enabled: false,
 	points: [
 		{
@@ -388,6 +388,10 @@ export const timelinePxPerMsAtom = atom(
 
 export const playheadDraggingAtom = atom<boolean>(false);
 
+// Smart playhead following state
+export const userIsManuallyScrollingAtom = atom<boolean>(false);
+export const playheadAutoFollowEnabledAtom = atom<boolean>(true);
+
 export const playheadViewportAtom = atom((get) => {
 	const { pxPerMs, horizontalScroll } = get(timelineViewportAtom);
 	const playback = get(playbackAtom);
@@ -457,7 +461,7 @@ export const updateTrackAtom = atom(
 		const playback = get(playbackAtom);
 		const updatedTracks = tracks.map((track) => {
 			if (track.id !== trackId) return track;
-			if (updates.volumeEnvelope && updates.volumeEnvelope.points) {
+			if (updates.volumeEnvelope?.points) {
 				const normalizedEnvelope: TrackEnvelope = {
 					...track.volumeEnvelope,
 					...updates.volumeEnvelope,
