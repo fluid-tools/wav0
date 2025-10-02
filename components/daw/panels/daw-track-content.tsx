@@ -263,26 +263,33 @@ export function DAWTrackContent() {
 
 					// Vertical movement (track switching)
 					const deltaY = lastY - draggingClip.startY;
-					const trackHeight = Math.round(DAW_HEIGHTS.TRACK_ROW * trackHeightZoom);
+					const trackHeight = Math.round(
+						DAW_HEIGHTS.TRACK_ROW * trackHeightZoom,
+					);
 					const trackIndexOffset = Math.round(deltaY / trackHeight);
 					const newTrackIndex = Math.max(
 						0,
-						Math.min(tracks.length - 1, draggingClip.originalTrackIndex + trackIndexOffset),
+						Math.min(
+							tracks.length - 1,
+							draggingClip.originalTrackIndex + trackIndexOffset,
+						),
 					);
 
 					// Check if we need to move to a different track
 					if (newTrackIndex !== draggingClip.originalTrackIndex) {
 						const newTrack = tracks[newTrackIndex];
 						const oldTrack = tracks.find((t) => t.id === draggingClip.trackId);
-						
+
 						if (newTrack && oldTrack && newTrack.id !== oldTrack.id) {
 							// Find the clip
-							const clip = oldTrack.clips?.find((c) => c.id === draggingClip.clipId);
+							const clip = oldTrack.clips?.find(
+								(c) => c.id === draggingClip.clipId,
+							);
 							if (clip) {
 								// ATOMIC UPDATE: Modify both tracks in single operation
 								// This prevents duplicate keys by ensuring clip never exists in both tracks simultaneously
 								const updatedClip = { ...clip, startTime: newStartTime };
-								
+
 								// Single atomic update to prevent duplicate keys
 								setTracks((prev) =>
 									prev.map((t) => {
@@ -290,7 +297,10 @@ export function DAWTrackContent() {
 											// Remove clip from old track
 											return {
 												...t,
-												clips: t.clips?.filter((c) => c.id !== draggingClip.clipId) ?? [],
+												clips:
+													t.clips?.filter(
+														(c) => c.id !== draggingClip.clipId,
+													) ?? [],
 											};
 										}
 										if (t.id === newTrack.id) {

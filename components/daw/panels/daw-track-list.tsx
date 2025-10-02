@@ -193,7 +193,9 @@ export function DAWTrackList() {
 										type="button"
 										className={`flex items-center gap-2 flex-1 min-w-0 cursor-pointer ${DAW_BUTTONS.TRANSPARENT} text-left`}
 										onClick={selectTrack}
-										onDoubleClick={() => startEditingTrack(track.id, track.name)}
+										onDoubleClick={() =>
+											startEditingTrack(track.id, track.name)
+										}
 									>
 										<div
 											className={`${DAW_ICONS.XS} rounded-full flex-shrink-0`}
@@ -235,7 +237,9 @@ export function DAWTrackList() {
 												isMuted={track.muted}
 												isSoloed={track.soloed}
 												currentDb={dbValue}
-												onRequestRename={() => startEditingTrack(track.id, track.name)}
+												onRequestRename={() =>
+													startEditingTrack(track.id, track.name)
+												}
 												onToggleSolo={toggleSoloAction}
 												onToggleMute={toggleMuteAction}
 												onResetVolume={resetVolume}

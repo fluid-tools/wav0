@@ -51,10 +51,10 @@ export function AutomationLane({
 		(point: TrackEnvelopePoint, e: React.PointerEvent) => {
 			e.preventDefault();
 			e.stopPropagation();
-			
+
 			isDraggingRef.current = true;
 			e.currentTarget.setPointerCapture(e.pointerId);
-			
+
 			setDraggingPoint({
 				pointId: point.id,
 				startX: e.clientX,
@@ -97,8 +97,8 @@ export function AutomationLane({
 			// Update point in envelope
 			if (!envelope) return;
 			const updatedPoints = envelope.points.map((p) =>
-				p.id === draggingPoint.pointId 
-					? { ...p, value: newValue, time: newTime } 
+				p.id === draggingPoint.pointId
+					? { ...p, value: newValue, time: newTime }
 					: p,
 			);
 
@@ -112,14 +112,17 @@ export function AutomationLane({
 		[draggingPoint, trackHeight, envelope, track.id, updateTrack, pxPerMs],
 	);
 
-	const handlePointerUp = useCallback((e: React.PointerEvent) => {
-		if (draggingPoint && e.pointerId === draggingPoint.pointerId) {
-			isDraggingRef.current = false;
-			setDraggingPoint(null);
-			// Emit event to unlock grid drag
-			window.dispatchEvent(new CustomEvent("wav0:automation-drag-end"));
-		}
-	}, [draggingPoint]);
+	const handlePointerUp = useCallback(
+		(e: React.PointerEvent) => {
+			if (draggingPoint && e.pointerId === draggingPoint.pointerId) {
+				isDraggingRef.current = false;
+				setDraggingPoint(null);
+				// Emit event to unlock grid drag
+				window.dispatchEvent(new CustomEvent("wav0:automation-drag-end"));
+			}
+		},
+		[draggingPoint],
+	);
 
 	// Handle segment right-click for curve type selection
 	const handleSegmentContextMenu = useCallback(
@@ -161,18 +164,18 @@ export function AutomationLane({
 	const handleSvgDoubleClick = useCallback(
 		(e: React.MouseEvent<SVGSVGElement>) => {
 			if (!svgRef.current || !envelope) return;
-			
+
 			const rect = svgRef.current.getBoundingClientRect();
 			const x = e.clientX - rect.left;
 			const y = e.clientY - rect.top;
-			
+
 			// Convert pixel position to time and value
 			const time = x / pxPerMs;
 			const padding = 20;
 			const usableHeight = trackHeight - padding * 2;
 			const normalizedY = (trackHeight - padding - y) / usableHeight;
 			const value = Math.max(0, Math.min(4, normalizedY * 4));
-			
+
 			// Create new point
 			const newPoint: TrackEnvelopePoint = {
 				id: `point-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
@@ -180,7 +183,7 @@ export function AutomationLane({
 				value,
 				curve: "linear",
 			};
-			
+
 			updateTrack(track.id, {
 				volumeEnvelope: {
 					...envelope,
@@ -327,175 +330,174 @@ export function AutomationLane({
 
 	return (
 		<>
-		<svg
-			ref={svgRef}
-			className="pointer-events-auto absolute inset-0"
-			width={trackWidth}
-			height={trackHeight}
-			style={{ zIndex: 10 }}
-			aria-label={`Volume automation for ${track.name}`}
-			onDoubleClick={handleSvgDoubleClick}
-		>
-			<title>{`Volume automation: ${sorted.length} points (double-click to add)`}</title>
-			{/* Automation curve path */}
-			<path
-				d={path}
-				fill="none"
-				stroke={automationColor}
-				strokeWidth={2}
-				strokeOpacity={0.85}
-				vectorEffect="non-scaling-stroke"
-			/>
-
-			{/* Interactive segments for curve type selection */}
-			{sorted.map((point, index) => {
-				if (index === 0) return null; // No segment before first point
-
-				const prevPoint = sorted[index - 1];
-				const x1 = prevPoint.time * pxPerMs;
-				const y1 =
-					trackHeight -
-					padding -
-					(Math.max(0, Math.min(4, prevPoint.value)) / 4) * usableHeight;
-				const x2 = point.time * pxPerMs;
-				const y2 =
-					trackHeight -
-					padding -
-					(Math.max(0, Math.min(4, point.value)) / 4) * usableHeight;
-
-				// Create a thick invisible path for easier clicking
-				return (
-					<g
-						key={`segment-${prevPoint.id}-${point.id}`}
-						onContextMenu={(e) =>
-							handleSegmentContextMenu(prevPoint.id, point.id, e)
-						}
-						className="cursor-context-menu"
-					>
-						<line
-							x1={x1}
-							y1={y1}
-							x2={x2}
-							y2={y2}
-							stroke="transparent"
-							strokeWidth={12}
-							style={{ pointerEvents: "stroke" }}
-						/>
-						<title>Right-click to change curve type</title>
-					</g>
-				);
-			})}
-
-			{/* Automation points (draggable) */}
-			{sorted.map((point) => {
-				const x = point.time * pxPerMs;
-				const normalizedValue = Math.max(0, Math.min(4, point.value)) / 4;
-				const y = trackHeight - padding - normalizedValue * usableHeight;
-				const envelopeDb = multiplierToDb(point.value);
-				const effectiveDb = getEffectiveDb(track.volume, point.value);
-
-				return (
-					<g
-						key={point.id}
-						onPointerDown={(e) => handlePointPointerDown(point, e)}
-						onPointerMove={handlePointerMove}
-						onPointerUp={handlePointerUp}
-						className="cursor-move"
-					>
-						{/* Hit area (larger, invisible) */}
-						<circle
-							cx={x}
-							cy={y}
-							r={10}
-							fill="transparent"
-							className="pointer-events-auto"
-						/>
-						{/* Visual point */}
-						<circle
-							cx={x}
-							cy={y}
-							r={4}
-							fill={automationColor}
-							stroke={track.color}
-							strokeWidth={2}
-							className="pointer-events-none"
-						/>
-						{/* Tooltip on hover */}
-						<title>
-							{`Time: ${(point.time / 1000).toFixed(2)}s, Envelope: ${envelopeDb.toFixed(1)} dB, Effective: ${effectiveDb.toFixed(1)} dB`}
-						</title>
-					</g>
-				);
-			})}
-
-			{/* Playhead indicator on curve */}
-			{playback.isPlaying && playheadX !== null && playheadY !== null && (
-				<circle
-					cx={playheadX}
-					cy={playheadY}
-					r={5}
-					fill="rgb(239, 68, 68)" // red-500
-					stroke="white"
+			<svg
+				ref={svgRef}
+				className="pointer-events-auto absolute inset-0"
+				width={trackWidth}
+				height={trackHeight}
+				style={{ zIndex: 10 }}
+				aria-label={`Volume automation for ${track.name}`}
+				onDoubleClick={handleSvgDoubleClick}
+			>
+				<title>{`Volume automation: ${sorted.length} points (double-click to add)`}</title>
+				{/* Automation curve path */}
+				<path
+					d={path}
+					fill="none"
+					stroke={automationColor}
 					strokeWidth={2}
-					className="pointer-events-none"
-					style={{ filter: "drop-shadow(0 0 4px rgba(239, 68, 68, 0.8))" }}
+					strokeOpacity={0.85}
+					vectorEffect="non-scaling-stroke"
 				/>
-			)}
 
-		</svg>
-		{/* Curve type context menu - rendered as portal */}
-		{selectedSegment &&
-			typeof document !== "undefined" &&
-			createPortal(
-				<div
-					className="fixed"
-					style={{
-						left: selectedSegment.x,
-						top: selectedSegment.y,
-						zIndex: 9999,
-					}}
-					onClick={(e) => e.stopPropagation()}
-				>
-					<div className="rounded-lg border border-border bg-popover p-1 shadow-xl">
-						<div className="text-xs font-medium text-muted-foreground px-2 py-1 border-b border-border/50 mb-1">
-							Curve Type
+				{/* Interactive segments for curve type selection */}
+				{sorted.map((point, index) => {
+					if (index === 0) return null; // No segment before first point
+
+					const prevPoint = sorted[index - 1];
+					const x1 = prevPoint.time * pxPerMs;
+					const y1 =
+						trackHeight -
+						padding -
+						(Math.max(0, Math.min(4, prevPoint.value)) / 4) * usableHeight;
+					const x2 = point.time * pxPerMs;
+					const y2 =
+						trackHeight -
+						padding -
+						(Math.max(0, Math.min(4, point.value)) / 4) * usableHeight;
+
+					// Create a thick invisible path for easier clicking
+					return (
+						<g
+							key={`segment-${prevPoint.id}-${point.id}`}
+							onContextMenu={(e) =>
+								handleSegmentContextMenu(prevPoint.id, point.id, e)
+							}
+							className="cursor-context-menu"
+						>
+							<line
+								x1={x1}
+								y1={y1}
+								x2={x2}
+								y2={y2}
+								stroke="transparent"
+								strokeWidth={12}
+								style={{ pointerEvents: "stroke" }}
+							/>
+							<title>Right-click to change curve type</title>
+						</g>
+					);
+				})}
+
+				{/* Automation points (draggable) */}
+				{sorted.map((point) => {
+					const x = point.time * pxPerMs;
+					const normalizedValue = Math.max(0, Math.min(4, point.value)) / 4;
+					const y = trackHeight - padding - normalizedValue * usableHeight;
+					const envelopeDb = multiplierToDb(point.value);
+					const effectiveDb = getEffectiveDb(track.volume, point.value);
+
+					return (
+						<g
+							key={point.id}
+							onPointerDown={(e) => handlePointPointerDown(point, e)}
+							onPointerMove={handlePointerMove}
+							onPointerUp={handlePointerUp}
+							className="cursor-move"
+						>
+							{/* Hit area (larger, invisible) */}
+							<circle
+								cx={x}
+								cy={y}
+								r={10}
+								fill="transparent"
+								className="pointer-events-auto"
+							/>
+							{/* Visual point */}
+							<circle
+								cx={x}
+								cy={y}
+								r={4}
+								fill={automationColor}
+								stroke={track.color}
+								strokeWidth={2}
+								className="pointer-events-none"
+							/>
+							{/* Tooltip on hover */}
+							<title>
+								{`Time: ${(point.time / 1000).toFixed(2)}s, Envelope: ${envelopeDb.toFixed(1)} dB, Effective: ${effectiveDb.toFixed(1)} dB`}
+							</title>
+						</g>
+					);
+				})}
+
+				{/* Playhead indicator on curve */}
+				{playback.isPlaying && playheadX !== null && playheadY !== null && (
+					<circle
+						cx={playheadX}
+						cy={playheadY}
+						r={5}
+						fill="rgb(239, 68, 68)" // red-500
+						stroke="white"
+						strokeWidth={2}
+						className="pointer-events-none"
+						style={{ filter: "drop-shadow(0 0 4px rgba(239, 68, 68, 0.8))" }}
+					/>
+				)}
+			</svg>
+			{/* Curve type context menu - rendered as portal */}
+			{selectedSegment &&
+				typeof document !== "undefined" &&
+				createPortal(
+					<div
+						className="fixed"
+						style={{
+							left: selectedSegment.x,
+							top: selectedSegment.y,
+							zIndex: 9999,
+						}}
+						onClick={(e) => e.stopPropagation()}
+					>
+						<div className="rounded-lg border border-border bg-popover p-1 shadow-xl">
+							<div className="text-xs font-medium text-muted-foreground px-2 py-1 border-b border-border/50 mb-1">
+								Curve Type
+							</div>
+							<button
+								type="button"
+								onClick={() => setCurveType("linear")}
+								className="w-full rounded px-3 py-1.5 text-left text-sm hover:bg-accent transition-colors flex items-center gap-2"
+							>
+								<span className="text-xs opacity-50">—</span>
+								<span>Linear</span>
+							</button>
+							<button
+								type="button"
+								onClick={() => setCurveType("easeIn")}
+								className="w-full rounded px-3 py-1.5 text-left text-sm hover:bg-accent transition-colors flex items-center gap-2"
+							>
+								<span className="text-xs opacity-50">↗</span>
+								<span>Ease In</span>
+							</button>
+							<button
+								type="button"
+								onClick={() => setCurveType("easeOut")}
+								className="w-full rounded px-3 py-1.5 text-left text-sm hover:bg-accent transition-colors flex items-center gap-2"
+							>
+								<span className="text-xs opacity-50">↘</span>
+								<span>Ease Out</span>
+							</button>
+							<button
+								type="button"
+								onClick={() => setCurveType("sCurve")}
+								className="w-full rounded px-3 py-1.5 text-left text-sm hover:bg-accent transition-colors flex items-center gap-2"
+							>
+								<span className="text-xs opacity-50">~</span>
+								<span>S-Curve</span>
+							</button>
 						</div>
-						<button
-							type="button"
-							onClick={() => setCurveType("linear")}
-							className="w-full rounded px-3 py-1.5 text-left text-sm hover:bg-accent transition-colors flex items-center gap-2"
-						>
-							<span className="text-xs opacity-50">—</span>
-							<span>Linear</span>
-						</button>
-						<button
-							type="button"
-							onClick={() => setCurveType("easeIn")}
-							className="w-full rounded px-3 py-1.5 text-left text-sm hover:bg-accent transition-colors flex items-center gap-2"
-						>
-							<span className="text-xs opacity-50">↗</span>
-							<span>Ease In</span>
-						</button>
-						<button
-							type="button"
-							onClick={() => setCurveType("easeOut")}
-							className="w-full rounded px-3 py-1.5 text-left text-sm hover:bg-accent transition-colors flex items-center gap-2"
-						>
-							<span className="text-xs opacity-50">↘</span>
-							<span>Ease Out</span>
-						</button>
-						<button
-							type="button"
-							onClick={() => setCurveType("sCurve")}
-							className="w-full rounded px-3 py-1.5 text-left text-sm hover:bg-accent transition-colors flex items-center gap-2"
-						>
-							<span className="text-xs opacity-50">~</span>
-							<span>S-Curve</span>
-						</button>
-					</div>
-				</div>,
-				document.body,
-			)}
-	</>
+					</div>,
+					document.body,
+				)}
+		</>
 	);
 }

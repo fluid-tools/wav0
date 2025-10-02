@@ -198,7 +198,7 @@ export function DAWContainer() {
 			// After 500ms of no scrolling, check if playhead is visible
 			scrollDebounceRef.current = setTimeout(() => {
 				setUserIsScrolling(false);
-				
+
 				// Re-enable auto-follow if playhead is within viewport
 				const controller = gridControllerRef.current;
 				const grid = trackGridScrollRef.current;
@@ -207,7 +207,7 @@ export function DAWContainer() {
 					const width = grid.clientWidth;
 					const viewportLeft = controller.scrollLeft;
 					const viewportRight = viewportLeft + width;
-					
+
 					// If playhead is visible, re-enable auto-follow
 					if (x >= viewportLeft && x <= viewportRight) {
 						setAutoFollowEnabled(true);
@@ -284,16 +284,28 @@ export function DAWContainer() {
 
 		gridEl.addEventListener("wheel", handleWheel, { passive: false });
 		gridEl.addEventListener("pointermove", handlePointerMove);
-		window.addEventListener("wav0:automation-drag-start", handleAutomationDragStart);
-		window.addEventListener("wav0:automation-drag-end", handleAutomationDragEnd);
+		window.addEventListener(
+			"wav0:automation-drag-start",
+			handleAutomationDragStart,
+		);
+		window.addEventListener(
+			"wav0:automation-drag-end",
+			handleAutomationDragEnd,
+		);
 
 		return () => {
 			gridControllerRef.current = null;
 			controller.cancelAnimation();
 			gridEl.removeEventListener("wheel", handleWheel);
 			gridEl.removeEventListener("pointermove", handlePointerMove);
-			window.removeEventListener("wav0:automation-drag-start", handleAutomationDragStart);
-			window.removeEventListener("wav0:automation-drag-end", handleAutomationDragEnd);
+			window.removeEventListener(
+				"wav0:automation-drag-start",
+				handleAutomationDragStart,
+			);
+			window.removeEventListener(
+				"wav0:automation-drag-end",
+				handleAutomationDragEnd,
+			);
 		};
 	}, [viewport, setTimelineZoom]);
 
@@ -320,16 +332,16 @@ export function DAWContainer() {
 		const controller = gridControllerRef.current;
 		const grid = trackGridScrollRef.current;
 		if (!controller || !grid) return;
-		
+
 		// Don't auto-scroll if user is dragging playhead
 		if (isPlayheadDragging) return;
-		
+
 		// Don't auto-scroll if user is manually scrolling
 		if (userIsScrolling) return;
-		
+
 		// Don't auto-scroll if auto-follow is disabled
 		if (!autoFollowEnabled) return;
-		
+
 		// Don't auto-scroll if not playing
 		if (!playback.isPlaying) return;
 
@@ -338,11 +350,11 @@ export function DAWContainer() {
 		const width = grid.clientWidth;
 		if (width <= 0) return;
 		const left = controller.scrollLeft;
-		
+
 		// Define center band (35-65% of viewport)
 		const bandLeft = left + width * 0.35;
 		const bandRight = left + width * 0.65;
-		
+
 		// Auto-scroll to keep playhead centered when it exits the band
 		if (x < bandLeft || x > bandRight) {
 			const target = Math.max(0, x - width * 0.5);
