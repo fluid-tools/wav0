@@ -29,14 +29,37 @@ export const CurvePreview = memo(function CurvePreview({
 	// Generate curve path
 	const numPoints = 50;
 	const points: { x: number; y: number }[] = [];
+	
+	// Ensure all numeric params are valid
+	const safeShape = Number.isFinite(shape) ? shape : 0.5;
+	const safeWidth = Number.isFinite(width) && width > 0 ? width : 80;
+	const safeHeight = Number.isFinite(height) && height > 0 ? height : 40;
 
 	for (let i = 0; i < numPoints; i++) {
 		const t = i / (numPoints - 1);
-		const value = evaluateCurve(type, t, shape);
+		const value = evaluateCurve(type, t, safeShape);
+		
+		// Guard against NaN/Infinity
+		if (!Number.isFinite(value)) {
+			console.warn(`CurvePreview: Invalid value at t=${t}, type=${type}, shape=${safeShape}`);
+			continue;
+		}
+		
 		points.push({
-			x: t * width,
-			y: height - value * height, // Flip Y (SVG origin is top-left)
+			x: t * safeWidth,
+			y: safeHeight - value * safeHeight, // Flip Y (SVG origin is top-left)
 		});
+	}
+	
+	// Bail if no valid points
+	if (points.length < 2) {
+		return (
+			<svg width={safeWidth} height={safeHeight} className={cn("inline-block", className)}>
+				<text x={safeWidth / 2} y={safeHeight / 2} textAnchor="middle" fontSize="10" fill="currentColor" opacity={0.5}>
+					Invalid curve
+				</text>
+			</svg>
+		);
 	}
 
 	const pathData = points
@@ -45,10 +68,10 @@ export const CurvePreview = memo(function CurvePreview({
 
 	return (
 		<svg
-			width={width}
-			height={height}
+			width={safeWidth}
+			height={safeHeight}
 			className={cn("inline-block", className)}
-			viewBox={`0 0 ${width} ${height}`}
+			viewBox={`0 0 ${safeWidth} ${safeHeight}`}
 			role="img"
 			aria-label={`${type} curve preview`}
 		>
@@ -56,18 +79,18 @@ export const CurvePreview = memo(function CurvePreview({
 			{/* Grid lines for reference */}
 			<line
 				x1={0}
-				y1={height / 2}
-				x2={width}
-				y2={height / 2}
+				y1={safeHeight / 2}
+				x2={safeWidth}
+				y2={safeHeight / 2}
 				stroke="currentColor"
 				strokeOpacity={0.1}
 				strokeWidth={1}
 			/>
 			<line
-				x1={width / 2}
+				x1={safeWidth / 2}
 				y1={0}
-				x2={width / 2}
-				y2={height}
+				x2={safeWidth / 2}
+				y2={safeHeight}
 				stroke="currentColor"
 				strokeOpacity={0.1}
 				strokeWidth={1}
