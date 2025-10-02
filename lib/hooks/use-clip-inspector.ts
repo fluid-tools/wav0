@@ -1,6 +1,7 @@
 import { useAtom } from "jotai";
 import { useEffect, useMemo, useState } from "react";
 import {
+	type Clip,
 	clipInspectorOpenAtom,
 	clipInspectorTargetAtom,
 	type TrackEnvelopePoint,
@@ -99,6 +100,12 @@ export function useClipInspector() {
 		if (key === "fadeOut") setFadeOutDraft(clamped);
 	};
 
+	// Helper to update clip with partial updates
+	const handleUpdateClip = (updates: Partial<Clip>) => {
+		if (!current) return;
+		updateClip(current.track.id, current.clip.id, updates);
+	};
+
 	return {
 		open,
 		current,
@@ -112,6 +119,7 @@ export function useClipInspector() {
 		handleEnvelopeChange,
 		handleEnvelopeSave,
 		commitFade,
+		updateClip: handleUpdateClip,
 		MAX_FADE_MS,
 	};
 }

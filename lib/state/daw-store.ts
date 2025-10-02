@@ -23,6 +23,12 @@ export type Clip = {
 	// Optional fade envelopes (ms)
 	fadeIn?: number;
 	fadeOut?: number;
+	// Fade curve types (logarithmic is natural for fade-out)
+	fadeInCurve?: TrackEnvelopeCurve;
+	fadeOutCurve?: TrackEnvelopeCurve;
+	// Fade curve shape parameter (0-1, default 0.5)
+	fadeInShape?: number;
+	fadeOutShape?: number;
 	// Loop clip content continuously (seamless). When true, clip repeats.
 	loop?: boolean;
 	// Optional loop end time in ms (timeline absolute). If unset, no visual extension.
@@ -37,6 +43,7 @@ export type TrackEnvelopePoint = {
 	time: number; // absolute timeline ms
 	value: number; // 0-4 linear gain multiplier
 	curve?: TrackEnvelopeCurve;
+	curveShape?: number; // 0-1, default 0.5 (affects curve steepness)
 };
 
 export type TrackEnvelope = {
@@ -63,6 +70,7 @@ const createDefaultEnvelope = (_volume: number): TrackEnvelope => ({
 			time: 0,
 			value: 1.0, // 100% multiplier = no change from base volume
 			curve: "linear",
+			curveShape: 0.5, // Balanced default
 		},
 	],
 });

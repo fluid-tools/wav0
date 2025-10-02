@@ -10,6 +10,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { getCurveDescription } from "@/lib/audio/curve-functions";
 import {
 	clampAutomationDb,
 	dbToMultiplier,
@@ -20,6 +21,7 @@ import {
 } from "@/lib/audio/volume";
 import type { TrackEnvelopePoint } from "@/lib/state/daw-store";
 import { formatDuration } from "@/lib/storage/opfs";
+import { CurvePreview } from "../controls/curve-preview";
 
 type EnvelopeEditorProps = {
 	points: TrackEnvelopePoint[];
@@ -251,6 +253,58 @@ export function EnvelopeEditor({
 											</Select>
 										</div>
 									</div>
+
+									{/* Curve Shape Parameter */}
+									{point.curve && point.curve !== "linear" && (
+										<div className="space-y-2">
+											<div className="flex items-center justify-between gap-2">
+												<label
+													className="text-xs font-medium text-muted-foreground"
+													htmlFor={`envelope-shape-${point.id}`}
+												>
+													Curve Shape
+												</label>
+												<span className="text-xs font-mono text-muted-foreground tabular-nums">
+													{((point.curveShape ?? 0.5) * 100).toFixed(0)}%
+												</span>
+											</div>
+											<input
+												type="range"
+												id={`envelope-shape-${point.id}`}
+												min={0}
+												max={100}
+												step={1}
+												value={(point.curveShape ?? 0.5) * 100}
+												onChange={(e) =>
+													handlePointChange(originalIndex, {
+														curveShape: parseInt(e.target.value, 10) / 100,
+													})
+												}
+												className="w-full h-2 cursor-pointer appearance-none rounded-lg bg-muted hover:bg-muted/80 transition-colors"
+												aria-label="Curve shape parameter"
+											/>
+											<div className="flex justify-between text-[10px] text-muted-foreground">
+												<span>Gentle</span>
+												<span>Balanced</span>
+												<span>Steep</span>
+											</div>
+
+											{/* Visual Preview */}
+											<div className="flex items-center justify-center p-3 rounded-md bg-muted/30">
+												<CurvePreview
+													type={point.curve}
+													shape={point.curveShape ?? 0.5}
+													width={160}
+													height={60}
+													className="text-primary"
+													strokeWidth={2.5}
+												/>
+											</div>
+											<p className="text-[10px] text-muted-foreground text-center">
+												{getCurveDescription(point.curve)}
+											</p>
+										</div>
+									)}
 								</div>
 							);
 						})}
