@@ -25,7 +25,7 @@ import { formatDuration } from "@/lib/storage/opfs";
 import { cn } from "@/lib/utils";
 
 export function DAWTrackContent() {
-	const [tracks] = useAtom(tracksAtom);
+	const [tracks, setTracks] = useAtom(tracksAtom);
 	const [selectedTrackId, setSelectedTrackId] = useAtom(selectedTrackIdAtom);
 	const [selectedClipId, setSelectedClipId] = useAtom(selectedClipIdAtom);
 	const [_activeTool] = useAtom(activeToolAtom);
@@ -275,20 +275,34 @@ export function DAWTrackContent() {
 						const newTrack = tracks[newTrackIndex];
 						const oldTrack = tracks.find((t) => t.id === draggingClip.trackId);
 						
-						if (newTrack && oldTrack) {
+						if (newTrack && oldTrack && newTrack.id !== oldTrack.id) {
 							// Find the clip
 							const clip = oldTrack.clips?.find((c) => c.id === draggingClip.clipId);
 							if (clip) {
-								// Remove from old track
-								const updatedOldClips = oldTrack.clips?.filter(
-									(c) => c.id !== draggingClip.clipId,
-								) ?? [];
-								_updateTrack(draggingClip.trackId, { clips: updatedOldClips });
-
-								// Add to new track with updated time
+								// ATOMIC UPDATE: Modify both tracks in single operation
+								// This prevents duplicate keys by ensuring clip never exists in both tracks simultaneously
 								const updatedClip = { ...clip, startTime: newStartTime };
-								const updatedNewClips = [...(newTrack.clips ?? []), updatedClip];
-								_updateTrack(newTrack.id, { clips: updatedNewClips });
+								
+								// Single atomic update to prevent duplicate keys
+								setTracks((prev) =>
+									prev.map((t) => {
+										if (t.id === oldTrack.id) {
+											// Remove clip from old track
+											return {
+												...t,
+												clips: t.clips?.filter((c) => c.id !== draggingClip.clipId) ?? [],
+											};
+										}
+										if (t.id === newTrack.id) {
+											// Add clip to new track with updated time
+											return {
+												...t,
+												clips: [...(t.clips ?? []), updatedClip],
+											};
+										}
+										return t;
+									}),
+								);
 
 								// Update dragging state to track new location
 								setDraggingClip({
@@ -358,6 +372,9 @@ export function DAWTrackContent() {
 		tracks,
 		timeline.snapToGrid,
 		timeline.gridSize,
+		setTracks,
+		setSelectedTrackId,
+		trackHeightZoom,
 	]);
 
 	return (
