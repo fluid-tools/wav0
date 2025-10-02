@@ -394,29 +394,29 @@ export function DAWTrackContent() {
 				const trackHeight = Math.round(DAW_HEIGHTS.TRACK_ROW * trackHeightZoom);
 				const trackY = index * trackHeight;
 
-				// Fallback legacy clip if no clips array yet
-				const clips: Clip[] =
-					track.clips && track.clips.length > 0
-						? (track.clips as Clip[])
-						: track.opfsFileId
-							? [
-									{
-										id: track.id,
-										name: track.name,
-										opfsFileId: track.opfsFileId,
-										audioFileName: track.audioFileName,
-										audioFileType: track.audioFileType,
-										startTime: track.startTime,
-										trimStart: track.trimStart,
-										trimEnd: track.trimEnd,
-										sourceDurationMs: Math.max(
-											0,
-											track.trimEnd - track.trimStart,
-										),
-										color: track.color,
-									} as Clip,
-								]
-							: [];
+				// Fallback legacy clip only when the track has no multi-clip data defined
+				const hasClipArray = Array.isArray(track.clips);
+				const clips: Clip[] = hasClipArray
+					? ((track.clips as Clip[]) ?? [])
+					: track.opfsFileId
+						? [
+								{
+									id: track.id,
+									name: track.name,
+									opfsFileId: track.opfsFileId,
+									audioFileName: track.audioFileName,
+									audioFileType: track.audioFileType,
+									startTime: track.startTime,
+									trimStart: track.trimStart,
+									trimEnd: track.trimEnd,
+									sourceDurationMs: Math.max(
+										0,
+										track.trimEnd - track.trimStart,
+									),
+									color: track.color,
+								} as Clip,
+							]
+						: [];
 
 				return (
 					<div
