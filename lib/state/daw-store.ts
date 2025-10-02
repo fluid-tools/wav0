@@ -276,6 +276,10 @@ export const removeClipAtom = atom(
 		if (!updatedTrack) return;
 		if (playback.isPlaying) {
 			try {
+				const sourceTrack = tracks.find((t) => t.id !== trackId && t.clips?.some((clip) => clip.id === clipId));
+				if (sourceTrack) {
+					playbackEngine.stopClip(sourceTrack.id, clipId);
+				}
 				await playbackEngine.rescheduleTrack(updatedTrack);
 			} catch (e) {
 				console.error(

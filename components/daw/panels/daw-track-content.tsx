@@ -5,11 +5,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ClipContextMenu } from "@/components/daw/context-menus/clip-context-menu";
 import { ClipFadeHandles } from "@/components/daw/controls/clip-fade-handles";
 import { AutomationLane } from "@/components/daw/panels/automation-lane";
+import { playbackEngine } from "@/lib/audio/playback-engine";
 import { DAW_HEIGHTS } from "@/lib/constants/daw-design";
-import type { Clip } from "@/lib/state/daw-store";
+import type { Clip, Track } from "@/lib/state/daw-store";
 import {
 	activeToolAtom,
 	loadAudioFileAtom,
+	playbackAtom,
 	projectEndPositionAtom,
 	selectedClipIdAtom,
 	selectedTrackIdAtom,
@@ -32,12 +34,12 @@ export function DAWTrackContent() {
 	const [, _updateTrack] = useAtom(updateTrackAtom);
 	const [, updateClip] = useAtom(updateClipAtom);
 	const [, loadAudioFile] = useAtom(loadAudioFileAtom);
+	const [playback] = useAtom(playbackAtom);
 	const [timeline] = useAtom(timelineAtom);
 	const [pxPerMs] = useAtom(timelinePxPerMsAtom);
 	const [trackHeightZoom] = useAtom(trackHeightZoomAtom);
 	const [projectEndPosition] = useAtom(projectEndPositionAtom);
 	const [_totalDuration] = useAtom(totalDurationAtom);
-
 	const [resizingClip, setResizingClip] = useState<{
 		trackId: string;
 		clipId: string;
@@ -48,14 +50,18 @@ export function DAWTrackContent() {
 		startClipStartTime: number;
 	} | null>(null);
 
-	const [draggingClip, setDraggingClip] = useState<{
-		trackId: string;
-		clipId: string;
-		startX: number;
-		startY: number;
-		startTime: number;
-		originalTrackIndex: number;
-	} | null>(null);
+	const [draggingClip, setDraggingClip] = useState<
+		| {
+			trackId: string;
+			clipId: string;
+			startX: number;
+			startY: number;
+			startTime: number;
+			originalTrackIndex: number;
+			sourceTrackId: string;
+		}
+		| null
+	>(null);
 
 	const [loopDragging, setLoopDragging] = useState<{
 		trackId: string;
@@ -285,44 +291,50 @@ export function DAWTrackContent() {
 							const clip = oldTrack.clips?.find(
 								(c) => c.id === draggingClip.clipId,
 							);
-							if (clip) {
-								// ATOMIC UPDATE: Modify both tracks in single operation
-								// This prevents duplicate keys by ensuring clip never exists in both tracks simultaneously
-								const updatedClip = { ...clip, startTime: newStartTime };
-
-								// Single atomic update to prevent duplicate keys
-								setTracks((prev) =>
-									prev.map((t) => {
-										if (t.id === oldTrack.id) {
-											// Remove clip from old track
-											return {
-												...t,
-												clips:
-													t.clips?.filter(
-														(c) => c.id !== draggingClip.clipId,
-													) ?? [],
-											};
-										}
-										if (t.id === newTrack.id) {
-											// Add clip to new track with updated time
-											return {
-												...t,
-												clips: [...(t.clips ?? []), updatedClip],
-											};
-										}
-										return t;
-									}),
-								);
-
-								// Update dragging state to track new location
-								setDraggingClip({
-									...draggingClip,
-									trackId: newTrack.id,
-									startTime: newStartTime,
-								});
-								setSelectedTrackId(newTrack.id);
-								return;
+						if (clip) {
+							// Stop playback on old track immediately if playing
+							if (playback.isPlaying) {
+								playbackEngine.stopClip(oldTrack.id, draggingClip.clipId);
 							}
+
+							// ATOMIC UPDATE: Modify both tracks in single operation
+							// This prevents duplicate keys by ensuring clip never exists in both tracks simultaneously
+							const updatedClip = { ...clip, startTime: newStartTime };
+
+							// Single atomic update to prevent duplicate keys
+							setTracks((prev) =>
+								prev.map((t) => {
+									if (t.id === oldTrack.id) {
+										// Remove clip from old track
+										return {
+											...t,
+											clips:
+												t.clips?.filter(
+													(c) => c.id !== draggingClip.clipId,
+												) ?? [],
+										};
+									}
+									if (t.id === newTrack.id) {
+										// Add clip to new track with updated time
+										return {
+											...t,
+											clips: [...(t.clips ?? []), updatedClip],
+										};
+									}
+									return t;
+								}),
+							);
+
+							// Update dragging state to track new location
+							setDraggingClip({
+								...draggingClip,
+								trackId: newTrack.id,
+								startTime: newStartTime,
+								sourceTrackId: newTrack.id,
+							});
+							setSelectedTrackId(newTrack.id);
+							return;
+						}
 						}
 					}
 
@@ -527,6 +539,7 @@ export function DAWTrackContent() {
 															startY: e.clientY,
 															startTime: clip.startTime,
 															originalTrackIndex: index,
+															sourceTrackId: track.id,
 														});
 													}
 												}}
@@ -569,6 +582,7 @@ export function DAWTrackContent() {
 														startY: e.clientY,
 														startTime: clip.startTime,
 														originalTrackIndex: index,
+														sourceTrackId: track.id,
 													});
 												}}
 												aria-label="Drag clip"
