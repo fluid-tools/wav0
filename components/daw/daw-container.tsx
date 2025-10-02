@@ -38,7 +38,6 @@ import { DAWToolbar } from "./controls/daw-toolbar";
 import { GlobalShortcuts } from "./controls/global-shortcuts";
 import { ClipEditorDrawer } from "./inspectors/clip-editor-drawer";
 import { EventListSheet } from "./inspectors/event-list-sheet";
-import { AudioTestPanel } from "./panels/audio-test-panel";
 import { DAWTimeline } from "./panels/daw-timeline";
 import { DAWTrackContent } from "./panels/daw-track-content";
 import { DAWTrackList } from "./panels/daw-track-list";

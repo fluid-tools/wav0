@@ -121,7 +121,6 @@ function interpolateValue(
 					: 1 - 2 * (1 - progress) * (1 - progress);
 			return start + (end - start) * t;
 		}
-		case "linear":
 		default:
 			// Linear interpolation
 			return start + (end - start) * progress;

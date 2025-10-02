@@ -368,12 +368,14 @@ export function AutomationLane({
 
 					// Create a thick invisible path for easier clicking
 					return (
+						// biome-ignore lint/a11y/noStaticElementInteractions: SVG element with context menu for curve type selection
 						<g
 							key={`segment-${prevPoint.id}-${point.id}`}
 							onContextMenu={(e) =>
 								handleSegmentContextMenu(prevPoint.id, point.id, e)
 							}
 							className="cursor-context-menu"
+							aria-label={`Automation segment from ${prevPoint.time}ms to ${point.time}ms - Right click to change curve type`}
 						>
 							<line
 								x1={x1}
@@ -457,6 +459,11 @@ export function AutomationLane({
 							zIndex: 9999,
 						}}
 						onClick={(e) => e.stopPropagation()}
+						onKeyDown={(e) => {
+							if (e.key === "Escape") setSelectedSegment(null);
+						}}
+						role="menu"
+						aria-label="Curve type menu"
 					>
 						<div className="rounded-lg border border-border bg-popover p-1 shadow-xl">
 							<div className="text-xs font-medium text-muted-foreground px-2 py-1 border-b border-border/50 mb-1">
