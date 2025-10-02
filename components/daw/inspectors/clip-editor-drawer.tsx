@@ -21,12 +21,41 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useClipInspector } from "@/lib/hooks/use-clip-inspector";
 import type { TrackEnvelopeCurve } from "@/lib/state/daw-store";
 import { formatDuration } from "@/lib/storage/opfs";
 import { CurvePreview } from "../controls/curve-preview";
 import { EnvelopeEditor } from "./envelope-editor";
 import { InspectorCard, InspectorSection } from "./inspector-section";
+
+// Curve type metadata for consistent naming and descriptions
+const CURVE_METADATA: Record<
+	TrackEnvelopeCurve,
+	{ label: string; description: string }
+> = {
+	linear: {
+		label: "Linear",
+		description: "Constant rate of change",
+	},
+	easeIn: {
+		label: "Ease In (Exponential)",
+		description: "Starts slow, accelerates toward end",
+	},
+	easeOut: {
+		label: "Ease Out (Logarithmic)",
+		description: "Starts fast, decelerates toward end",
+	},
+	sCurve: {
+		label: "S-Curve (Cosine)",
+		description: "Smooth acceleration and deceleration",
+	},
+};
 
 export function ClipEditorDrawer() {
 	const {
@@ -184,40 +213,66 @@ export function ClipEditorDrawer() {
 											>
 												Curve Type
 											</label>
-											<Select
-												value={clip.fadeInCurve || "easeOut"}
-												onValueChange={(value) =>
-													updateClip({
-														fadeInCurve: value as TrackEnvelopeCurve,
-													})
-												}
-											>
-												<SelectTrigger id="fade-in-curve">
-													<SelectValue />
-												</SelectTrigger>
-												<SelectContent>
-													<SelectItem value="linear">Linear</SelectItem>
-													<SelectItem value="easeIn">Exponential</SelectItem>
-													<SelectItem value="easeOut">
-														Logarithmic (Natural)
-													</SelectItem>
-													<SelectItem value="sCurve">
-														S-Curve (Smooth)
-													</SelectItem>
-												</SelectContent>
-											</Select>
+											<TooltipProvider>
+												<Tooltip>
+													<TooltipTrigger asChild>
+														<div>
+															<Select
+																value={clip.fadeInCurve || "easeOut"}
+																onValueChange={(value) =>
+																	updateClip({
+																		fadeInCurve: value as TrackEnvelopeCurve,
+																	})
+																}
+															>
+																<SelectTrigger id="fade-in-curve">
+																	<SelectValue />
+																</SelectTrigger>
+																<SelectContent>
+																	{Object.entries(CURVE_METADATA).map(
+																		([key, meta]) => (
+																			<SelectItem key={key} value={key}>
+																				{meta.label}
+																			</SelectItem>
+																		),
+																	)}
+																</SelectContent>
+															</Select>
+														</div>
+													</TooltipTrigger>
+													<TooltipContent side="right" className="max-w-xs">
+														<p className="text-xs">
+															{CURVE_METADATA[clip.fadeInCurve || "easeOut"]
+																?.description ||
+																"Select a curve type for the fade"}
+														</p>
+													</TooltipContent>
+												</Tooltip>
+											</TooltipProvider>
 										</div>
 
 										{/* Fade In Shape */}
 										{clip.fadeInCurve && clip.fadeInCurve !== "linear" && (
 											<div className="space-y-2">
 												<div className="flex items-center justify-between">
-													<label
-														htmlFor="fade-in-shape"
-														className="text-xs font-medium text-muted-foreground"
-													>
-														Shape
-													</label>
+													<TooltipProvider>
+														<Tooltip>
+															<TooltipTrigger asChild>
+																<label
+																	htmlFor="fade-in-shape"
+																	className="text-xs font-medium text-muted-foreground cursor-help"
+																>
+																	Curve Intensity
+																</label>
+															</TooltipTrigger>
+															<TooltipContent side="right" className="max-w-xs">
+																<p className="text-xs">
+																	Controls the steepness of the curve. 0% =
+																	gentle, 100% = aggressive
+																</p>
+															</TooltipContent>
+														</Tooltip>
+													</TooltipProvider>
 													<span className="text-xs font-mono text-muted-foreground tabular-nums">
 														{((clip.fadeInShape ?? 0.5) * 100).toFixed(0)}%
 													</span>
@@ -278,40 +333,66 @@ export function ClipEditorDrawer() {
 											>
 												Curve Type
 											</label>
-											<Select
-												value={clip.fadeOutCurve || "easeOut"}
-												onValueChange={(value) =>
-													updateClip({
-														fadeOutCurve: value as TrackEnvelopeCurve,
-													})
-												}
-											>
-												<SelectTrigger id="fade-out-curve">
-													<SelectValue />
-												</SelectTrigger>
-												<SelectContent>
-													<SelectItem value="linear">Linear</SelectItem>
-													<SelectItem value="easeIn">Exponential</SelectItem>
-													<SelectItem value="easeOut">
-														Logarithmic (Natural)
-													</SelectItem>
-													<SelectItem value="sCurve">
-														S-Curve (Smooth)
-													</SelectItem>
-												</SelectContent>
-											</Select>
+											<TooltipProvider>
+												<Tooltip>
+													<TooltipTrigger asChild>
+														<div>
+															<Select
+																value={clip.fadeOutCurve || "easeOut"}
+																onValueChange={(value) =>
+																	updateClip({
+																		fadeOutCurve: value as TrackEnvelopeCurve,
+																	})
+																}
+															>
+																<SelectTrigger id="fade-out-curve">
+																	<SelectValue />
+																</SelectTrigger>
+																<SelectContent>
+																	{Object.entries(CURVE_METADATA).map(
+																		([key, meta]) => (
+																			<SelectItem key={key} value={key}>
+																				{meta.label}
+																			</SelectItem>
+																		),
+																	)}
+																</SelectContent>
+															</Select>
+														</div>
+													</TooltipTrigger>
+													<TooltipContent side="right" className="max-w-xs">
+														<p className="text-xs">
+															{CURVE_METADATA[clip.fadeOutCurve || "easeOut"]
+																?.description ||
+																"Select a curve type for the fade"}
+														</p>
+													</TooltipContent>
+												</Tooltip>
+											</TooltipProvider>
 										</div>
 
 										{/* Fade Out Shape */}
 										{clip.fadeOutCurve && clip.fadeOutCurve !== "linear" && (
 											<div className="space-y-2">
 												<div className="flex items-center justify-between">
-													<label
-														htmlFor="fade-out-shape"
-														className="text-xs font-medium text-muted-foreground"
-													>
-														Shape
-													</label>
+													<TooltipProvider>
+														<Tooltip>
+															<TooltipTrigger asChild>
+																<label
+																	htmlFor="fade-out-shape"
+																	className="text-xs font-medium text-muted-foreground cursor-help"
+																>
+																	Curve Intensity
+																</label>
+															</TooltipTrigger>
+															<TooltipContent side="right" className="max-w-xs">
+																<p className="text-xs">
+																	Controls the steepness of the curve. 0% =
+																	gentle, 100% = aggressive
+																</p>
+															</TooltipContent>
+														</Tooltip>
+													</TooltipProvider>
 													<span className="text-xs font-mono text-muted-foreground tabular-nums">
 														{((clip.fadeOutShape ?? 0.5) * 100).toFixed(0)}%
 													</span>

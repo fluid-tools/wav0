@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/context-menu";
 import { Input } from "@/components/ui/input";
 import {
+	automationViewEnabledAtom,
 	clipInspectorOpenAtom,
 	clipInspectorTargetAtom,
 	removeClipAtom,
@@ -40,8 +41,12 @@ export function ClipContextMenu({
 	const [, removeClip] = useAtom(removeClipAtom);
 	const [, setInspectorOpen] = useAtom(clipInspectorOpenAtom);
 	const [, setInspectorTarget] = useAtom(clipInspectorTargetAtom);
+	const [automationView, setAutomationView] = useAtom(
+		automationViewEnabledAtom,
+	);
 	const [editing, setEditing] = useState(false);
 	const [draftName, setDraftName] = useState(clipName);
+	const [_showPropertiesDialog, setShowPropertiesDialog] = useState(false);
 
 	const commitRename = async () => {
 		const next = draftName.trim();
@@ -102,7 +107,21 @@ export function ClipContextMenu({
 						setInspectorOpen(true);
 					}}
 				>
-					Info…
+					Edit
+				</ContextMenuItem>
+				<ContextMenuItem
+					onClick={() => {
+						setAutomationView(!automationView);
+					}}
+				>
+					{automationView ? "Hide Automation" : "Show Automation"}
+				</ContextMenuItem>
+				<ContextMenuItem
+					onClick={() => {
+						setShowPropertiesDialog(true);
+					}}
+				>
+					Properties
 				</ContextMenuItem>
 				<ContextMenuSeparator />
 				<ContextMenuItem
