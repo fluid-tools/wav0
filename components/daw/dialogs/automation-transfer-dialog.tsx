@@ -40,8 +40,8 @@ export function AutomationTransferDialog({
 					<DialogTitle>Move Automation Data?</DialogTitle>
 					<DialogDescription className="space-y-3 pt-2">
 						<p>
-							You're moving <span className="font-semibold">{clipName}</span> from{" "}
-							<span className="font-semibold">{sourceTrackName}</span> to{" "}
+							You're moving <span className="font-semibold">{clipName}</span>{" "}
+							from <span className="font-semibold">{sourceTrackName}</span> to{" "}
 							<span className="font-semibold">{targetTrackName}</span>.
 						</p>
 						{automationPointCount > 0 ? (
@@ -94,4 +94,3 @@ export function AutomationTransferDialog({
 		</Dialog>
 	);
 }
-

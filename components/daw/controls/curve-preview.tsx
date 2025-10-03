@@ -29,7 +29,7 @@ export const CurvePreview = memo(function CurvePreview({
 	// Generate curve path
 	const numPoints = 50;
 	const points: { x: number; y: number }[] = [];
-	
+
 	// Ensure all numeric params are valid
 	const safeShape = Number.isFinite(shape) ? shape : 0.5;
 	const safeWidth = Number.isFinite(width) && width > 0 ? width : 80;
@@ -38,24 +38,40 @@ export const CurvePreview = memo(function CurvePreview({
 	for (let i = 0; i < numPoints; i++) {
 		const t = i / (numPoints - 1);
 		const value = evaluateCurve(type, t, safeShape);
-		
+
 		// Guard against NaN/Infinity
 		if (!Number.isFinite(value)) {
-			console.warn(`CurvePreview: Invalid value at t=${t}, type=${type}, shape=${safeShape}`);
+			console.warn(
+				`CurvePreview: Invalid value at t=${t}, type=${type}, shape=${safeShape}`,
+			);
 			continue;
 		}
-		
+
 		points.push({
 			x: t * safeWidth,
 			y: safeHeight - value * safeHeight, // Flip Y (SVG origin is top-left)
 		});
 	}
-	
+
 	// Bail if no valid points
 	if (points.length < 2) {
 		return (
-			<svg width={safeWidth} height={safeHeight} className={cn("inline-block", className)}>
-				<text x={safeWidth / 2} y={safeHeight / 2} textAnchor="middle" fontSize="10" fill="currentColor" opacity={0.5}>
+			<svg
+				width={safeWidth}
+				height={safeHeight}
+				className={cn("inline-block", className)}
+				role="img"
+				aria-label="Invalid curve data"
+			>
+				<title>Invalid curve data</title>
+				<text
+					x={safeWidth / 2}
+					y={safeHeight / 2}
+					textAnchor="middle"
+					fontSize="10"
+					fill="currentColor"
+					opacity={0.5}
+				>
 					Invalid curve
 				</text>
 			</svg>

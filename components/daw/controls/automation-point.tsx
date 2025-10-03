@@ -32,11 +32,14 @@ export const AutomationPoint = memo(function AutomationPoint({
 	}
 
 	return (
+		// biome-ignore lint/a11y/useSemanticElements: SVG <g> elements cannot be replaced with semantic HTML elements
 		<g
 			transform={`translate(${x}, ${y})`}
 			className={cn("cursor-move transition-transform", className)}
 			onPointerDown={onPointerDown}
 			onContextMenu={onContextMenu}
+			role="button"
+			aria-label="Automation point"
 			style={{
 				transformOrigin: "center",
 			}}
@@ -62,12 +65,7 @@ export const AutomationPoint = memo(function AutomationPoint({
 			/>
 
 			{/* Hit area (invisible, larger for easier interaction) */}
-			<circle
-				r={12}
-				fill="transparent"
-				className="cursor-pointer"
-			/>
+			<circle r={12} fill="transparent" className="cursor-pointer" />
 		</g>
 	);
 });
-
