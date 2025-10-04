@@ -346,8 +346,7 @@ export function DAWTrackContent() {
 										if (t.id === oldTrack.id) {
 											return {
 												...t,
-												clips:
-													t.clips?.filter((c) => c.id !== clip.id) ?? [],
+												clips: t.clips?.filter((c) => c.id !== clip.id) ?? [],
 											};
 										}
 										if (t.id === newTrack.id) {

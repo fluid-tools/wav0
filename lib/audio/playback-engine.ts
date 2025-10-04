@@ -127,18 +127,18 @@ export class PlaybackEngine {
 
 	/**
 	 * Schedule track volume automation envelope
-	 * 
+	 *
 	 * Architecture:
 	 * - Envelope points define MULTIPLIERS (0-4x) applied to base track volume
 	 * - Each point has a curve type that defines the transition TO THE NEXT point
 	 * - Curves are sampled into Float32Array and applied via setValueCurveAtTime
 	 * - Uses cumulative audio context time to prevent overlapping schedules
-	 * 
+	 *
 	 * Math:
 	 * - Base volume: track.volume / 100 (0-1 range from slider)
 	 * - Envelope multiplier: point.value (0-4 range for ±36dB)
 	 * - Final gain: baseVolume * multiplier
-	 * 
+	 *
 	 * @param track Track with volumeEnvelope to schedule
 	 */
 	private scheduleTrackEnvelope(track: Track): void {
@@ -205,18 +205,19 @@ export class PlaybackEngine {
 			// Sample the curve at 60Hz for smooth transitions
 			const steps = Math.max(2, Math.ceil(durationSec * 60));
 			const values = new Float32Array(steps);
-			
+
 			// Get curve type from the PREVIOUS point (curve defines transition FROM that point)
 			const previousPoint =
 				sorted.find((p) => p.time === lastTime) ?? sorted[0];
 			const curveType = previousPoint?.curve ?? "linear";
 			const curveShape = previousPoint?.curveShape ?? 0.5;
-			
+
 			// Generate gain values for each sample
 			for (let i = 0; i < steps; i++) {
 				const t = i / (steps - 1); // Normalized time 0-1
 				const curveValue = evaluateCurve(curveType, t, curveShape); // 0-1 curve output
-				const multiplier = lastMultiplier + (point.value - lastMultiplier) * curveValue;
+				const multiplier =
+					lastMultiplier + (point.value - lastMultiplier) * curveValue;
 				values[i] = baseVolume * multiplier;
 			}
 
