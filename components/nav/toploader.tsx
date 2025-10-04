@@ -4,23 +4,23 @@ import NextTopLoader from "nextjs-toploader";
 import { useEffect, useState } from "react";
 
 export default function TopLoader() {
-  const { theme } = useTheme();
+	const { theme } = useTheme();
 
-  const [isDark, setIsDark] = useState(false);
+	const [isDark, setIsDark] = useState(false);
 
-  useEffect(() => {
-    setIsDark(
-      theme === "dark" ||
-        (theme === "system" &&
-          window.matchMedia("(prefers-color-scheme: dark)").matches),
-    );
-  }, [theme]);
+	useEffect(() => {
+		setIsDark(
+			theme === "dark" ||
+				(theme === "system" &&
+					window.matchMedia("(prefers-color-scheme: dark)").matches),
+		);
+	}, [theme]);
 
-  return (
-    <NextTopLoader
-      color={isDark ? "white" : "black"}
-      height={4}
-      showSpinner={true}
-    />
-  );
+	return (
+		<NextTopLoader
+			color={isDark ? "white" : "black"}
+			height={4}
+			showSpinner={true}
+		/>
+	);
 }
