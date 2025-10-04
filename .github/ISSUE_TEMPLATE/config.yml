@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Discord Community
+    url: https://discord.gg/wav0
+    about: Join our Discord community for discussions, help, and real-time support
+  - name: 📚 Documentation
+    url: https://wav0.app/docs
+    about: Check our documentation for guides, API reference, and examples
+  - name: 🐦 Twitter
+    url: https://twitter.com/wav0ai
+    about: Follow us on Twitter for updates and announcements
