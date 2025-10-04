@@ -1,21 +1,25 @@
 <div align="center">
 
-# [WAV0 AI](https://wav0.app)
+# [WAV0](https://wav0.app)
 
-**The Open-Source AI Native Music Studio**
+**The Open-Source AI-Native Music Studio**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Website](https://img.shields.io/badge/website-wav0.app-blue)](https://wav0.app)
-[![Discord](https://img.shields.io/badge/discord-join%20us-5865F2)](https://wav0.app/discord)
+[![Discord](https://img.shields.io/badge/discord-join%20us-5865F2)](https://discord.gg/wav0)
 [![Twitter Follow](https://img.shields.io/twitter/follow/wav0ai?style=social)](https://twitter.com/wav0ai)
+[![Contributors](https://img.shields.io/github/contributors/yourusername/wav0)](https://github.com/yourusername/wav0/graphs/contributors)
+[![Stars](https://img.shields.io/github/stars/yourusername/wav0)](https://github.com/yourusername/wav0/stargazers)
 
 ![WAV0](https://di2lwe4r5jgy9jlt.public.blob.vercel-storage.com/og0image.png)
 
-*Faster than piracy, faster than stock sites. Go from idea to sound in seconds. Generate custom soundpacks and use them anywhere (YouTube, Twitch, TikTok, Logic Pro, [OpenCut](opencut.app), Final Cut Pro, etc.).*
+> **Making music production as accessible as Figma made design.** Go from idea to sound in seconds, not hours.
 
-*No downloads, no DAW commitment—just instant, one-click music creation.*
+WAV0 is the first AI-native music studio that works entirely in your browser. Think of us as the "Figma for audio" - we're democratizing music creation by reducing the steps from idea to sound while maintaining professional quality.
 
-**Built for creators, by creators at [FLUID.TOOLS](https://fluid.tools)**
+**No downloads, no DAW commitment, no learning curve—just instant, one-click music creation.**
+
+Built for creators, by creators at [FLUID.TOOLS](https://fluid.tools)
 
 [🎵 Try Live Demo](https://wav0.app/agent) • [📚 Documentation](https://wav0.app/docs) • [💬 Discord](https://discord.gg/wav0) • [🐦 Twitter](https://twitter.com/wav0ai)
 
@@ -25,34 +29,60 @@
 
 ## ✨ Features
 
-### 🤖 [**WAV0 AI**](https://wav0.app/agent)
+### 🤖 [**WAV0 AI Agent**](https://wav0.app/agent)
+**Natural language to audio in seconds**
+- Just describe what you want: "Create a hype TikTok transition soundpack"
+- AI generates custom music, sound effects, and audio assets
+- Export directly to your favorite platforms and editors
+- No technical knowledge required
 
-Just ask and it turns your idea to sound in seconds. Use it from WAV0 Playground or WAV0 Studio.
+### 🎛️ [**Studio DAW**](https://wav0.app/studio)
+**Professional DAW in your browser**
+- Multi-track editing with real-time playback
+- Automation lanes and curve editing
+- Professional audio effects and processing
+- Export to WAV, MP3, and other formats
+- Works on any device with a modern browser
 
-### 🎛️ [**Studio**](https://wav0.app/studio)
-
-In-browser AI-Native DAW that works without downloads. Edit audio files, create soundpacks, and export to widely available audio formats.
-
-
-### [**Playground**](https://wav0.app/studio)
-
-Quickly experiment with asset generation, song generation, and songwriting with just prompts.
+### 🎮 [**Playground**](https://wav0.app/playground)
+**Rapid experimentation and prototyping**
+- Quick asset generation and iteration
+- Test ideas before committing to full projects
+- Share and collaborate on audio experiments
+- Perfect for content creators and producers
 
 ### 🗄️ [**Vault**](https://wav0.app/vault)
+**Secure, flexible audio storage**
+- Private by default with granular sharing controls
+- Version control for all your audio files
+- Organize projects and collaborate with teams
+- Cloud storage with offline access
 
-Secure flexible storage for your music. Easily store and have control over who has access to your music. Private by default.
-
-### 📝 **Version Control**
-
-Easily toggle between versions of your audio files in Vault and generations in WAV0 Agent.
+### 🔄 **Seamless Workflow Integration**
+- Export to Logic Pro, Ableton, Pro Tools
+- Direct integration with video editors (Final Cut Pro, Premiere)
+- One-click sharing to social platforms
+- API access for custom integrations
 
 ## 🎯 Who It's For
 
-**YouTube Creators & Channels** - Generate custom background music, sound effects, and intros in seconds. Drop directly into your editor without leaving your workflow.
+### Content Creators
+- **YouTube Creators**: Generate custom background music, sound effects, and intros in seconds
+- **Twitch Streamers**: Create instant soundpacks for alerts, transitions, and ambient music
+- **TikTok Creators**: Produce viral-ready audio that matches your content style
+- **Podcasters**: Professional intro/outro music and sound design
 
-**Twitch Creators & Channels** - Create instant soundpacks for alerts, transitions, and ambient music. No more digging through free libraries or dealing with copyright claims.
+### Music Producers
+- **Beatmakers**: Build beats, loops, and samples faster than traditional methods
+- **Songwriters**: Prototype ideas and collaborate on tracks in real-time
+- **Sound Designers**: Create custom effects and audio assets for any project
+- **Indie Artists**: Professional-quality production without expensive software
 
-**Internet Producers** - Build beats, loops, and samples faster than traditional methods. Export to any platform with zero friction.
+### Developers & Integrators
+- **App Developers**: Integrate AI music generation into your applications
+- **Game Developers**: Create dynamic soundtracks and audio effects
+- **Web Developers**: Add audio capabilities to web applications
+- **API Users**: Build custom audio workflows with our developer tools
 
 ## 🚀 Quick Start
 
@@ -92,8 +122,17 @@ Visit <http://localhost:3000> to see your local instance running.
 
 ## 🗺️ Roadmap
 
-* \[ ] **Background Generations**
-* \[ ] [**WAV0 Community**](https://wav0.app/community) - A library of music and sounds by the wav0 community
+### 🚀 Coming Soon
+- [ ] **Background Generations** - Generate audio while you work on other tasks
+- [ ] **Real-time Collaboration** - Work on tracks with others simultaneously
+- [ ] **Advanced AI Models** - More sophisticated music generation capabilities
+- [ ] **Mobile App** - Native iOS and Android applications
+
+### 🌟 Future Vision
+- [ ] **WAV0 Community** - A library of music and sounds by the community
+- [ ] **Plugin Ecosystem** - Third-party audio effects and instruments
+- [ ] **AI Mastering** - Automatic audio mastering and optimization
+- [ ] **Live Performance Mode** - Real-time audio manipulation for live shows
 
 ## 🤝 Sponsors & Partners
 
@@ -111,8 +150,15 @@ Visit <http://localhost:3000> to see your local instance running.
 
 ## 🙏 OSS Shoutouts
 
+We're grateful to the open source community for making WAV0 possible:
+
 * [MediaBunny](https://mediabunny.dev) - Fast browser-based media processing
 * [AI SDK](https://ai-sdk.dev/) - The TypeScript toolkit for AI apps
+* [Next.js](https://nextjs.org/) - The React framework for production
+* [Jotai](https://jotai.org/) - Primitive and flexible state management
+* [Radix UI](https://www.radix-ui.com/) - Low-level UI primitives
+* [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
+* [Biome](https://biomejs.dev/) - Fast formatter and linter
 
 ## 📖 Documentation
 
@@ -124,15 +170,36 @@ For detailed documentation, visit our [docs](https://wav0.app/docs) or check out
 
 ## 🤝 Contributing
 
-We love contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+We love contributions! WAV0 is built by the community, for the community. Whether you're fixing bugs, adding features, or improving documentation, your contributions help make music creation accessible to everyone.
+
+### Quick Start for Contributors
+
+1. **Read our [Contributing Guide](CONTRIBUTING.md)** - Comprehensive guide to getting started
+2. **Join our [Discord](https://discord.gg/wav0)** - Connect with other contributors and get help
+3. **Check our [Issues](https://github.com/yourusername/wav0/issues)** - Find something to work on
+4. **Fork and contribute** - Make your first contribution!
+
+### Areas We Need Help With
+
+- 🎵 **Audio Engine**: Improve playback, effects, and processing
+- 🤖 **AI Integration**: Enhance music generation capabilities  
+- 🎨 **UI/UX**: Make the interface more intuitive and accessible
+- 📱 **Mobile**: Optimize for mobile devices and touch interfaces
+- 🧪 **Testing**: Add comprehensive test coverage
+- 📚 **Documentation**: Improve guides and API documentation
+- 🌐 **Internationalization**: Help translate WAV0 to other languages
 
 ### Development
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+```bash
+# Fork the repository, then:
+git clone https://github.com/yourusername/wav0.git
+cd wav0
+bun install
+bun dev
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed setup instructions.
 
 ## 📄 License
 
