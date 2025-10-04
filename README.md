@@ -170,7 +170,7 @@ For detailed documentation, visit our [docs](https://wav0.app/docs) or check out
 
 ## 🤝 Contributing
 
-We love contributions! WAV0 is built by the community, for the community. Whether you're fixing bugs, adding features, or improving documentation, your contributions help make music creation accessible to everyone.
+We love contributions! WAV0 is meant to be built by the community, for the community. Whether you're fixing bugs, adding features, or improving documentation, your contributions help make music creation accessible to everyone.
 
 ### Quick Start for Contributors
 
