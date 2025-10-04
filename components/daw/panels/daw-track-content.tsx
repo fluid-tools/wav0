@@ -315,19 +315,59 @@ export function DAWTrackContent() {
 									clipEndTime,
 								);
 
-								// Show dialog to confirm automation transfer
-								setAutomationTransferDialog({
-									open: true,
-									clipId: clip.id,
-									clipName: clip.name || "Untitled",
-									sourceTrack: { id: oldTrack.id, name: oldTrack.name },
-									targetTrack: { id: newTrack.id, name: newTrack.name },
-									automationPointCount: automationCount,
-									newStartTime,
-								});
+								// If automation exists, show dialog; otherwise move immediately
+								if (automationCount > 0) {
+									// Show dialog to confirm automation transfer
+									setAutomationTransferDialog({
+										open: true,
+										clipId: clip.id,
+										clipName: clip.name || "Untitled",
+										sourceTrack: { id: oldTrack.id, name: oldTrack.name },
+										targetTrack: { id: newTrack.id, name: newTrack.name },
+										automationPointCount: automationCount,
+										newStartTime,
+									});
 
-								// Pause further dragging until dialog is resolved
-								setDraggingClip(null);
+									// Pause further dragging until dialog is resolved
+									setDraggingClip(null);
+									return;
+								}
+
+								// No automation - proceed with immediate move
+								// Stop playback on old track if playing
+								if (playback.isPlaying) {
+									playbackEngine.stopClip(oldTrack.id, clip.id);
+								}
+
+								// Move clip atomically
+								const updatedClip = { ...clip, startTime: newStartTime };
+								setTracks((prev) =>
+									prev.map((t) => {
+										if (t.id === oldTrack.id) {
+											return {
+												...t,
+												clips:
+													t.clips?.filter((c) => c.id !== clip.id) ?? [],
+											};
+										}
+										if (t.id === newTrack.id) {
+											return {
+												...t,
+												clips: [...(t.clips ?? []), updatedClip],
+											};
+										}
+										return t;
+									}),
+								);
+
+								// Update dragging state to track new location
+								setDraggingClip({
+									...draggingClip,
+									trackId: newTrack.id,
+									startTime: newStartTime,
+									sourceTrackId: newTrack.id,
+								});
+								setSelectedTrackId(newTrack.id);
 								return;
 							}
 						}
@@ -460,16 +500,17 @@ export function DAWTrackContent() {
 			setTracks((prev) =>
 				prev.map((t) => {
 					if (t.id === oldTrack.id) {
+						// Remove clip from source track and apply automation changes
 						return {
 							...updatedOldTrack,
-							clips:
-								updatedOldTrack.clips?.filter((c) => c.id !== clipId) ?? [],
+							clips: oldTrack.clips?.filter((c) => c.id !== clipId) ?? [],
 						};
 					}
 					if (t.id === newTrack.id) {
+						// Add clip to destination track and apply automation changes
 						return {
 							...updatedNewTrack,
-							clips: [...(updatedNewTrack.clips ?? []), updatedClip],
+							clips: [...(newTrack.clips ?? []), updatedClip],
 						};
 					}
 					return t;

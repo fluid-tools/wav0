@@ -140,12 +140,16 @@ export function AutomationLane({
 	);
 
 	// Change curve type for selected segment
+	// NOTE: Updates track automation immediately (no draft state)
+	// This ensures curve changes in automation lane sync with drawer
 	const setCurveType = useCallback(
 		(curveType: TrackEnvelopePoint["curve"]) => {
 			if (!selectedSegment || !envelope) return;
 
+			// Update the curve type on the "from" point of the segment
+			// The curve defines the shape from this point to the next point
 			const updatedPoints = envelope.points.map((p) =>
-				p.id === selectedSegment.toPointId ? { ...p, curve: curveType } : p,
+				p.id === selectedSegment.fromPointId ? { ...p, curve: curveType } : p,
 			);
 
 			updateTrack(track.id, {

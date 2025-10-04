@@ -38,6 +38,13 @@ const curveItems = [
 	{ label: "S-curve", value: "sCurve" as const },
 ];
 
+/**
+ * Envelope Editor for clip drawer
+ * 
+ * NOTE: This component displays a DRAFT of the track's automation.
+ * Changes are applied via the Save button, which calls onSave().
+ * External changes (from automation lane) sync via useEffect in use-clip-inspector.
+ */
 export function EnvelopeEditor({
 	points,
 	onChange,

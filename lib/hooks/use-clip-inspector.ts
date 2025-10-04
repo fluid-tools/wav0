@@ -32,13 +32,15 @@ export function useClipInspector() {
 		return track && clip ? { track, clip } : null;
 	}, [target, tracks]);
 
+	// Sync envelope draft with track automation (single source of truth)
+	// Re-sync whenever track automation changes externally
 	useEffect(() => {
 		if (!current) return;
 		setFadeInDraft(current.clip.fadeIn ?? 0);
 		setFadeOutDraft(current.clip.fadeOut ?? 0);
 		const points = current.track.volumeEnvelope?.points ?? [];
 		setEnvelopeDraft(points.map((point) => ({ ...point })));
-	}, [current]);
+	}, [current, current?.track.volumeEnvelope]);
 
 	const close = (nextOpen: boolean) => {
 		setOpen(nextOpen);
