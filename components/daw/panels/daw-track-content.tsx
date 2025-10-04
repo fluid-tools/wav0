@@ -429,6 +429,9 @@ export function DAWTrackContent() {
 		timeline.snapToGrid,
 		timeline.gridSize,
 		trackHeightZoom,
+		playback.isPlaying,
+		setSelectedTrackId,
+		setTracks,
 	]);
 
 	// Handle automation transfer dialog confirmation
