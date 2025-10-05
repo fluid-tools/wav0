@@ -46,7 +46,7 @@ export default function Home() {
 						size="sm"
 						className="font-mono text-xs uppercase tracking-tight"
 					>
-						<Link href="/create">Get Started</Link>
+						<Link href="/daw">Get Started</Link>
 					</Button>
 				</div>
 			</nav>
@@ -80,7 +80,7 @@ export default function Home() {
 								size="lg"
 								className="font-mono text-sm uppercase tracking-tight"
 							>
-								<Link href="/create">Start Creating</Link>
+								<Link href="/daw">Start Creating</Link>
 							</Button>
 							<Button
 								asChild
@@ -271,7 +271,7 @@ export default function Home() {
 						size="lg"
 						className="font-mono text-sm uppercase tracking-tight"
 					>
-						<Link href="/create">Try WAV0 Free</Link>
+						<Link href="/daw">Try WAV0 Free</Link>
 					</Button>
 				</div>
 			</section>
