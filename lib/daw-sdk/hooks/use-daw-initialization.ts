@@ -1,56 +1,55 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { audioService } from "../core/audio-service"
-import { playbackService } from "../core/playback-service"
+import { useEffect, useState } from "react";
+import { audioService } from "../core/audio-service";
+import { playbackService } from "../core/playback-service";
 
 /**
  * Initialize DAW SDK on app mount
  * This hook ensures services are ready before use
  */
 export function useDAWInitialization() {
-	const [isInitialized, setIsInitialized] = useState(false)
-	const [error, setError] = useState<Error | null>(null)
+	const [isInitialized, setIsInitialized] = useState(false);
+	const [error, setError] = useState<Error | null>(null);
 
 	useEffect(() => {
-		let mounted = true
+		let mounted = true;
 
 		async function initialize() {
 			try {
 				// Initialize audio context
-				await audioService.getAudioContext()
-				
+				await audioService.getAudioContext();
+
 				if (mounted) {
-					setIsInitialized(true)
-					console.log("[DAW SDK] Initialized successfully")
+					setIsInitialized(true);
+					console.log("[DAW SDK] Initialized successfully");
 				}
 			} catch (err) {
 				if (mounted) {
-					const error = err instanceof Error ? err : new Error(String(err))
-					setError(error)
-					console.error("[DAW SDK] Initialization failed:", error)
+					const error = err instanceof Error ? err : new Error(String(err));
+					setError(error);
+					console.error("[DAW SDK] Initialization failed:", error);
 				}
 			}
 		}
 
-		initialize()
+		initialize();
 
 		return () => {
-			mounted = false
-		}
-	}, [])
+			mounted = false;
+		};
+	}, []);
 
 	// Cleanup on unmount
 	useEffect(() => {
 		return () => {
-			Promise.all([
-				audioService.cleanup(),
-				playbackService.cleanup(),
-			]).catch((err) => {
-				console.error("[DAW SDK] Cleanup failed:", err)
-			})
-		}
-	}, [])
+			Promise.all([audioService.cleanup(), playbackService.cleanup()]).catch(
+				(err) => {
+					console.error("[DAW SDK] Cleanup failed:", err);
+				},
+			);
+		};
+	}, []);
 
-	return { isInitialized, error }
+	return { isInitialized, error };
 }

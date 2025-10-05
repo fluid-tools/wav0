@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef } from "react";
 
-export { useDAWInitialization } from "./use-daw-initialization"
+export { useDAWInitialization } from "./use-daw-initialization";
 
 /**
  * Consolidated hook for playback time synchronization
@@ -13,24 +13,24 @@ export function usePlaybackSync(
 	currentTime: number,
 	callback: (time: number) => void,
 ) {
-	const callbackRef = useRef(callback)
-	callbackRef.current = callback
+	const callbackRef = useRef(callback);
+	callbackRef.current = callback;
 
 	useEffect(() => {
-		if (!isPlaying) return
+		if (!isPlaying) return;
 
-		let frameId: number
+		let frameId: number;
 		const update = () => {
-			callbackRef.current(currentTime)
-			frameId = requestAnimationFrame(update)
-		}
+			callbackRef.current(currentTime);
+			frameId = requestAnimationFrame(update);
+		};
 
-		frameId = requestAnimationFrame(update)
+		frameId = requestAnimationFrame(update);
 
 		return () => {
-			cancelAnimationFrame(frameId)
-		}
-	}, [isPlaying, currentTime])
+			cancelAnimationFrame(frameId);
+		};
+	}, [isPlaying, currentTime]);
 }
 
 /**
@@ -40,47 +40,47 @@ export function useScrollSync(
 	refs: React.RefObject<HTMLElement>[],
 	onScroll?: (scrollLeft: number, scrollTop: number) => void,
 ) {
-	const scrollingRef = useRef(false)
-	const onScrollRef = useRef(onScroll)
-	onScrollRef.current = onScroll
+	const scrollingRef = useRef(false);
+	const onScrollRef = useRef(onScroll);
+	onScrollRef.current = onScroll;
 
 	useEffect(() => {
 		const elements = refs
 			.map((ref) => ref.current)
-			.filter((el): el is HTMLElement => el !== null)
-		if (elements.length === 0) return
+			.filter((el): el is HTMLElement => el !== null);
+		if (elements.length === 0) return;
 
 		const handleScroll = (e: Event) => {
-			if (scrollingRef.current) return
-			scrollingRef.current = true
+			if (scrollingRef.current) return;
+			scrollingRef.current = true;
 
-			const target = e.target as HTMLElement
-			const { scrollLeft, scrollTop } = target
+			const target = e.target as HTMLElement;
+			const { scrollLeft, scrollTop } = target;
 
 			for (const el of elements) {
 				if (el !== target) {
-					el.scrollLeft = scrollLeft
-					el.scrollTop = scrollTop
+					el.scrollLeft = scrollLeft;
+					el.scrollTop = scrollTop;
 				}
 			}
 
-			onScrollRef.current?.(scrollLeft, scrollTop)
+			onScrollRef.current?.(scrollLeft, scrollTop);
 
 			requestAnimationFrame(() => {
-				scrollingRef.current = false
-			})
-		}
+				scrollingRef.current = false;
+			});
+		};
 
 		for (const el of elements) {
-			el.addEventListener("scroll", handleScroll)
+			el.addEventListener("scroll", handleScroll);
 		}
 
 		return () => {
 			for (const el of elements) {
-				el.removeEventListener("scroll", handleScroll)
+				el.removeEventListener("scroll", handleScroll);
 			}
-		}
-	}, [refs])
+		};
+	}, [refs]);
 }
 
 /**
@@ -90,25 +90,25 @@ export function useResizeObserver(
 	ref: React.RefObject<HTMLElement>,
 	callback: (entry: ResizeObserverEntry) => void,
 ) {
-	const callbackRef = useRef(callback)
-	callbackRef.current = callback
+	const callbackRef = useRef(callback);
+	callbackRef.current = callback;
 
 	useEffect(() => {
-		const el = ref.current
-		if (!el) return
+		const el = ref.current;
+		if (!el) return;
 
 		const ro = new ResizeObserver((entries) => {
 			for (const entry of entries) {
-				callbackRef.current(entry)
+				callbackRef.current(entry);
 			}
-		})
+		});
 
-		ro.observe(el)
+		ro.observe(el);
 
 		return () => {
-			ro.disconnect()
-		}
-	}, [ref])
+			ro.disconnect();
+		};
+	}, [ref]);
 }
 
 /**
@@ -119,16 +119,16 @@ export function useDocumentEvent<K extends keyof DocumentEventMap>(
 	handler: (e: DocumentEventMap[K]) => void,
 	options?: AddEventListenerOptions,
 ) {
-	const handlerRef = useRef(handler)
-	handlerRef.current = handler
+	const handlerRef = useRef(handler);
+	handlerRef.current = handler;
 
 	useEffect(() => {
-		const listener = (e: DocumentEventMap[K]) => handlerRef.current(e)
-		document.addEventListener(event, listener, options)
+		const listener = (e: DocumentEventMap[K]) => handlerRef.current(e);
+		document.addEventListener(event, listener, options);
 		return () => {
-			document.removeEventListener(event, listener, options)
-		}
-	}, [event, options])
+			document.removeEventListener(event, listener, options);
+		};
+	}, [event, options]);
 }
 
 /**
@@ -139,16 +139,16 @@ export function useWindowEvent<K extends keyof WindowEventMap>(
 	handler: (e: WindowEventMap[K]) => void,
 	options?: AddEventListenerOptions,
 ) {
-	const handlerRef = useRef(handler)
-	handlerRef.current = handler
+	const handlerRef = useRef(handler);
+	handlerRef.current = handler;
 
 	useEffect(() => {
-		const listener = (e: WindowEventMap[K]) => handlerRef.current(e)
-		window.addEventListener(event, listener, options)
+		const listener = (e: WindowEventMap[K]) => handlerRef.current(e);
+		window.addEventListener(event, listener, options);
 		return () => {
-			window.removeEventListener(event, listener, options)
-		}
-	}, [event, options])
+			window.removeEventListener(event, listener, options);
+		};
+	}, [event, options]);
 }
 
 /**
@@ -158,17 +158,17 @@ export function useCustomEvent<T = unknown>(
 	event: string,
 	handler: (detail: T) => void,
 ) {
-	const handlerRef = useRef(handler)
-	handlerRef.current = handler
+	const handlerRef = useRef(handler);
+	handlerRef.current = handler;
 
 	useEffect(() => {
 		const listener = (e: Event) => {
-			const customEvent = e as CustomEvent<T>
-			handlerRef.current(customEvent.detail)
-		}
-		window.addEventListener(event, listener)
+			const customEvent = e as CustomEvent<T>;
+			handlerRef.current(customEvent.detail);
+		};
+		window.addEventListener(event, listener);
 		return () => {
-			window.removeEventListener(event, listener)
-		}
-	}, [event])
+			window.removeEventListener(event, listener);
+		};
+	}, [event]);
 }

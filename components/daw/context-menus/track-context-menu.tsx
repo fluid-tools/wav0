@@ -10,12 +10,7 @@ import {
 	ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { Input } from "@/components/ui/input";
-import {
-	clampDb,
-	formatDb,
-	VOLUME_MAX_DB,
-	VOLUME_MIN_DB,
-} from "@/lib/daw-sdk";
+import { clampDb, formatDb, VOLUME_MAX_DB, VOLUME_MIN_DB } from "@/lib/daw-sdk";
 
 type TrackMenuHandlers = {
 	onRequestRename?: () => void;

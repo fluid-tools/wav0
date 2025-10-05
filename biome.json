@@ -14,7 +14,8 @@
 			"!dist",
 			"!build",
 			"!.vscode",
-			"!.cursor"
+			"!.cursor",
+			"!convex/_generated"
 		]
 	},
 	"formatter": {

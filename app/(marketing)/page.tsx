@@ -1,8 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
+import { ThemeToggleGroup } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ThemeToggleGroup } from "@/components/theme-toggle";
 
 export default function Home() {
 	return (

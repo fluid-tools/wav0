@@ -1,8 +1,8 @@
 "use client";
 
 import { Monitor, Moon, Sun } from "lucide-react";
-import { useTheme } from "next-themes";
 import dynamic from "next/dynamic";
+import { useTheme } from "next-themes";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -67,5 +67,5 @@ function ThemeToggleGroupInner() {
 
 export const ThemeToggleGroup = dynamic(
 	async () => ({ default: ThemeToggleGroupInner }),
-	{ ssr: false }
+	{ ssr: false },
 );
