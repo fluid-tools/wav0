@@ -15,7 +15,7 @@ import {
 	formatDb,
 	VOLUME_MAX_DB,
 	VOLUME_MIN_DB,
-} from "@/lib/audio/volume";
+} from "@/lib/daw-sdk";
 
 type TrackMenuHandlers = {
 	onRequestRename?: () => void;

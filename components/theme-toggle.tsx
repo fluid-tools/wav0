@@ -2,6 +2,7 @@
 
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
+import dynamic from "next/dynamic";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -39,7 +40,7 @@ export function ThemeToggle() {
 	);
 }
 
-export function ThemeToggleGroup() {
+function ThemeToggleGroupInner() {
 	const { theme, setTheme } = useTheme();
 
 	return (
@@ -63,3 +64,8 @@ export function ThemeToggleGroup() {
 		</ToggleGroup>
 	);
 }
+
+export const ThemeToggleGroup = dynamic(
+	async () => ({ default: ThemeToggleGroupInner }),
+	{ ssr: false }
+);

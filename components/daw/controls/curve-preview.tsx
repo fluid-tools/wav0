@@ -1,8 +1,8 @@
 "use client";
 
 import { memo } from "react";
-import type { CurveType } from "@/lib/audio/curve-functions";
-import { evaluateCurve } from "@/lib/audio/curve-functions";
+import type { CurveType } from "@/lib/daw-sdk";
+import { evaluateCurve } from "@/lib/daw-sdk";
 import { cn } from "@/lib/utils";
 
 type CurvePreviewProps = {

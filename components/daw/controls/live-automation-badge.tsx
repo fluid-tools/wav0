@@ -1,7 +1,7 @@
 "use client";
 
 import { useAtom } from "jotai";
-import { formatDb } from "@/lib/audio/volume";
+import { formatDb } from "@/lib/daw-sdk";
 import { useLiveAutomationGain } from "@/lib/hooks/use-live-automation-gain";
 import { playbackAtom } from "@/lib/state/daw-store";
 

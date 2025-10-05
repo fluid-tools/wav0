@@ -10,15 +10,15 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { getCurveDescription } from "@/lib/audio/curve-functions";
 import {
+	getCurveDescription,
 	clampAutomationDb,
 	dbToMultiplier,
 	formatDb,
 	getEffectiveDb,
 	multiplierToDb,
 	volumeToDb,
-} from "@/lib/audio/volume";
+} from "@/lib/daw-sdk";
 import type { TrackEnvelopePoint } from "@/lib/state/daw-store";
 import { formatDuration } from "@/lib/storage/opfs";
 import { CurvePreview } from "../controls/curve-preview";

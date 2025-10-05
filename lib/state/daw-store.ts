@@ -2,8 +2,7 @@
 
 import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
-import { audioManager } from "@/lib/audio/audio-manager";
-import { playbackEngine } from "@/lib/audio/playback-engine";
+import { audioService, playbackService } from "@/lib/daw-sdk";
 import { DAW_PIXELS_PER_SECOND_AT_ZOOM_1 } from "@/lib/constants";
 import { generateTrackId } from "@/lib/storage/opfs";
 
@@ -236,7 +235,7 @@ export const updateClipAtom = atom(
 				updates.loopEnd !== undefined)
 		) {
 			try {
-				await playbackEngine.rescheduleTrack(updatedTrack);
+				await playbackService.rescheduleTrack(updatedTrack);
 			} catch (e) {
 				console.error(
 					"Failed to reschedule track after clip update",
@@ -281,9 +280,9 @@ export const removeClipAtom = atom(
 						t.id !== trackId && t.clips?.some((clip) => clip.id === clipId),
 				);
 				if (sourceTrack) {
-					playbackEngine.stopClip(sourceTrack.id, clipId);
+					await playbackService.stopClip(sourceTrack.id, clipId);
 				}
-				await playbackEngine.rescheduleTrack(updatedTrack);
+				await playbackService.rescheduleTrack(updatedTrack);
 			} catch (e) {
 				console.error(
 					"Failed to reschedule track after clip removal",
@@ -343,7 +342,7 @@ export const splitClipAtPlayheadAtom = atom(null, async (get, set) => {
 
 	if (playback.isPlaying) {
 		try {
-			await playbackEngine.rescheduleTrack(updatedTrack);
+			await playbackService.rescheduleTrack(updatedTrack);
 		} catch (e) {
 			console.error("Failed to reschedule after split", track.id, e);
 		}
@@ -539,21 +538,21 @@ export const updateTrackAtom = atom(
 
 		const updatedTrack = updatedTracks.find((t) => t.id === trackId);
 		if (!updatedTrack) return;
-		playbackEngine.synchronizeTracks(updatedTracks);
+		playbackService.synchronizeTracks(updatedTracks);
 
 		// Volume/mute/solo should reflect immediately without reschedule
 		if (typeof updates.volume === "number") {
-			playbackEngine.updateTrackVolume(trackId, updates.volume);
+			playbackService.updateTrackVolume(trackId, updates.volume);
 		}
 		if (typeof updates.muted === "boolean") {
 			const vol =
 				typeof updates.volume === "number"
 					? updates.volume
 					: updatedTrack.volume;
-			playbackEngine.updateTrackMute(trackId, updates.muted, vol);
+			playbackService.updateTrackMute(trackId, updates.muted, vol);
 		}
 		if (typeof updates.soloed === "boolean") {
-			playbackEngine.updateSoloStates(updatedTracks);
+			playbackService.updateSoloStates(updatedTracks);
 		}
 
 		// If playing and timing changed, reschedule for immediate correctness
@@ -564,7 +563,7 @@ export const updateTrackAtom = atom(
 				updates.trimEnd !== undefined)
 		) {
 			try {
-				await playbackEngine.rescheduleTrack(updatedTrack);
+				await playbackService.rescheduleTrack(updatedTrack);
 			} catch (e) {
 				console.error("Failed to reschedule track after update", trackId, e);
 			}
@@ -592,12 +591,12 @@ export const setCurrentTimeAtom = atom(null, async (get, set, time: number) => {
 
 	if (playback.isPlaying) {
 		// Pause current playback
-		await playbackEngine.pause();
+		await playbackService.pause();
 
 		// Restart playback from new position
-		await playbackEngine.play(tracks, {
+		await playbackService.play(tracks, {
 			startTime: time / 1000,
-			onTimeUpdate: (currentTime) => {
+			onTimeUpdate: (currentTime: number) => {
 				const newPlayback = get(playbackAtom);
 				// Restart at end-of-project if we cross it
 				const total = get(totalDurationAtom);
@@ -638,7 +637,7 @@ export const initializeAudioFromOPFSAtom = atom(null, async (get, _set) => {
 					"opfsFileId:",
 					track.opfsFileId,
 				);
-				await audioManager.loadTrackFromOPFS(
+				await audioService.loadTrackFromOPFS(
 					track.opfsFileId,
 					track.audioFileName,
 				);
@@ -667,7 +666,7 @@ export const loadAudioFileAtom = atom(
 			console.log("loadAudioFileAtom called:", { existingTrackId, opfsFileId });
 
 			// Load audio file through MediaBunny
-			const audioInfo = await audioManager.loadAudioFile(file, opfsFileId);
+			const audioInfo = await audioService.loadAudioFile(file, opfsFileId);
 
 			if (existingTrackId) {
 				// Update existing track with audio data
@@ -714,7 +713,7 @@ export const loadAudioFileAtom = atom(
 					const playback = get(playbackAtom);
 					if (playback.isPlaying) {
 						try {
-							await playbackEngine.rescheduleTrack(updatedTrack);
+							await playbackService.rescheduleTrack(updatedTrack);
 						} catch (e) {
 							console.error(
 								"Failed to reschedule after adding clip",
@@ -767,7 +766,7 @@ export const loadAudioFileAtom = atom(
 			const playback = get(playbackAtom);
 			if (playback.isPlaying) {
 				try {
-					await playbackEngine.rescheduleTrack(newTrack);
+					await playbackService.rescheduleTrack(newTrack);
 				} catch (e) {
 					console.error(
 						"Failed to reschedule after creating track",
@@ -797,7 +796,7 @@ export const togglePlaybackAtom = atom(null, async (get, set) => {
 
 	if (playback.isPlaying) {
 		// Pause playback
-		await playbackEngine.pause();
+		await playbackService.pause();
 		set(playbackAtom, { ...playback, isPlaying: false });
 		console.log("Playback paused");
 	} else {
@@ -816,11 +815,11 @@ export const togglePlaybackAtom = atom(null, async (get, set) => {
 		);
 
 		// Initialize engine with current tracks
-		await playbackEngine.initializeWithTracks(tracks);
+		await playbackService.initializeWithTracks(tracks);
 
-		await playbackEngine.play(tracks, {
+		await playbackService.play(tracks, {
 			startTime: currentTime,
-			onTimeUpdate: (time) => {
+			onTimeUpdate: (time: number) => {
 				// Update time and restart when crossing project end
 				const playback = get(playbackAtom);
 				const total = get(totalDurationAtom);
@@ -844,7 +843,7 @@ export const togglePlaybackAtom = atom(null, async (get, set) => {
 });
 
 export const stopPlaybackAtom = atom(null, async (get, set) => {
-	await playbackEngine.stop();
+	await playbackService.stop();
 	const playback = get(playbackAtom);
 	set(playbackAtom, {
 		...playback,

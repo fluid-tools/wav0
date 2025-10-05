@@ -23,7 +23,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { dbToVolume, formatDb, volumeToDb } from "@/lib/audio/volume";
+import { dbToVolume, formatDb, volumeToDb } from "@/lib/daw-sdk";
 import {
 	DAW_BUTTONS,
 	DAW_COLORS,

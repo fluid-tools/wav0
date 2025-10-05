@@ -2,7 +2,7 @@
 
 import { useAtom } from "jotai";
 import { useEffect, useState } from "react";
-import { getEffectiveDb, multiplierToDb } from "@/lib/audio/volume";
+import { getEffectiveDb, multiplierToDb } from "@/lib/daw-sdk";
 import type { TrackEnvelopePoint } from "@/lib/state/daw-store";
 import { playbackAtom, tracksAtom } from "@/lib/state/daw-store";
 
