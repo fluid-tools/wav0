@@ -8,7 +8,7 @@ import { AutomationTransferDialog } from "@/components/daw/dialogs/automation-tr
 import { AutomationLane } from "@/components/daw/panels/automation-lane";
 import { DAW_HEIGHTS } from "@/lib/constants/daw-design";
 import { playbackService } from "@/lib/daw-sdk";
-import type { Clip } from "@/lib/state/daw-store";
+import type { Clip } from "@/lib/daw-sdk";
 import {
 	activeToolAtom,
 	loadAudioFileAtom,
@@ -23,7 +23,7 @@ import {
 	tracksAtom,
 	updateClipAtom,
 	updateTrackAtom,
-} from "@/lib/state/daw-store";
+} from "@/lib/daw-sdk";
 import { formatDuration } from "@/lib/storage/opfs";
 import { cn } from "@/lib/utils";
 import {

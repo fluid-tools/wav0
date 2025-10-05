@@ -23,7 +23,7 @@ import {
 	stopPlaybackAtom,
 	togglePlaybackAtom,
 	tracksAtom,
-} from "@/lib/state/daw-store";
+} from "@/lib/daw-sdk";
 
 export function AudioTestPanel() {
 	const [tracks] = useAtom(tracksAtom);

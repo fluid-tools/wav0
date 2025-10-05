@@ -4,13 +4,13 @@ import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { getEffectiveDb, multiplierToDb } from "@/lib/daw-sdk";
-import type { Track, TrackEnvelopePoint } from "@/lib/state/daw-store";
+import type { Track, TrackEnvelopePoint } from "@/lib/daw-sdk";
 import {
 	automationViewEnabledAtom,
 	playbackAtom,
 	timelinePxPerMsAtom,
 	updateTrackAtom,
-} from "@/lib/state/daw-store";
+} from "@/lib/daw-sdk";
 
 type AutomationLaneProps = {
 	track: Track;

@@ -19,7 +19,7 @@ import {
 	multiplierToDb,
 	volumeToDb,
 } from "@/lib/daw-sdk";
-import type { TrackEnvelopePoint } from "@/lib/state/daw-store";
+import type { TrackEnvelopePoint } from "@/lib/daw-sdk";
 import { formatDuration } from "@/lib/storage/opfs";
 import { CurvePreview } from "../controls/curve-preview";
 

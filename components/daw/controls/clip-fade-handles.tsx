@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import type { Clip } from "@/lib/state/daw-store";
+import type { Clip } from "@/lib/daw-sdk";
 import { formatDuration } from "@/lib/storage/opfs";
 import { cn } from "@/lib/utils";
 
