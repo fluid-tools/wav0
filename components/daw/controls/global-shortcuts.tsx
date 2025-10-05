@@ -15,7 +15,7 @@ import {
 	totalDurationAtom,
 	tracksAtom,
 	updateClipAtom,
-} from "@/lib/state/daw-store";
+} from "@/lib/daw-sdk";
 
 export function GlobalShortcuts() {
 	const [playback] = useAtom(playbackAtom);

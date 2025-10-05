@@ -18,7 +18,7 @@ import {
 	renameClipAtom,
 	selectedClipIdAtom,
 	selectedTrackIdAtom,
-} from "@/lib/state/daw-store";
+} from "@/lib/daw-sdk";
 
 type ClipContextMenuProps = {
 	trackId: string;

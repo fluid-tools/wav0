@@ -8,7 +8,7 @@ import {
 	tracksAtom,
 	updateClipAtom,
 	updateTrackAtom,
-} from "@/lib/state/daw-store";
+} from "@/lib/daw-sdk";
 
 const MAX_FADE_MS = 120_000;
 

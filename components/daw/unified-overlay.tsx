@@ -11,7 +11,7 @@ import {
 	setCurrentTimeAtom,
 	timelineAtom,
 	timelinePxPerMsAtom,
-} from "@/lib/state/daw-store";
+} from "@/lib/daw-sdk";
 
 export function UnifiedOverlay() {
 	const [playheadViewport] = useAtom(playheadViewportAtom);

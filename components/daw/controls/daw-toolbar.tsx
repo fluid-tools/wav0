@@ -34,7 +34,7 @@ import {
 	eventListOpenAtom,
 	projectNameAtom,
 	tracksAtom,
-} from "@/lib/state/daw-store";
+} from "@/lib/daw-sdk";
 
 export function DAWToolbar() {
 	const [projectName, setProjectName] = useAtom(projectNameAtom);

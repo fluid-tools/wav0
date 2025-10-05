@@ -32,7 +32,7 @@ import {
 	DAW_TEXT,
 } from "@/lib/constants/daw-design";
 import { dbToVolume, formatDb, volumeToDb } from "@/lib/daw-sdk";
-import type { AutomationType } from "@/lib/state/daw-store";
+import type { AutomationType } from "@/lib/daw-sdk";
 import {
 	automationViewEnabledAtom,
 	removeTrackAtom,
@@ -42,7 +42,7 @@ import {
 	trackHeightZoomAtom,
 	tracksAtom,
 	updateTrackAtom,
-} from "@/lib/state/daw-store";
+} from "@/lib/daw-sdk";
 import { cn } from "@/lib/utils";
 
 export function DAWTrackList() {

@@ -32,7 +32,7 @@ import {
 	tracksAtom,
 	userIsManuallyScrollingAtom,
 	verticalScrollAtom,
-} from "@/lib/state/daw-store";
+} from "@/lib/daw-sdk";
 import { DAWControls } from "./controls/daw-controls";
 import { DAWToolbar } from "./controls/daw-toolbar";
 import { GlobalShortcuts } from "./controls/global-shortcuts";

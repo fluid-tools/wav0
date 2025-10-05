@@ -21,13 +21,13 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from "@/components/ui/sheet";
-import type { Clip, Track } from "@/lib/state/daw-store";
+import type { Clip, Track } from "@/lib/daw-sdk";
 import {
 	clipInspectorOpenAtom,
 	clipInspectorTargetAtom,
 	eventListOpenAtom,
 	tracksAtom,
-} from "@/lib/state/daw-store";
+} from "@/lib/daw-sdk";
 import { formatDuration } from "@/lib/storage/opfs";
 
 type EventRow = {

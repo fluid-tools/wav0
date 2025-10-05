@@ -28,7 +28,7 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useClipInspector } from "@/lib/daw-sdk";
-import type { TrackEnvelopeCurve } from "@/lib/state/daw-store";
+import type { CurveType } from "@/lib/daw-sdk";
 import { formatDuration } from "@/lib/storage/opfs";
 import { CurvePreview } from "../controls/curve-preview";
 import { EnvelopeEditor } from "./envelope-editor";
@@ -36,7 +36,7 @@ import { InspectorCard, InspectorSection } from "./inspector-section";
 
 // Curve type metadata for consistent naming and descriptions
 const CURVE_METADATA: Record<
-	TrackEnvelopeCurve,
+	CurveType,
 	{ label: string; description: string }
 > = {
 	linear: {
@@ -221,7 +221,7 @@ export function ClipEditorDrawer() {
 																value={clip.fadeInCurve || "easeOut"}
 																onValueChange={(value) =>
 																	updateClip({
-																		fadeInCurve: value as TrackEnvelopeCurve,
+																		fadeInCurve: value as CurveType,
 																	})
 																}
 															>
@@ -341,7 +341,7 @@ export function ClipEditorDrawer() {
 																value={clip.fadeOutCurve || "easeOut"}
 																onValueChange={(value) =>
 																	updateClip({
-																		fadeOutCurve: value as TrackEnvelopeCurve,
+																		fadeOutCurve: value as CurveType,
 																	})
 																}
 															>

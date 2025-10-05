@@ -37,7 +37,7 @@ import {
 	trackHeightZoomAtom,
 	tracksAtom,
 	updateClipAtom,
-} from "@/lib/state/daw-store";
+} from "@/lib/daw-sdk";
 import { formatDuration } from "@/lib/storage/opfs";
 
 export function DAWControls() {
@@ -97,10 +97,10 @@ export function DAWControls() {
 	// Selected clip lookup
 	const findSelectedClip = () => {
 		if (!selectedTrackId || !selectedClipId)
-			return null as {
-				track: import("@/lib/state/daw-store").Track;
-				clip: import("@/lib/state/daw-store").Clip;
-			} | null;
+		return null as {
+			track: import("@/lib/daw-sdk").Track;
+			clip: import("@/lib/daw-sdk").Clip;
+		} | null;
 		const track = tracks.find((t) => t.id === selectedTrackId);
 		if (!track || !track.clips) return null;
 		const clip = track.clips.find((c) => c.id === selectedClipId);

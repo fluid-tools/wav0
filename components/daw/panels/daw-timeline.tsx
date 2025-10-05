@@ -11,7 +11,7 @@ import {
 	timelineAtom,
 	timelinePxPerMsAtom,
 	timelineWidthAtom,
-} from "@/lib/state/daw-store";
+} from "@/lib/daw-sdk";
 import { formatDuration } from "@/lib/storage/opfs";
 
 export function DAWTimeline() {
