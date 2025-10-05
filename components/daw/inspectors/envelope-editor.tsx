@@ -11,10 +11,10 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import {
-	getCurveDescription,
 	clampAutomationDb,
 	dbToMultiplier,
 	formatDb,
+	getCurveDescription,
 	getEffectiveDb,
 	multiplierToDb,
 	volumeToDb,

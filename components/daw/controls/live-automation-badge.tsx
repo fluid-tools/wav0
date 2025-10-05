@@ -1,8 +1,7 @@
 "use client";
 
 import { useAtom } from "jotai";
-import { formatDb } from "@/lib/daw-sdk";
-import { useLiveAutomationGain } from "@/lib/hooks/use-live-automation-gain";
+import { formatDb, useLiveAutomationGain } from "@/lib/daw-sdk";
 import { playbackAtom } from "@/lib/state/daw-store";
 
 type LiveAutomationBadgeProps = {

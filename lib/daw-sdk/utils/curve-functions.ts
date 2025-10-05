@@ -1,36 +1,36 @@
-import type { CurveType } from "../types/schemas"
+import type { CurveType } from "../types/schemas";
 
 /**
  * Calculate intermediate value for a given curve type at time t
  * Used for envelope automation and UI previews
  */
 export function evaluateCurve(type: CurveType, t: number, shape = 0.5): number {
-	const s = Math.max(0, Math.min(1, shape))
-	const clamped = Math.max(0, Math.min(1, t))
+	const s = Math.max(0, Math.min(1, shape));
+	const clamped = Math.max(0, Math.min(1, t));
 
 	switch (type) {
 		case "linear":
-			return clamped
+			return clamped;
 
 		case "easeIn": {
-			const power = 1 + s * 3
-			return clamped ** power
+			const power = 1 + s * 3;
+			return clamped ** power;
 		}
 
 		case "easeOut": {
-			const power = 1 + s * 3
-			return 1 - (1 - clamped) ** power
+			const power = 1 + s * 3;
+			return 1 - (1 - clamped) ** power;
 		}
 
 		case "sCurve": {
-			const freq = 1 + s * 2
-			const raw = 0.5 - 0.5 * Math.cos(Math.PI * freq * clamped)
-			const rangeMax = 0.5 - 0.5 * Math.cos(Math.PI * freq)
-			return raw / rangeMax
+			const freq = 1 + s * 2;
+			const raw = 0.5 - 0.5 * Math.cos(Math.PI * freq * clamped);
+			const rangeMax = 0.5 - 0.5 * Math.cos(Math.PI * freq);
+			return raw / rangeMax;
 		}
 
 		default:
-			return clamped
+			return clamped;
 	}
 }
 
@@ -45,18 +45,18 @@ export function generateCurve(
 	shape = 0.5,
 	sampleRate = 48000,
 ): Float32Array {
-	const numSamples = Math.max(2, Math.ceil(duration * sampleRate))
-	const curve = new Float32Array(numSamples)
-	const delta = endValue - startValue
-	const s = Math.max(0, Math.min(1, shape))
+	const numSamples = Math.max(2, Math.ceil(duration * sampleRate));
+	const curve = new Float32Array(numSamples);
+	const delta = endValue - startValue;
+	const s = Math.max(0, Math.min(1, shape));
 
 	for (let i = 0; i < numSamples; i++) {
-		const t = i / (numSamples - 1)
-		const value = startValue + delta * evaluateCurve(type, t, s)
-		curve[i] = value
+		const t = i / (numSamples - 1);
+		const value = startValue + delta * evaluateCurve(type, t, s);
+		curve[i] = value;
 	}
 
-	return curve
+	return curve;
 }
 
 /**
@@ -72,31 +72,31 @@ export function applyCurveToParam(
 	shape: number,
 	audioContext: AudioContext,
 ): void {
-	const now = audioContext.currentTime
-	const at = Math.max(startTime, now)
+	const now = audioContext.currentTime;
+	const at = Math.max(startTime, now);
 
-	param.cancelScheduledValues(at)
-	param.setValueAtTime(startValue, at)
+	param.cancelScheduledValues(at);
+	param.setValueAtTime(startValue, at);
 
 	switch (type) {
 		case "linear":
-			param.linearRampToValueAtTime(endValue, at + duration)
-			break
+			param.linearRampToValueAtTime(endValue, at + duration);
+			break;
 
 		case "easeIn": {
-			const safeStart = Math.max(startValue, 0.0001)
-			const safeEnd = Math.max(endValue, 0.0001)
+			const safeStart = Math.max(startValue, 0.0001);
+			const safeEnd = Math.max(endValue, 0.0001);
 
 			if (startValue !== safeStart) {
-				param.setValueAtTime(safeStart, at)
+				param.setValueAtTime(safeStart, at);
 			}
 
-			param.exponentialRampToValueAtTime(safeEnd, at + duration)
+			param.exponentialRampToValueAtTime(safeEnd, at + duration);
 
 			if (endValue < 0.0001) {
-				param.setValueAtTime(0, at + duration)
+				param.setValueAtTime(0, at + duration);
 			}
-			break
+			break;
 		}
 
 		case "easeOut":
@@ -108,13 +108,13 @@ export function applyCurveToParam(
 				duration,
 				shape,
 				audioContext.sampleRate,
-			)
-			param.setValueCurveAtTime(curve, at, duration)
-			break
+			);
+			param.setValueCurveAtTime(curve, at, duration);
+			break;
 		}
 
 		default:
-			param.linearRampToValueAtTime(endValue, at + duration)
+			param.linearRampToValueAtTime(endValue, at + duration);
 	}
 }
 
@@ -124,15 +124,15 @@ export function applyCurveToParam(
 export function getCurveLabel(type: CurveType): string {
 	switch (type) {
 		case "linear":
-			return "Linear"
+			return "Linear";
 		case "easeIn":
-			return "Exponential"
+			return "Exponential";
 		case "easeOut":
-			return "Logarithmic"
+			return "Logarithmic";
 		case "sCurve":
-			return "S-Curve"
+			return "S-Curve";
 		default:
-			return "Unknown"
+			return "Unknown";
 	}
 }
 
@@ -142,14 +142,14 @@ export function getCurveLabel(type: CurveType): string {
 export function getCurveDescription(type: CurveType): string {
 	switch (type) {
 		case "linear":
-			return "Constant rate of change"
+			return "Constant rate of change";
 		case "easeIn":
-			return "Slow start, accelerating end"
+			return "Slow start, accelerating end";
 		case "easeOut":
-			return "Fast start, decelerating end (natural fade-out)"
+			return "Fast start, decelerating end (natural fade-out)";
 		case "sCurve":
-			return "Smooth acceleration (slow → fast → slow)"
+			return "Smooth acceleration (slow → fast → slow)";
 		default:
-			return ""
+			return "";
 	}
 }

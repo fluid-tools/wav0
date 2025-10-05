@@ -27,7 +27,7 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useClipInspector } from "@/lib/hooks/use-clip-inspector";
+import { useClipInspector } from "@/lib/daw-sdk";
 import type { TrackEnvelopeCurve } from "@/lib/state/daw-store";
 import { formatDuration } from "@/lib/storage/opfs";
 import { CurvePreview } from "../controls/curve-preview";

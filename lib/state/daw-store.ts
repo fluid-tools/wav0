@@ -2,8 +2,8 @@
 
 import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
-import { audioService, playbackService } from "@/lib/daw-sdk";
 import { DAW_PIXELS_PER_SECOND_AT_ZOOM_1 } from "@/lib/constants";
+import { audioService, playbackService } from "@/lib/daw-sdk";
 import { generateTrackId } from "@/lib/storage/opfs";
 
 export type Clip = {

@@ -23,7 +23,6 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { dbToVolume, formatDb, volumeToDb } from "@/lib/daw-sdk";
 import {
 	DAW_BUTTONS,
 	DAW_COLORS,
@@ -32,6 +31,7 @@ import {
 	DAW_SPACING,
 	DAW_TEXT,
 } from "@/lib/constants/daw-design";
+import { dbToVolume, formatDb, volumeToDb } from "@/lib/daw-sdk";
 import type { AutomationType } from "@/lib/state/daw-store";
 import {
 	automationViewEnabledAtom,

@@ -400,8 +400,8 @@ export function AutomationLane({
 					const x = point.time * pxPerMs;
 					const normalizedValue = Math.max(0, Math.min(4, point.value)) / 4;
 					const y = trackHeight - padding - normalizedValue * usableHeight;
-				const envelopeDb = multiplierToDb(point.value);
-				const effectiveDb = getEffectiveDb(track.volume, point.value);
+					const envelopeDb = multiplierToDb(point.value);
+					const effectiveDb = getEffectiveDb(track.volume, point.value);
 
 					return (
 						<g
