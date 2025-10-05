@@ -6,7 +6,7 @@ import { ClipContextMenu } from "@/components/daw/context-menus/clip-context-men
 import { ClipFadeHandles } from "@/components/daw/controls/clip-fade-handles";
 import { AutomationTransferDialog } from "@/components/daw/dialogs/automation-transfer-dialog";
 import { AutomationLane } from "@/components/daw/panels/automation-lane";
-import { playbackEngine } from "@/lib/audio/playback-engine";
+import { playbackService } from "@/lib/daw-sdk";
 import { DAW_HEIGHTS } from "@/lib/constants/daw-design";
 import type { Clip } from "@/lib/state/daw-store";
 import {
@@ -335,9 +335,9 @@ export function DAWTrackContent() {
 
 								// No automation - proceed with immediate move
 								// Stop playback on old track if playing
-								if (playback.isPlaying) {
-									playbackEngine.stopClip(oldTrack.id, clip.id);
-								}
+							if (playback.isPlaying) {
+								playbackService.stopClip(oldTrack.id, clip.id).catch(console.error);
+							}
 
 								// Move clip atomically
 								const updatedClip = { ...clip, startTime: newStartTime };
@@ -436,7 +436,7 @@ export function DAWTrackContent() {
 
 	// Handle automation transfer dialog confirmation
 	const handleAutomationTransfer = useCallback(
-		(transferAutomation: boolean) => {
+		async (transferAutomation: boolean) => {
 			if (!automationTransferDialog) return;
 
 			const { clipId, sourceTrack, targetTrack, newStartTime } =
@@ -453,9 +453,9 @@ export function DAWTrackContent() {
 			}
 
 			// Stop playback on old track if playing
-			if (playback.isPlaying) {
-				playbackEngine.stopClip(oldTrack.id, clipId);
-			}
+		if (playback.isPlaying) {
+			await playbackService.stopClip(oldTrack.id, clipId);
+		}
 
 			const clipEndTime = clip.startTime + (clip.trimEnd - clip.trimStart);
 

@@ -3,7 +3,7 @@
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { getEffectiveDb, multiplierToDb } from "@/lib/audio/volume";
+import { getEffectiveDb, multiplierToDb } from "@/lib/daw-sdk";
 import type { Track, TrackEnvelopePoint } from "@/lib/state/daw-store";
 import {
 	automationViewEnabledAtom,
@@ -400,8 +400,8 @@ export function AutomationLane({
 					const x = point.time * pxPerMs;
 					const normalizedValue = Math.max(0, Math.min(4, point.value)) / 4;
 					const y = trackHeight - padding - normalizedValue * usableHeight;
-					const envelopeDb = multiplierToDb(point.value);
-					const effectiveDb = getEffectiveDb(track.volume, point.value);
+				const envelopeDb = multiplierToDb(point.value);
+				const effectiveDb = getEffectiveDb(track.volume, point.value);
 
 					return (
 						<g

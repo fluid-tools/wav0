@@ -16,7 +16,7 @@ import {
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { audioManager } from "@/lib/audio/audio-manager";
+import { audioService } from "@/lib/daw-sdk";
 import {
 	loadAudioFileAtom,
 	playbackAtom,
@@ -78,12 +78,12 @@ export function AudioTestPanel() {
 
 		try {
 			// Use the AudioBufferSink to fetch a small slice and play via Web Audio API
-			const sink = audioManager.getAudioBufferSink(track.opfsFileId);
+			const sink = audioService.getAudioBufferSink(track.opfsFileId);
 			if (!sink) {
 				console.log("No sink available for track");
 				return;
 			}
-			const audioContext = await audioManager.getAudioContext();
+			const audioContext = await audioService.getAudioContext();
 			const baseTime = audioContext.currentTime + 0.05; // slight delay to avoid immediate start drift
 			// Play the first ~1s as a sanity test
 			for await (const { buffer, timestamp } of sink.buffers(
