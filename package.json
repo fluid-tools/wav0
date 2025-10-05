@@ -55,6 +55,7 @@
 		"botid": "^1.5.5",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
+		"convex": "^1.27.3",
 		"dotenv": "^17.2.2",
 		"drizzle-kit": "^0.31.4",
 		"drizzle-zod": "^0.8.3",
