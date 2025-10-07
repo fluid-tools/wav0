@@ -30,6 +30,7 @@
         "@dnd-kit/utilities": "^3.2.2",
         "@elevenlabs/elevenlabs-js": "^2.17.0",
         "@mendable/firecrawl-js": "^4.3.7",
+        "@paper-design/shaders-react": "^0.0.57",
         "@radix-ui/react-alert-dialog": "^1.1.15",
         "@radix-ui/react-avatar": "^1.1.10",
         "@radix-ui/react-collapsible": "^1.1.12",
@@ -503,6 +504,10 @@
     "@noble/hashes": ["@noble/hashes@2.0.1", "", {}, "sha512-XlOlEbQcE9fmuXxrVTXCTlG2nlRXa9Rj3rr5Ue/+tX+nmkgbX720YHh0VR3hBF9xDvwnb8D2shVGOwNx+ulArw=="],
 
     "@opentelemetry/api": ["@opentelemetry/api@1.9.0", "", {}, "sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg=="],
+
+    "@paper-design/shaders": ["@paper-design/shaders@0.0.57", "", {}, "sha512-2bV7CqLcfA9paFOdH0a5NQuqzyAKep4Zf5j7ll78bCV6lzFz5/z0TMjduR+cd+DrSWGzdJfVQE8QC7f7AmcQQQ=="],
+
+    "@paper-design/shaders-react": ["@paper-design/shaders-react@0.0.57", "", { "dependencies": { "@paper-design/shaders": "0.0.57" }, "peerDependencies": { "@types/react": "^18 || ^19", "react": "^18 || ^19" }, "optionalPeers": ["@types/react"] }, "sha512-PUr//I3Fdk4l44ORt6NNGPgz4MRz+DDNjAWK9B/hNlLZrKPKdBJtiXYUlQBpcJfnBUjq3sy2VJk6tNdby8o/2g=="],
 
     "@peculiar/asn1-android": ["@peculiar/asn1-android@2.5.0", "", { "dependencies": { "@peculiar/asn1-schema": "^2.5.0", "asn1js": "^3.0.6", "tslib": "^2.8.1" } }, "sha512-t8A83hgghWQkcneRsgGs2ebAlRe54ns88p7ouv8PW2tzF1nAW4yHcL4uZKrFpIU+uszIRzTkcCuie37gpkId0A=="],
 
