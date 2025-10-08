@@ -5,6 +5,7 @@ import { motion, useScroll, useTransform } from "motion/react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { ThemeToggleGroup } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 
 export default function Home() {
@@ -131,7 +132,8 @@ export default function Home() {
 							as accessible as Figma
 						</h1>
 						<p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-							Go from idea to sound in seconds. AI-native music studio that works entirely in your browser.
+							Go from idea to sound in seconds. AI-native music studio that
+							works entirely in your browser.
 						</p>
 					</motion.div>
 
@@ -292,23 +294,26 @@ export default function Home() {
 								</Link>
 							</div>
 
-							<div className="flex items-center gap-6 text-[10px] text-muted-foreground/40 font-light tracking-wider uppercase">
-								<Link
-									href="https://github.com/fluid-tools/wav0"
-									target="_blank"
-									rel="noopener noreferrer"
-									className="hover:text-foreground transition-colors duration-300"
-								>
-									Docs
-								</Link>
-								<Link
-									href="https://fluid.tools"
-									target="_blank"
-									rel="noopener noreferrer"
-									className="hover:text-foreground transition-colors duration-300"
-								>
-									FLUID.TOOLS
-								</Link>
+							<div className="flex items-center gap-6">
+								<div className="flex items-center gap-6 text-[10px] text-muted-foreground/40 font-light tracking-wider uppercase">
+									<Link
+										href="https://github.com/fluid-tools/wav0"
+										target="_blank"
+										rel="noopener noreferrer"
+										className="hover:text-foreground transition-colors duration-300"
+									>
+										Docs
+									</Link>
+									<Link
+										href="https://fluid.tools"
+										target="_blank"
+										rel="noopener noreferrer"
+										className="hover:text-foreground transition-colors duration-300"
+									>
+										FLUID.TOOLS
+									</Link>
+								</div>
+								<ThemeToggleGroup />
 							</div>
 						</div>
 					</motion.div>
