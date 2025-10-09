@@ -5,7 +5,7 @@
       "name": "wav0",
       "devDependencies": {
         "@biomejs/biome": "2.2.4",
-        "turbo": "^2.5.4",
+        "turbo": "^2.5.8",
         "ultracite": "5.4.7",
       },
     },
