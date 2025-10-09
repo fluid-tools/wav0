@@ -2,17 +2,27 @@
     "$schema": "https://turbo.build/schema.json",
     "ui": "tui",
     "globalEnv": [
+      "AI_GATEWAY_API_KEY",
+      "AWS_ACCESS_KEY_ID",
+      "AWS_BUCKET_NAME",
+      "AWS_REGION",
+      "AWS_SECRET_ACCESS_KEY",
+      "BETTER_AUTH_SECRET",
+      "BETTER_AUTH_URL",
+      "BLOB_READ_WRITE_TOKEN",
+      "CONVEX_DEPLOYMENT",
+      "CONVEX_DEPLOY_KEY",
+      "CONVEX_URL",
+      "DATABASE_URL",
       "ELEVENLABS_API_KEY",
-      "FIRECRAWL_API_KEY", 
+      "FIRECRAWL_API_KEY",
       "GOOGLE_CLIENT_ID",
       "GOOGLE_CLIENT_SECRET",
+      "REDIS_STREAM_URL",
       "RESEND_API_KEY",
       "RESEND_FROM_EMAIL",
       "UPSTASH_REDIS_REST_TOKEN",
-      "UPSTASH_REDIS_REST_URL",
-      "REDIS_STREAM_URL",
-      "CONVEX_DEPLOYMENT",
-      "CONVEX_URL"
+      "UPSTASH_REDIS_REST_URL"
     ],
     "tasks": {
       "build": {
