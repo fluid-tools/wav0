@@ -21,7 +21,7 @@
     },
     "dependencies": {},
     "devDependencies": {
-      "turbo": "^2.5.4",
+      "turbo": "^2.5.8",
       "@biomejs/biome": "2.2.4",
       "ultracite": "5.4.7"
     },
