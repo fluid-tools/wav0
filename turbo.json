@@ -1,6 +1,19 @@
 {
     "$schema": "https://turbo.build/schema.json",
     "ui": "tui",
+    "globalEnv": [
+      "ELEVENLABS_API_KEY",
+      "FIRECRAWL_API_KEY", 
+      "GOOGLE_CLIENT_ID",
+      "GOOGLE_CLIENT_SECRET",
+      "RESEND_API_KEY",
+      "RESEND_FROM_EMAIL",
+      "UPSTASH_REDIS_REST_TOKEN",
+      "UPSTASH_REDIS_REST_URL",
+      "REDIS_STREAM_URL",
+      "CONVEX_DEPLOYMENT",
+      "CONVEX_URL"
+    ],
     "tasks": {
       "build": {
         "dependsOn": ["^build"],
