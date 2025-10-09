@@ -27,8 +27,8 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useClipInspector } from "@/lib/daw-sdk";
 import type { CurveType } from "@/lib/daw-sdk";
+import { useClipInspector } from "@/lib/daw-sdk";
 import { formatDuration } from "@/lib/storage/opfs";
 import { CurvePreview } from "../controls/curve-preview";
 import { EnvelopeEditor } from "./envelope-editor";
@@ -290,6 +290,33 @@ export function ClipEditorDrawer() {
 													}
 													className="w-full h-2 cursor-pointer appearance-none rounded-lg bg-muted hover:bg-muted/80 transition-colors"
 												/>
+												<div className="flex justify-between text-[10px] text-muted-foreground">
+													{clip.fadeInCurve === "easeIn" ? (
+														<>
+															<span>Linear</span>
+															<span>Balanced</span>
+															<span>Exponential</span>
+														</>
+													) : clip.fadeInCurve === "easeOut" ? (
+														<>
+															<span>Sharp</span>
+															<span>Balanced</span>
+															<span>Smooth</span>
+														</>
+													) : clip.fadeInCurve === "sCurve" ? (
+														<>
+															<span>Subtle</span>
+															<span>Balanced</span>
+															<span>Pronounced</span>
+														</>
+													) : (
+														<>
+															<span>Gentle</span>
+															<span>Balanced</span>
+															<span>Steep</span>
+														</>
+													)}
+												</div>
 												<CurvePreview
 													type={clip.fadeInCurve}
 													shape={clip.fadeInShape ?? 0.5}
@@ -410,6 +437,33 @@ export function ClipEditorDrawer() {
 													}
 													className="w-full h-2 cursor-pointer appearance-none rounded-lg bg-muted hover:bg-muted/80 transition-colors"
 												/>
+												<div className="flex justify-between text-[10px] text-muted-foreground">
+													{clip.fadeOutCurve === "easeIn" ? (
+														<>
+															<span>Linear</span>
+															<span>Balanced</span>
+															<span>Exponential</span>
+														</>
+													) : clip.fadeOutCurve === "easeOut" ? (
+														<>
+															<span>Sharp</span>
+															<span>Balanced</span>
+															<span>Smooth</span>
+														</>
+													) : clip.fadeOutCurve === "sCurve" ? (
+														<>
+															<span>Subtle</span>
+															<span>Balanced</span>
+															<span>Pronounced</span>
+														</>
+													) : (
+														<>
+															<span>Gentle</span>
+															<span>Balanced</span>
+															<span>Steep</span>
+														</>
+													)}
+												</div>
 												<CurvePreview
 													type={clip.fadeOutCurve}
 													shape={clip.fadeOutShape ?? 0.5}

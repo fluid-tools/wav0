@@ -3,10 +3,12 @@
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { getEffectiveDb, multiplierToDb } from "@/lib/daw-sdk";
 import type { Track, TrackEnvelopePoint } from "@/lib/daw-sdk";
 import {
 	automationViewEnabledAtom,
+	evaluateCurve,
+	getEffectiveDb,
+	multiplierToDb,
 	playbackAtom,
 	timelinePxPerMsAtom,
 	updateTrackAtom,
@@ -141,13 +143,14 @@ export function AutomationLane({
 
 	// Change curve type for selected segment
 	// NOTE: Updates track automation immediately (no draft state)
-	// This ensures curve changes in automation lane sync with drawer
+	// CONVENTION: Point's curve defines shape FROM that point TO the next point
+	// So we update the "from" point's curve property
 	const setCurveType = useCallback(
 		(curveType: TrackEnvelopePoint["curve"]) => {
 			if (!selectedSegment || !envelope) return;
 
 			// Update the curve type on the "from" point of the segment
-			// The curve defines the shape from this point to the next point
+			// The curve defines the shape FROM this point TO the next point
 			const updatedPoints = envelope.points.map((p) =>
 				p.id === selectedSegment.fromPointId ? { ...p, curve: curveType } : p,
 			);
@@ -268,31 +271,30 @@ export function AutomationLane({
 		let pathData = `M ${points[0].x} ${points[0].y}`;
 
 		// Connect points based on curve type
+		// IMPORTANT: prev.point.curve defines the shape FROM prev TO curr
+		// Use actual curve functions for accurate representation
 		for (let i = 1; i < points.length; i++) {
 			const prev = points[i - 1];
 			const curr = points[i];
-			const curve = curr.point.curve || "linear";
+			const curve = prev.point.curve || "linear"; // Read from PREVIOUS point
+			const curveShape = prev.point.curveShape ?? 0.5;
 
-			if (curve === "easeIn") {
-				// Quadratic bezier for ease-in
-				const cpX = prev.x + (curr.x - prev.x) * 0.7;
-				const cpY = prev.y;
-				pathData += ` Q ${cpX} ${cpY}, ${curr.x} ${curr.y}`;
-			} else if (curve === "easeOut") {
-				// Quadratic bezier for ease-out
-				const cpX = prev.x + (curr.x - prev.x) * 0.3;
-				const cpY = curr.y;
-				pathData += ` Q ${cpX} ${cpY}, ${curr.x} ${curr.y}`;
-			} else if (curve === "sCurve") {
-				// Cubic bezier for S-curve
-				const cp1X = prev.x + (curr.x - prev.x) * 0.33;
-				const cp1Y = prev.y;
-				const cp2X = prev.x + (curr.x - prev.x) * 0.67;
-				const cp2Y = curr.y;
-				pathData += ` C ${cp1X} ${cp1Y}, ${cp2X} ${cp2Y}, ${curr.x} ${curr.y}`;
-			} else {
-				// Linear or default
+			if (curve === "linear") {
+				// Linear is simple
 				pathData += ` L ${curr.x} ${curr.y}`;
+			} else {
+				// For non-linear curves, sample points using actual curve function
+				const samples = 20; // Number of samples per segment
+				const deltaX = curr.x - prev.x;
+				const deltaY = curr.y - prev.y;
+
+				for (let s = 1; s <= samples; s++) {
+					const t = s / samples;
+					const curveValue = evaluateCurve(curve, t, curveShape);
+					const x = prev.x + deltaX * t;
+					const y = prev.y + deltaY * curveValue;
+					pathData += ` L ${x} ${y}`;
+				}
 			}
 		}
 
@@ -390,7 +392,11 @@ export function AutomationLane({
 								strokeWidth={12}
 								style={{ pointerEvents: "stroke" }}
 							/>
-							<title>Right-click to change curve type</title>
+							<title>
+								Right-click to change curve type for segment from point at{" "}
+								{(prevPoint.time / 1000).toFixed(2)}s to{" "}
+								{(point.time / 1000).toFixed(2)}s
+							</title>
 						</g>
 					);
 				})}

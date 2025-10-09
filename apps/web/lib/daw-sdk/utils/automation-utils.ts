@@ -90,6 +90,7 @@ export function removeAutomationPointsInRange(
 
 /**
  * Get envelope multiplier at specific time with interpolation
+ * CONVENTION: Point's curve defines shape FROM that point TO the next point
  */
 export function getEnvelopeMultiplierAtTime(
 	points: TrackEnvelopePoint[],
@@ -113,7 +114,8 @@ export function getEnvelopeMultiplierAtTime(
 
 		if (timeMs >= p1.time && timeMs <= p2.time) {
 			const progress = (timeMs - p1.time) / (p2.time - p1.time);
-			return interpolateValue(p1.value, p2.value, progress, p2.curve);
+			// Use p1.curve (FROM point) not p2.curve
+			return interpolateValue(p1.value, p2.value, progress, p1.curve);
 		}
 	}
 

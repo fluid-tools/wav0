@@ -11,15 +11,13 @@ export type { LoadedAudioTrack } from "./core/audio-service";
 // ===== Core Services =====
 export { AudioService, audioService } from "./core/audio-service";
 export { PlaybackService, playbackService } from "./core/playback-service";
-
-// ===== State Management =====
-export * from "./state";
-
+export * from "./hooks/use-clip-inspector";
+export * from "./hooks/use-drag-interaction";
+export * from "./hooks/use-live-automation-gain";
 // ===== React Hooks =====
 export * from "./hooks/use-playback-sync";
-export * from "./hooks/use-drag-interaction";
-export * from "./hooks/use-clip-inspector";
-export * from "./hooks/use-live-automation-gain";
+// ===== State Management =====
+export * from "./state";
 // ===== Type Schemas & Validation =====
 export * from "./types/schemas";
 export * from "./utils/automation-utils";

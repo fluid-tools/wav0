@@ -10,6 +10,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import type { TrackEnvelopePoint } from "@/lib/daw-sdk";
 import {
 	clampAutomationDb,
 	dbToMultiplier,
@@ -19,7 +20,6 @@ import {
 	multiplierToDb,
 	volumeToDb,
 } from "@/lib/daw-sdk";
-import type { TrackEnvelopePoint } from "@/lib/daw-sdk";
 import { formatDuration } from "@/lib/storage/opfs";
 import { CurvePreview } from "../controls/curve-preview";
 
@@ -291,9 +291,27 @@ export function EnvelopeEditor({
 												aria-label="Curve shape parameter"
 											/>
 											<div className="flex justify-between text-[10px] text-muted-foreground">
-												<span>Gentle</span>
-												<span>Balanced</span>
-												<span>Steep</span>
+												{point.curve === "easeIn" && (
+													<>
+														<span>Linear</span>
+														<span>Balanced</span>
+														<span>Exponential</span>
+													</>
+												)}
+												{point.curve === "easeOut" && (
+													<>
+														<span>Sharp</span>
+														<span>Balanced</span>
+														<span>Smooth</span>
+													</>
+												)}
+												{point.curve === "sCurve" && (
+													<>
+														<span>Subtle</span>
+														<span>Balanced</span>
+														<span>Pronounced</span>
+													</>
+												)}
 											</div>
 
 											{/* Visual Preview */}

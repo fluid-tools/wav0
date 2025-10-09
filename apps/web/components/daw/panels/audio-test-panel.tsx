@@ -16,8 +16,8 @@ import {
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { audioService } from "@/lib/daw-sdk";
 import {
+	audioService,
 	loadAudioFileAtom,
 	playbackAtom,
 	stopPlaybackAtom,

@@ -4,52 +4,52 @@
  */
 
 export type {
-  Clip,
-  Track,
-  TrackEnvelope,
-  TrackEnvelopePoint,
-  PlaybackState,
-  TimelineState,
-  TimelineSection,
-  Tool,
-  AutomationType,
-  ClipInspectorTarget,
-} from "../types/schemas"
+	AutomationType,
+	Clip,
+	ClipInspectorTarget,
+	PlaybackState,
+	TimelineSection,
+	TimelineState,
+	Tool,
+	Track,
+	TrackEnvelope,
+	TrackEnvelopePoint,
+} from "../types/schemas";
 
 import type {
-  TrackEnvelope,
-  TrackEnvelopePoint,
-  PlaybackState,
-  TimelineState,
-  Track,
-} from "../types/schemas"
+	PlaybackState,
+	TimelineState,
+	Track,
+	TrackEnvelope,
+	TrackEnvelopePoint,
+} from "../types/schemas";
 
 export type DAWState = {
-  projectName: string
-  tracks: Track[]
-  playback: PlaybackState
-  timeline: TimelineState
-  selectedTrackId: string | null
-}
+	projectName: string;
+	tracks: Track[];
+	playback: PlaybackState;
+	timeline: TimelineState;
+	selectedTrackId: string | null;
+};
 
-export const ENVELOPE_GAIN_MIN = 0
-export const ENVELOPE_GAIN_MAX = 4
+export const ENVELOPE_GAIN_MIN = 0;
+export const ENVELOPE_GAIN_MAX = 4;
 
 export function clampEnvelopeGain(value: number): number {
-  return Math.min(ENVELOPE_GAIN_MAX, Math.max(ENVELOPE_GAIN_MIN, value))
+	return Math.min(ENVELOPE_GAIN_MAX, Math.max(ENVELOPE_GAIN_MIN, value));
 }
 
 export function createDefaultEnvelope(_volume: number): TrackEnvelope {
-  const defaultPoint: TrackEnvelopePoint = {
-    id: crypto.randomUUID(),
-    time: 0,
-    value: 1,
-    curve: "linear",
-    curveShape: 0.5,
-  }
+	const defaultPoint: TrackEnvelopePoint = {
+		id: crypto.randomUUID(),
+		time: 0,
+		value: 1,
+		curve: "linear",
+		curveShape: 0.5,
+	};
 
-  return {
-    enabled: false,
-    points: [defaultPoint],
-  }
+	return {
+		enabled: false,
+		points: [defaultPoint],
+	};
 }

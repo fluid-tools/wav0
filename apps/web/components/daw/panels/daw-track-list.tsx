@@ -31,10 +31,11 @@ import {
 	DAW_SPACING,
 	DAW_TEXT,
 } from "@/lib/constants/daw-design";
-import { dbToVolume, formatDb, volumeToDb } from "@/lib/daw-sdk";
 import type { AutomationType } from "@/lib/daw-sdk";
 import {
 	automationViewEnabledAtom,
+	dbToVolume,
+	formatDb,
 	removeTrackAtom,
 	selectedTrackIdAtom,
 	setTrackHeightZoomAtom,
@@ -42,6 +43,7 @@ import {
 	trackHeightZoomAtom,
 	tracksAtom,
 	updateTrackAtom,
+	volumeToDb,
 } from "@/lib/daw-sdk";
 import { cn } from "@/lib/utils";
 
