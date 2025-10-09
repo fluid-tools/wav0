@@ -3,6 +3,12 @@ import type { CurveType } from "../types/schemas";
 /**
  * Calculate intermediate value for a given curve type at time t
  * Used for envelope automation and UI previews
+ *
+ * CONVENTION: Point's curve defines shape FROM that point TO the next point
+ *
+ * @param type - Curve type (linear, easeIn, easeOut, sCurve)
+ * @param t - Time progress from 0.0 to 1.0
+ * @param shape - Curve intensity from 0.0 (gentle) to 1.0 (steep)
  */
 export function evaluateCurve(type: CurveType, t: number, shape = 0.5): number {
 	const s = Math.max(0, Math.min(1, shape));

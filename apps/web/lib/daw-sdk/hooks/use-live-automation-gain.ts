@@ -2,9 +2,13 @@
 
 import { useAtom } from "jotai";
 import { useEffect, useState } from "react";
-import { getEffectiveDb, multiplierToDb } from "@/lib/daw-sdk";
 import type { TrackEnvelopePoint } from "@/lib/daw-sdk";
-import { playbackAtom, tracksAtom } from "@/lib/daw-sdk";
+import {
+	getEffectiveDb,
+	multiplierToDb,
+	playbackAtom,
+	tracksAtom,
+} from "@/lib/daw-sdk";
 
 /**
  * Hook to get the current automated gain value for a track during playback

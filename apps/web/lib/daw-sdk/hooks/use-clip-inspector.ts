@@ -1,5 +1,5 @@
 import { useAtom } from "jotai";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
 	type Clip,
 	clipInspectorOpenAtom,
@@ -23,6 +23,9 @@ export function useClipInspector() {
 	const [fadeOutDraft, setFadeOutDraft] = useState<number>(0);
 	const [envelopeDraft, setEnvelopeDraft] = useState<TrackEnvelopePoint[]>([]);
 
+	// Track previous points for comparison
+	const prevPointsRef = useRef<string>("");
+
 	const current = useMemo(() => {
 		if (!target) return null;
 		const track = tracks.find((candidate) => candidate.id === target.trackId);
@@ -34,13 +37,25 @@ export function useClipInspector() {
 
 	// Sync envelope draft with track automation (single source of truth)
 	// Re-sync whenever track automation changes externally
+	// Uses deep comparison via ref to avoid infinite loops while catching ALL point changes
 	useEffect(() => {
 		if (!current) return;
 		setFadeInDraft(current.clip.fadeIn ?? 0);
 		setFadeOutDraft(current.clip.fadeOut ?? 0);
 		const points = current.track.volumeEnvelope?.points ?? [];
-		setEnvelopeDraft(points.map((point) => ({ ...point })));
-	}, [current, current?.track.volumeEnvelope]);
+
+		// Deep equality check: only update if points actually changed
+		const newPointsStr = JSON.stringify(points);
+
+		if (prevPointsRef.current !== newPointsStr) {
+			prevPointsRef.current = newPointsStr;
+			setEnvelopeDraft(points.map((point) => ({ ...point })));
+		}
+	}, [
+		current,
+		current?.track.volumeEnvelope?.enabled,
+		current?.track.volumeEnvelope?.points,
+	]);
 
 	const close = (nextOpen: boolean) => {
 		setOpen(nextOpen);
