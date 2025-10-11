@@ -1,8 +1,51 @@
 import type { CurveType } from "../types/schemas";
 
 /**
+ * NEW: Evaluate curve between two values using -99 to +99 curve parameter (Logic Pro style)
+ * @param start Starting value
+ * @param end Ending value
+ * @param t Progress 0-1
+ * @param curve Curve amount: -99 to +99 (0 = linear, negative = exponential, positive = logarithmic)
+ */
+export function evaluateSegmentCurve(
+	start: number,
+	end: number,
+	t: number,
+	curve: number,
+): number {
+	const clamped = Math.max(0, Math.min(1, t));
+
+	if (curve === 0) {
+		// Linear
+		return start + (end - start) * clamped;
+	}
+
+	// Normalize curve to 0-1 range
+	const normalized = Math.abs(curve) / 99;
+
+	let adjusted: number;
+	if (curve < 0) {
+		// Negative = Exponential (fast start, slow end)
+		const power = 1 + normalized * 3;
+		adjusted = clamped ** power;
+	} else {
+		// Positive = Logarithmic (slow start, fast end)
+		const power = 1 + normalized * 3;
+		adjusted = 1 - (1 - clamped) ** power;
+	}
+
+	return start + (end - start) * adjusted;
+}
+
+/**
  * Calculate intermediate value for a given curve type at time t
  * Used for envelope automation and UI previews
+ *
+ * @deprecated Use evaluateSegmentCurve with -99 to +99 curve parameter instead
+ *
+ * @param type - Curve type (linear, easeIn, easeOut, sCurve)
+ * @param t - Time progress from 0.0 to 1.0
+ * @param shape - Curve intensity from 0.0 (gentle) to 1.0 (steep)
  */
 export function evaluateCurve(type: CurveType, t: number, shape = 0.5): number {
 	const s = Math.max(0, Math.min(1, shape));
@@ -138,6 +181,7 @@ export function getCurveLabel(type: CurveType): string {
 
 /**
  * Get description for curve type
+ * @deprecated Use getSegmentCurveDescription with -99 to +99 curve parameter
  */
 export function getCurveDescription(type: CurveType): string {
 	switch (type) {
@@ -152,4 +196,14 @@ export function getCurveDescription(type: CurveType): string {
 		default:
 			return "";
 	}
+}
+
+/**
+ * Get description for segment curve (-99 to +99)
+ */
+export function getSegmentCurveDescription(curve: number): string {
+	if (curve === 0) return "Linear";
+	if (curve < 0)
+		return `Exponential (${Math.abs(curve)}) - Fast start, slow end`;
+	return `Logarithmic (${curve}) - Slow start, fast end`;
 }

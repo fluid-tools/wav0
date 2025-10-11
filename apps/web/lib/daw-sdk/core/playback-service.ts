@@ -178,16 +178,24 @@ export class PlaybackService {
 			const steps = Math.max(2, Math.ceil(durationSec * 60));
 			const values = new Float32Array(steps);
 
-			const previousPoint =
-				sorted.find((p) => p.time === lastTime) ?? sorted[0];
-			const curveType = previousPoint?.curve ?? "linear";
-			const curveShape = previousPoint?.curveShape ?? 0.5;
+			// Find the segment connecting the previous point to this point
+			const previousPoint = sorted.find((p) => p.time === lastTime);
+			const currentSegment = envelope.segments?.find(
+				(seg) =>
+					seg.fromPointId === previousPoint?.id && seg.toPointId === point.id,
+			);
+			const curveValue = currentSegment?.curve ?? 0;
 
 			for (let i = 0; i < steps; i++) {
 				const t = i / (steps - 1);
-				const curveValue = evaluateCurve(curveType, t, curveShape);
+				const curvedT =
+					curveValue === 0
+						? t
+						: curveValue < 0
+							? t ** (1 + (Math.abs(curveValue) / 99) * 3)
+							: 1 - (1 - t) ** (1 + (curveValue / 99) * 3);
 				const multiplier =
-					lastMultiplier + (point.value - lastMultiplier) * curveValue;
+					lastMultiplier + (point.value - lastMultiplier) * curvedT;
 				values[i] = baseVolume * multiplier;
 			}
 

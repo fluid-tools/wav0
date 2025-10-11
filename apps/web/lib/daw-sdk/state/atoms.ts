@@ -3,67 +3,69 @@
  * These primitive atoms are shared across domain-specific modules.
  */
 
-"use client"
+"use client";
 
-import { atom } from "jotai"
-import { atomWithStorage } from "jotai/utils"
+import { atom } from "jotai";
+import { atomWithStorage } from "jotai/utils";
 import type {
-  Track,
-  PlaybackState,
-  TimelineState,
-  TimelineSection,
-  Tool,
-  AutomationType,
-  ClipInspectorTarget,
-} from "./types"
+	AutomationType,
+	ClipInspectorTarget,
+	PlaybackState,
+	TimelineSection,
+	TimelineState,
+	Tool,
+	Track,
+} from "./types";
 
-export const tracksAtom = atomWithStorage<Track[]>("daw-tracks", [])
+export const tracksAtom = atomWithStorage<Track[]>("daw-tracks", []);
 
 export const playbackAtom = atom<PlaybackState>({
-  isPlaying: false,
-  currentTime: 0,
-  duration: 0,
-  bpm: 120,
-  looping: false,
-})
+	isPlaying: false,
+	currentTime: 0,
+	duration: 0,
+	bpm: 120,
+	looping: false,
+});
 
 export const timelineAtom = atom<TimelineState>({
-  zoom: 0.5,
-  scrollPosition: 0,
-  snapToGrid: true,
-  gridSize: 500,
-})
+	zoom: 0.5,
+	scrollPosition: 0,
+	snapToGrid: true,
+	gridSize: 500,
+});
 
-export const timelineSectionsAtom = atom<TimelineSection[]>([])
+export const timelineSectionsAtom = atom<TimelineSection[]>([]);
 
-export const trackHeightZoomAtom = atom(1.0)
-export const selectedTrackIdAtom = atom<string | null>(null)
-export const selectedClipIdAtom = atom<string | null>(null)
-export const clipInspectorOpenAtom = atom(false)
-export const clipInspectorTargetAtom = atom<ClipInspectorTarget>(null)
-export const eventListOpenAtom = atom(false)
-export const activeToolAtom = atom<Tool>("pointer")
-export const automationViewEnabledAtom = atom(false)
-export const trackAutomationTypeAtom = atom<Map<string, AutomationType>>(new Map())
+export const trackHeightZoomAtom = atom(1.0);
+export const selectedTrackIdAtom = atom<string | null>(null);
+export const selectedClipIdAtom = atom<string | null>(null);
+export const clipInspectorOpenAtom = atom(false);
+export const clipInspectorTargetAtom = atom<ClipInspectorTarget>(null);
+export const eventListOpenAtom = atom(false);
+export const activeToolAtom = atom<Tool>("pointer");
+export const automationViewEnabledAtom = atom(false);
+export const trackAutomationTypeAtom = atom<Map<string, AutomationType>>(
+	new Map(),
+);
 
 export const projectNameAtom = atomWithStorage<string>(
-  "daw-project-name",
-  "Untitled Project",
-)
+	"daw-project-name",
+	"Untitled Project",
+);
 
 export const projectEndOverrideAtom = atomWithStorage<number | null>(
-  "daw-project-end-override",
-  null,
-)
+	"daw-project-end-override",
+	null,
+);
 
-export const horizontalScrollAtom = atom<number>(0)
-export const verticalScrollAtom = atom<number>(0)
+export const horizontalScrollAtom = atom<number>(0);
+export const verticalScrollAtom = atom<number>(0);
 
 export const zoomLimitsAtom = atom<{ min: number; max: number }>({
-  min: 0.05,
-  max: 5,
-})
+	min: 0.05,
+	max: 5,
+});
 
-export const playheadDraggingAtom = atom<boolean>(false)
-export const userIsManuallyScrollingAtom = atom<boolean>(false)
-export const playheadAutoFollowEnabledAtom = atom<boolean>(true)
+export const playheadDraggingAtom = atom<boolean>(false);
+export const userIsManuallyScrollingAtom = atom<boolean>(false);
+export const playheadAutoFollowEnabledAtom = atom<boolean>(true);
