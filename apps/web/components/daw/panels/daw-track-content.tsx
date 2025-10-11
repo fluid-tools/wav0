@@ -7,12 +7,12 @@ import { ClipFadeHandles } from "@/components/daw/controls/clip-fade-handles";
 import { AutomationTransferDialog } from "@/components/daw/dialogs/automation-transfer-dialog";
 import { AutomationLane } from "@/components/daw/panels/automation-lane";
 import { DAW_HEIGHTS } from "@/lib/constants/daw-design";
-import { playbackService } from "@/lib/daw-sdk";
 import type { Clip } from "@/lib/daw-sdk";
 import {
 	activeToolAtom,
 	loadAudioFileAtom,
 	playbackAtom,
+	playbackService,
 	projectEndPositionAtom,
 	selectedClipIdAtom,
 	selectedTrackIdAtom,
@@ -307,15 +307,20 @@ export function DAWTrackContent() {
 							);
 							if (clip) {
 								// Check for automation in clip's time range
+								// Skip automation logic if envelope is disabled
 								const clipEndTime =
 									clip.startTime + (clip.trimEnd - clip.trimStart);
-								const automationCount = countAutomationPointsInRange(
-									oldTrack,
-									clip.startTime,
-									clipEndTime,
-								);
+								const hasEnabledAutomation =
+									oldTrack.volumeEnvelope?.enabled ?? false;
+								const automationCount = hasEnabledAutomation
+									? countAutomationPointsInRange(
+											oldTrack,
+											clip.startTime,
+											clipEndTime,
+										)
+									: 0;
 
-								// If automation exists, show dialog; otherwise move immediately
+								// If automation exists AND is enabled, show dialog; otherwise move immediately
 								if (automationCount > 0) {
 									// Show dialog to confirm automation transfer
 									setAutomationTransferDialog({
@@ -374,10 +379,25 @@ export function DAWTrackContent() {
 						}
 					}
 
-					// Normal horizontal-only update
-					updateClip(draggingClip.trackId, draggingClip.clipId, {
-						startTime: newStartTime,
-					});
+					// Normal horizontal-only update within same track
+					// Automatically move automation if enabled and points exist in range
+					const track = tracks.find((t) => t.id === draggingClip.trackId);
+					const clip = track?.clips?.find((c) => c.id === draggingClip.clipId);
+					const shouldMoveAutomation =
+						track?.volumeEnvelope?.enabled &&
+						clip &&
+						countAutomationPointsInRange(
+							track,
+							clip.startTime,
+							clip.startTime + (clip.trimEnd - clip.trimStart),
+						) > 0;
+
+					updateClip(
+						draggingClip.trackId,
+						draggingClip.clipId,
+						{ startTime: newStartTime },
+						{ moveAutomation: shouldMoveAutomation },
+					);
 				}
 
 				if (loopDragging) {
@@ -482,20 +502,21 @@ export function DAWTrackContent() {
 					clipEndTime,
 				);
 
-				// Add automation to new track
-				const newEnvelope = updatedNewTrack.volumeEnvelope || {
-					enabled: true,
-					points: [],
-				};
-				updatedNewTrack = {
-					...updatedNewTrack,
-					volumeEnvelope: {
-						...newEnvelope,
-						points: [...(newEnvelope.points || []), ...pointsToTransfer].sort(
-							(a, b) => a.time - b.time,
-						),
-					},
-				};
+			// Add automation to new track
+			const newEnvelope = updatedNewTrack.volumeEnvelope || {
+				enabled: true,
+				points: [],
+				segments: [],
+			};
+			updatedNewTrack = {
+				...updatedNewTrack,
+				volumeEnvelope: {
+					...newEnvelope,
+					points: [...(newEnvelope.points || []), ...pointsToTransfer].sort(
+						(a, b) => a.time - b.time,
+					),
+				},
+			};
 			}
 
 			// Move clip with updated automation

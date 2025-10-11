@@ -25,13 +25,12 @@ export function ClipInspectorSheet() {
 		current,
 		fadeInDraft,
 		fadeOutDraft,
-		envelopeDraft,
+		envelope,
 		setFadeInDraft,
 		setFadeOutDraft,
 		close,
 		handleToggleEnvelope,
 		handleEnvelopeChange,
-		handleEnvelopeSave,
 		commitFade,
 		MAX_FADE_MS,
 	} = useClipInspector();
@@ -45,7 +44,6 @@ export function ClipInspectorSheet() {
 	}
 
 	const { track, clip } = current;
-	const envelope = track.volumeEnvelope;
 	const envelopeEnabled = Boolean(envelope?.enabled);
 
 	return (
@@ -146,9 +144,8 @@ export function ClipInspectorSheet() {
 
 								{envelopeEnabled ? (
 									<EnvelopeEditor
-										points={envelopeDraft}
+										envelope={envelope}
 										onChange={handleEnvelopeChange}
-										onSave={handleEnvelopeSave}
 										clipStartTime={clip.startTime}
 										trackVolume={track.volume}
 									/>

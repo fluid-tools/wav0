@@ -2,9 +2,13 @@
 
 import { useAtom } from "jotai";
 import { useEffect, useState } from "react";
-import { getEffectiveDb, multiplierToDb } from "@/lib/daw-sdk";
-import type { TrackEnvelopePoint } from "@/lib/daw-sdk";
-import { playbackAtom, tracksAtom } from "@/lib/daw-sdk";
+import type { TrackEnvelopePoint, TrackEnvelopeSegment } from "@/lib/daw-sdk";
+import {
+	getEffectiveDb,
+	multiplierToDb,
+	playbackAtom,
+	tracksAtom,
+} from "@/lib/daw-sdk";
 
 /**
  * Hook to get the current automated gain value for a track during playback
@@ -42,6 +46,7 @@ export function useLiveAutomationGain(trackId: string): {
 		const currentTimeMs = playback.currentTime;
 		const multiplier = getEnvelopeMultiplierAtTime(
 			envelope.points,
+			envelope.segments || [],
 			currentTimeMs,
 		);
 		const effectiveDb = getEffectiveDb(track.volume, multiplier);
@@ -61,10 +66,11 @@ export function useLiveAutomationGain(trackId: string): {
 
 /**
  * Get the envelope multiplier at a specific time
- * Interpolates between points based on curve type
+ * Interpolates between points based on curve type from segments
  */
 function getEnvelopeMultiplierAtTime(
 	points: TrackEnvelopePoint[],
+	segments: TrackEnvelopeSegment[],
 	timeMs: number,
 ): number {
 	if (points.length === 0) return 1.0;
@@ -87,9 +93,15 @@ function getEnvelopeMultiplierAtTime(
 		const p2 = sorted[i + 1];
 
 		if (timeMs >= p1.time && timeMs <= p2.time) {
+			// Find the segment between these points
+			const segment = segments.find(
+				(seg) => seg.fromPointId === p1.id && seg.toPointId === p2.id,
+			);
+			const curve = segment?.curve ?? 0;
+
 			// Interpolate between p1 and p2
 			const progress = (timeMs - p1.time) / (p2.time - p1.time);
-			return interpolateValue(p1.value, p2.value, progress, p2.curve);
+			return interpolateValue(p1.value, p2.value, progress, curve);
 		}
 	}
 
@@ -98,31 +110,30 @@ function getEnvelopeMultiplierAtTime(
 }
 
 /**
- * Interpolate between two values based on curve type
+ * Interpolate between two values based on curve value (-99 to +99)
  */
 function interpolateValue(
 	start: number,
 	end: number,
 	progress: number,
-	curve: TrackEnvelopePoint["curve"],
+	curve: number,
 ): number {
-	switch (curve) {
-		case "easeIn":
-			// Exponential ease-in (slow start, fast end)
-			return start + (end - start) * progress * progress;
-		case "easeOut":
-			// Exponential ease-out (fast start, slow end)
-			return start + (end - start) * (1 - (1 - progress) * (1 - progress));
-		case "sCurve": {
-			// S-curve (ease-in-out)
-			const t =
-				progress < 0.5
-					? 2 * progress * progress
-					: 1 - 2 * (1 - progress) * (1 - progress);
-			return start + (end - start) * t;
-		}
-		default:
-			// Linear interpolation
-			return start + (end - start) * progress;
+	if (curve === 0) {
+		// Linear
+		return start + (end - start) * progress;
 	}
+
+	// Apply curve transformation
+	let curvedProgress: number;
+	if (curve < 0) {
+		// Negative = Exponential (fast start, slow end)
+		const power = 1 + (Math.abs(curve) / 99) * 3;
+		curvedProgress = progress ** power;
+	} else {
+		// Positive = Logarithmic (slow start, fast end)
+		const power = 1 + (curve / 99) * 3;
+		curvedProgress = 1 - (1 - progress) ** power;
+	}
+
+	return start + (end - start) * curvedProgress;
 }
