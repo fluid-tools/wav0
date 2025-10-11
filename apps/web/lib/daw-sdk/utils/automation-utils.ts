@@ -179,30 +179,33 @@ export function getEnvelopeMultiplierAtTime(
 }
 
 /**
- * Interpolate between two values based on curve type
+ * Interpolate between two values based on curve value (-99 to +99)
  * @deprecated Use evaluateSegmentCurve with -99 to +99 curve parameter instead
  */
 function interpolateValue(
 	start: number,
 	end: number,
 	progress: number,
-	curve: TrackEnvelopePoint["curve"],
+	curve: number,
 ): number {
-	switch (curve) {
-		case "easeIn":
-			return start + (end - start) * progress * progress;
-		case "easeOut":
-			return start + (end - start) * (1 - (1 - progress) * (1 - progress));
-		case "sCurve": {
-			const t =
-				progress < 0.5
-					? 2 * progress * progress
-					: 1 - 2 * (1 - progress) * (1 - progress);
-			return start + (end - start) * t;
-		}
-		default:
-			return start + (end - start) * progress;
+	if (curve === 0) {
+		// Linear
+		return start + (end - start) * progress;
 	}
+
+	// Apply curve transformation
+	let curvedProgress: number;
+	if (curve < 0) {
+		// Negative = Exponential (fast start, slow end)
+		const power = 1 + (Math.abs(curve) / 99) * 3;
+		curvedProgress = progress ** power;
+	} else {
+		// Positive = Logarithmic (slow start, fast end)
+		const power = 1 + (curve / 99) * 3;
+		curvedProgress = 1 - (1 - progress) ** power;
+	}
+
+	return start + (end - start) * curvedProgress;
 }
 
 /**

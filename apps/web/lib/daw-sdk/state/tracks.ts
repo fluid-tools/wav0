@@ -7,7 +7,7 @@ import {
 	selectedTrackIdAtom,
 	tracksAtom,
 } from "./atoms";
-import type { Clip, Track, TrackEnvelope } from "./types";
+import type { Clip, Track, TrackEnvelope, TrackEnvelopePoint } from "./types";
 import { clampEnvelopeGain, createDefaultEnvelope } from "./types";
 
 export const addTrackAtom = atom(null, (get, set, track: Omit<Track, "id">) => {
@@ -51,18 +51,20 @@ export const updateTrackAtom = atom(
 			if (track.id !== trackId) return track;
 			if (updates.volumeEnvelope) {
 				// Auto-migrate envelope if needed
-				const { migrateAutomationToSegments } = require("../utils/automation-utils");
+				const {
+					migrateAutomationToSegments,
+				} = require("../utils/automation-utils");
 				const migrated = migrateAutomationToSegments(updates.volumeEnvelope);
-				
-				const normalizedEnvelope: TrackEnvelope = {
-					...migrated,
-					points: migrated.points
-						.map((point) => ({
-							...point,
-							value: clampEnvelopeGain(point.value),
-						}))
-						.sort((a, b) => a.time - b.time),
-				};
+
+			const normalizedEnvelope: TrackEnvelope = {
+				...migrated,
+				points: migrated.points
+					.map((point: TrackEnvelopePoint) => ({
+						...point,
+						value: clampEnvelopeGain(point.value),
+					}))
+					.sort((a: TrackEnvelopePoint, b: TrackEnvelopePoint) => a.time - b.time),
+			};
 				return { ...track, ...updates, volumeEnvelope: normalizedEnvelope };
 			}
 			return { ...track, ...updates };
@@ -146,19 +148,21 @@ export const loadAudioFileAtom = atom(
 			const tracks = get(tracksAtom);
 			const existingTrack = tracks.find((t) => t.id === existingTrackId);
 			if (existingTrack) {
-				const clipId = crypto.randomUUID();
-				const clip: Clip = {
-					id: clipId,
-					name: file.name.replace(/\.[^/.]+$/, ""),
-					opfsFileId,
-					audioFileName: audioInfo.fileName,
-					audioFileType: audioInfo.fileType,
-					startTime: opts?.startTimeMs ?? existingTrack.startTime,
-					trimStart: 0,
-					trimEnd: audioInfo.duration * 1000,
-					sourceDurationMs: audioInfo.duration * 1000,
-					color: existingTrack.color,
-				};
+			const clipId = crypto.randomUUID();
+			const clip: Clip = {
+				id: clipId,
+				name: file.name.replace(/\.[^/.]+$/, ""),
+				opfsFileId,
+				audioFileName: audioInfo.fileName,
+				audioFileType: audioInfo.fileType,
+				startTime: opts?.startTimeMs ?? existingTrack.startTime,
+				trimStart: 0,
+				trimEnd: audioInfo.duration * 1000,
+				sourceDurationMs: audioInfo.duration * 1000,
+				fadeInCurve: 0,
+				fadeOutCurve: 0,
+				color: existingTrack.color,
+			};
 
 				const updatedTrack: Track = {
 					...existingTrack,
@@ -194,20 +198,22 @@ export const loadAudioFileAtom = atom(
 			}
 		}
 
-		const newTrackId = generateTrackId();
-		const clipId = crypto.randomUUID();
-		const clip: Clip = {
-			id: clipId,
-			name: file.name.replace(/\.[^/.]+$/, ""),
-			opfsFileId,
-			audioFileName: audioInfo.fileName,
-			audioFileType: audioInfo.fileType,
-			startTime: opts?.startTimeMs ?? 0,
-			trimStart: 0,
-			trimEnd: audioInfo.duration * 1000,
-			sourceDurationMs: audioInfo.duration * 1000,
-			color: "#3b82f6",
-		};
+	const newTrackId = generateTrackId();
+	const clipId = crypto.randomUUID();
+	const clip: Clip = {
+		id: clipId,
+		name: file.name.replace(/\.[^/.]+$/, ""),
+		opfsFileId,
+		audioFileName: audioInfo.fileName,
+		audioFileType: audioInfo.fileType,
+		startTime: opts?.startTimeMs ?? 0,
+		trimStart: 0,
+		trimEnd: audioInfo.duration * 1000,
+		sourceDurationMs: audioInfo.duration * 1000,
+		fadeInCurve: 0,
+		fadeOutCurve: 0,
+		color: "#3b82f6",
+	};
 		const newTrack: Track = {
 			id: newTrackId,
 			name: clip.name,

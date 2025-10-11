@@ -142,14 +142,14 @@ export function ClipInspectorSheet() {
 									</Badge>
 								</div>
 
-						{envelopeEnabled ? (
-							<EnvelopeEditor
-								envelope={envelope}
-								onChange={handleEnvelopeChange}
-								clipStartTime={clip.startTime}
-								trackVolume={track.volume}
-							/>
-						) : (
+								{envelopeEnabled ? (
+									<EnvelopeEditor
+										envelope={envelope}
+										onChange={handleEnvelopeChange}
+										clipStartTime={clip.startTime}
+										trackVolume={track.volume}
+									/>
+								) : (
 									<p className="rounded-xl border border-dashed border-border/60 bg-background/40 p-4 text-xs text-muted-foreground">
 										Envelope disabled — enable to author dynamic volume ramps.
 									</p>

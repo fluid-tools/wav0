@@ -502,20 +502,21 @@ export function DAWTrackContent() {
 					clipEndTime,
 				);
 
-				// Add automation to new track
-				const newEnvelope = updatedNewTrack.volumeEnvelope || {
-					enabled: true,
-					points: [],
-				};
-				updatedNewTrack = {
-					...updatedNewTrack,
-					volumeEnvelope: {
-						...newEnvelope,
-						points: [...(newEnvelope.points || []), ...pointsToTransfer].sort(
-							(a, b) => a.time - b.time,
-						),
-					},
-				};
+			// Add automation to new track
+			const newEnvelope = updatedNewTrack.volumeEnvelope || {
+				enabled: true,
+				points: [],
+				segments: [],
+			};
+			updatedNewTrack = {
+				...updatedNewTrack,
+				volumeEnvelope: {
+					...newEnvelope,
+					points: [...(newEnvelope.points || []), ...pointsToTransfer].sort(
+						(a, b) => a.time - b.time,
+					),
+				},
+			};
 			}
 
 			// Move clip with updated automation
