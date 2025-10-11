@@ -1,10 +1,10 @@
 import { useAtom } from "jotai";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
 	type Clip,
 	clipInspectorOpenAtom,
 	clipInspectorTargetAtom,
-	type TrackEnvelopePoint,
+	type TrackEnvelope,
 	tracksAtom,
 	updateClipAtom,
 	updateTrackAtom,
@@ -21,10 +21,6 @@ export function useClipInspector() {
 
 	const [fadeInDraft, setFadeInDraft] = useState<number>(0);
 	const [fadeOutDraft, setFadeOutDraft] = useState<number>(0);
-	const [envelopeDraft, setEnvelopeDraft] = useState<TrackEnvelopePoint[]>([]);
-
-	// Track previous points for comparison
-	const prevPointsRef = useRef<string>("");
 
 	const current = useMemo(() => {
 		if (!target) return null;
@@ -35,27 +31,12 @@ export function useClipInspector() {
 		return track && clip ? { track, clip } : null;
 	}, [target, tracks]);
 
-	// Sync envelope draft with track automation (single source of truth)
-	// Re-sync whenever track automation changes externally
-	// Uses deep comparison via ref to avoid infinite loops while catching ALL point changes
+	// Sync fade drafts with clip fades
 	useEffect(() => {
 		if (!current) return;
 		setFadeInDraft(current.clip.fadeIn ?? 0);
 		setFadeOutDraft(current.clip.fadeOut ?? 0);
-		const points = current.track.volumeEnvelope?.points ?? [];
-
-		// Deep equality check: only update if points actually changed
-		const newPointsStr = JSON.stringify(points);
-
-		if (prevPointsRef.current !== newPointsStr) {
-			prevPointsRef.current = newPointsStr;
-			setEnvelopeDraft(points.map((point) => ({ ...point })));
-		}
-	}, [
-		current,
-		current?.track.volumeEnvelope?.enabled,
-		current?.track.volumeEnvelope?.points,
-	]);
+	}, [current]);
 
 	const close = (nextOpen: boolean) => {
 		setOpen(nextOpen);
@@ -73,9 +54,9 @@ export function useClipInspector() {
 					id: crypto.randomUUID(),
 					time: current.clip.startTime,
 					value: 1.0, // 100% multiplier = no change from base volume
-					curve: "linear" as const,
 				},
 			],
+			segments: [],
 		};
 		updateTrack(current.track.id, {
 			volumeEnvelope: {
@@ -85,25 +66,27 @@ export function useClipInspector() {
 		});
 	};
 
-	const handleEnvelopeChange = (points: TrackEnvelopePoint[]) => {
-		setEnvelopeDraft(points);
-	};
-
-	const handleEnvelopeSave = () => {
+	const handleEnvelopeChange = (envelope: TrackEnvelope) => {
 		if (!current) return;
-		const normalized = envelopeDraft
-			.map((point) => ({
-				...point,
-				time: Math.max(0, Math.round(point.time)),
-				value: Math.min(4, Math.max(0, point.value)),
-			}))
-			.sort((a, b) => a.time - b.time);
+
+		// Auto-migrate and normalize
+		const { migrateAutomationToSegments } = require("@/lib/daw-sdk");
+		const migrated = migrateAutomationToSegments(envelope);
+
+		const normalized = {
+			...migrated,
+			enabled: true,
+			points: migrated.points
+				.map((point) => ({
+					...point,
+					time: Math.max(0, Math.round(point.time)),
+					value: Math.min(4, Math.max(0, point.value)),
+				}))
+				.sort((a, b) => a.time - b.time),
+		};
 
 		updateTrack(current.track.id, {
-			volumeEnvelope: {
-				enabled: true,
-				points: normalized,
-			},
+			volumeEnvelope: normalized,
 		});
 	};
 
@@ -128,13 +111,16 @@ export function useClipInspector() {
 		current,
 		fadeInDraft,
 		fadeOutDraft,
-		envelopeDraft,
+		envelope: current?.track.volumeEnvelope ?? {
+			enabled: false,
+			points: [],
+			segments: [],
+		},
 		setFadeInDraft,
 		setFadeOutDraft,
 		close,
 		handleToggleEnvelope,
 		handleEnvelopeChange,
-		handleEnvelopeSave,
 		commitFade,
 		updateClip: handleUpdateClip,
 		MAX_FADE_MS,

@@ -14,6 +14,7 @@ export type {
 	Track,
 	TrackEnvelope,
 	TrackEnvelopePoint,
+	TrackEnvelopeSegment,
 } from "../types/schemas";
 
 import type {
@@ -44,12 +45,12 @@ export function createDefaultEnvelope(_volume: number): TrackEnvelope {
 		id: crypto.randomUUID(),
 		time: 0,
 		value: 1,
-		curve: "linear",
-		curveShape: 0.5,
+		// No curve - curves are on segments, not points
 	};
 
 	return {
 		enabled: false,
 		points: [defaultPoint],
+		segments: [], // No segments with only one point
 	};
 }

@@ -13,49 +13,14 @@ import {
 } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipProvider,
-	TooltipTrigger,
-} from "@/components/ui/tooltip";
-import type { CurveType } from "@/lib/daw-sdk";
 import { useClipInspector } from "@/lib/daw-sdk";
 import { formatDuration } from "@/lib/storage/opfs";
-import { CurvePreview } from "../controls/curve-preview";
+import { SegmentCurvePreview } from "../controls/segment-curve-preview";
 import { EnvelopeEditor } from "./envelope-editor";
 import { InspectorCard, InspectorSection } from "./inspector-section";
 
-// Curve type metadata for consistent naming and descriptions
-const CURVE_METADATA: Record<
-	CurveType,
-	{ label: string; description: string }
-> = {
-	linear: {
-		label: "Linear",
-		description: "Constant rate of change",
-	},
-	easeIn: {
-		label: "Ease In (Exponential)",
-		description: "Starts slow, accelerates toward end",
-	},
-	easeOut: {
-		label: "Ease Out (Logarithmic)",
-		description: "Starts fast, decelerates toward end",
-	},
-	sCurve: {
-		label: "S-Curve (Cosine)",
-		description: "Smooth acceleration and deceleration",
-	},
-};
+// OLD curve metadata removed - now using simple -99 to +99 system (Logic Pro style)
 
 export function ClipEditorDrawer() {
 	const {
@@ -63,13 +28,12 @@ export function ClipEditorDrawer() {
 		current,
 		fadeInDraft,
 		fadeOutDraft,
-		envelopeDraft,
+		envelope,
 		setFadeInDraft,
 		setFadeOutDraft,
 		close,
 		handleToggleEnvelope,
 		handleEnvelopeChange,
-		handleEnvelopeSave,
 		commitFade,
 		updateClip,
 		MAX_FADE_MS,
@@ -80,7 +44,6 @@ export function ClipEditorDrawer() {
 	}
 
 	const { track, clip } = current;
-	const envelope = track.volumeEnvelope;
 	const envelopeEnabled = Boolean(envelope?.enabled);
 
 	return (
@@ -205,127 +168,61 @@ export function ClipEditorDrawer() {
 											aria-label="Fade in duration in milliseconds"
 										/>
 
-										{/* Fade In Curve Type */}
-										<div className="space-y-1.5">
-											<label
-												className="text-xs font-medium text-muted-foreground"
-												htmlFor="fade-in-curve"
-											>
-												Curve Type
-											</label>
-											<TooltipProvider>
-												<Tooltip>
-													<TooltipTrigger asChild>
-														<div>
-															<Select
-																value={clip.fadeInCurve || "easeOut"}
-																onValueChange={(value) =>
-																	updateClip({
-																		fadeInCurve: value as CurveType,
-																	})
-																}
-															>
-																<SelectTrigger id="fade-in-curve">
-																	<SelectValue />
-																</SelectTrigger>
-																<SelectContent>
-																	{Object.entries(CURVE_METADATA).map(
-																		([key, meta]) => (
-																			<SelectItem key={key} value={key}>
-																				{meta.label}
-																			</SelectItem>
-																		),
-																	)}
-																</SelectContent>
-															</Select>
-														</div>
-													</TooltipTrigger>
-													<TooltipContent side="right" className="max-w-xs">
-														<p className="text-xs">
-															{CURVE_METADATA[clip.fadeInCurve || "easeOut"]
-																?.description ||
-																"Select a curve type for the fade"}
-														</p>
-													</TooltipContent>
-												</Tooltip>
-											</TooltipProvider>
-										</div>
-
-										{/* Fade In Shape */}
-										{clip.fadeInCurve && clip.fadeInCurve !== "linear" && (
-											<div className="space-y-2">
-												<div className="flex items-center justify-between">
-													<TooltipProvider>
-														<Tooltip>
-															<TooltipTrigger asChild>
-																<label
-																	htmlFor="fade-in-shape"
-																	className="text-xs font-medium text-muted-foreground cursor-help"
-																>
-																	Curve Intensity
-																</label>
-															</TooltipTrigger>
-															<TooltipContent side="right" className="max-w-xs">
-																<p className="text-xs">
-																	Controls the steepness of the curve. 0% =
-																	gentle, 100% = aggressive
-																</p>
-															</TooltipContent>
-														</Tooltip>
-													</TooltipProvider>
-													<span className="text-xs font-mono text-muted-foreground tabular-nums">
-														{((clip.fadeInShape ?? 0.5) * 100).toFixed(0)}%
-													</span>
-												</div>
-												<input
-													id="fade-in-shape"
-													type="range"
-													min={0}
-													max={100}
-													value={(clip.fadeInShape ?? 0.5) * 100}
-													onChange={(e) =>
-														updateClip({
-															fadeInShape: parseInt(e.target.value, 10) / 100,
-														})
-													}
-													className="w-full h-2 cursor-pointer appearance-none rounded-lg bg-muted hover:bg-muted/80 transition-colors"
-												/>
-												<div className="flex justify-between text-[10px] text-muted-foreground">
-													{clip.fadeInCurve === "easeIn" ? (
-														<>
-															<span>Linear</span>
-															<span>Balanced</span>
-															<span>Exponential</span>
-														</>
-													) : clip.fadeInCurve === "easeOut" ? (
-														<>
-															<span>Sharp</span>
-															<span>Balanced</span>
-															<span>Smooth</span>
-														</>
-													) : clip.fadeInCurve === "sCurve" ? (
-														<>
-															<span>Subtle</span>
-															<span>Balanced</span>
-															<span>Pronounced</span>
-														</>
-													) : (
-														<>
-															<span>Gentle</span>
-															<span>Balanced</span>
-															<span>Steep</span>
-														</>
-													)}
-												</div>
-												<CurvePreview
-													type={clip.fadeInCurve}
-													shape={clip.fadeInShape ?? 0.5}
-													width={120}
-													height={48}
-													className="mx-auto text-primary"
-												/>
+									{/* Fade In Curve (Logic Pro style: -99 to +99) */}
+									{(clip.fadeIn ?? 0) > 0 && (
+										<div className="space-y-2">
+											<div className="flex items-center justify-between">
+												<label
+													htmlFor="fade-in-curve"
+													className="text-xs font-medium text-muted-foreground"
+												>
+													Fade Curve
+												</label>
+												<span className="text-xs font-mono text-muted-foreground tabular-nums">
+													{clip.fadeInCurve ?? 0}
+												</span>
 											</div>
-										)}
+											<input
+												id="fade-in-curve"
+												type="range"
+												min={-99}
+												max={99}
+												step={1}
+												value={clip.fadeInCurve ?? 0}
+												onChange={(e) =>
+													updateClip({
+														fadeInCurve: parseInt(e.target.value, 10),
+													})
+												}
+												className="w-full h-2 cursor-pointer appearance-none rounded-lg bg-muted hover:bg-muted/80 transition-colors"
+												style={{
+													background: `linear-gradient(to right, 
+														hsl(var(--primary) / 0.3) 0%, 
+														hsl(var(--primary) / 0.6) ${(((clip.fadeInCurve ?? 0) + 99) / 198) * 100}%, 
+														hsl(var(--muted)) ${(((clip.fadeInCurve ?? 0) + 99) / 198) * 100}%
+													)`,
+												}}
+											/>
+											<div className="flex justify-between text-[10px] text-muted-foreground">
+												<span>-99 (Fast)</span>
+												<span>0 (Linear)</span>
+												<span>+99 (Slow)</span>
+											</div>
+											<div className="text-[10px] text-muted-foreground text-center">
+												{(clip.fadeInCurve ?? 0) === 0
+													? "Linear"
+													: (clip.fadeInCurve ?? 0) < 0
+														? `Exponential - Fast attack, slow end`
+														: `Logarithmic - Slow attack, fast end`}
+											</div>
+											<SegmentCurvePreview
+												curve={clip.fadeInCurve ?? 0}
+												width={120}
+												height={48}
+												className="mx-auto text-primary"
+											/>
+										</div>
+									)}
 									</div>
 
 									{/* Fade Out */}
@@ -352,127 +249,61 @@ export function ClipEditorDrawer() {
 											aria-label="Fade out duration in milliseconds"
 										/>
 
-										{/* Fade Out Curve Type */}
-										<div className="space-y-1.5">
-											<label
-												className="text-xs font-medium text-muted-foreground"
-												htmlFor="fade-out-curve"
-											>
-												Curve Type
-											</label>
-											<TooltipProvider>
-												<Tooltip>
-													<TooltipTrigger asChild>
-														<div>
-															<Select
-																value={clip.fadeOutCurve || "easeOut"}
-																onValueChange={(value) =>
-																	updateClip({
-																		fadeOutCurve: value as CurveType,
-																	})
-																}
-															>
-																<SelectTrigger id="fade-out-curve">
-																	<SelectValue />
-																</SelectTrigger>
-																<SelectContent>
-																	{Object.entries(CURVE_METADATA).map(
-																		([key, meta]) => (
-																			<SelectItem key={key} value={key}>
-																				{meta.label}
-																			</SelectItem>
-																		),
-																	)}
-																</SelectContent>
-															</Select>
-														</div>
-													</TooltipTrigger>
-													<TooltipContent side="right" className="max-w-xs">
-														<p className="text-xs">
-															{CURVE_METADATA[clip.fadeOutCurve || "easeOut"]
-																?.description ||
-																"Select a curve type for the fade"}
-														</p>
-													</TooltipContent>
-												</Tooltip>
-											</TooltipProvider>
-										</div>
-
-										{/* Fade Out Shape */}
-										{clip.fadeOutCurve && clip.fadeOutCurve !== "linear" && (
-											<div className="space-y-2">
-												<div className="flex items-center justify-between">
-													<TooltipProvider>
-														<Tooltip>
-															<TooltipTrigger asChild>
-																<label
-																	htmlFor="fade-out-shape"
-																	className="text-xs font-medium text-muted-foreground cursor-help"
-																>
-																	Curve Intensity
-																</label>
-															</TooltipTrigger>
-															<TooltipContent side="right" className="max-w-xs">
-																<p className="text-xs">
-																	Controls the steepness of the curve. 0% =
-																	gentle, 100% = aggressive
-																</p>
-															</TooltipContent>
-														</Tooltip>
-													</TooltipProvider>
-													<span className="text-xs font-mono text-muted-foreground tabular-nums">
-														{((clip.fadeOutShape ?? 0.5) * 100).toFixed(0)}%
-													</span>
-												</div>
-												<input
-													id="fade-out-shape"
-													type="range"
-													min={0}
-													max={100}
-													value={(clip.fadeOutShape ?? 0.5) * 100}
-													onChange={(e) =>
-														updateClip({
-															fadeOutShape: parseInt(e.target.value, 10) / 100,
-														})
-													}
-													className="w-full h-2 cursor-pointer appearance-none rounded-lg bg-muted hover:bg-muted/80 transition-colors"
-												/>
-												<div className="flex justify-between text-[10px] text-muted-foreground">
-													{clip.fadeOutCurve === "easeIn" ? (
-														<>
-															<span>Linear</span>
-															<span>Balanced</span>
-															<span>Exponential</span>
-														</>
-													) : clip.fadeOutCurve === "easeOut" ? (
-														<>
-															<span>Sharp</span>
-															<span>Balanced</span>
-															<span>Smooth</span>
-														</>
-													) : clip.fadeOutCurve === "sCurve" ? (
-														<>
-															<span>Subtle</span>
-															<span>Balanced</span>
-															<span>Pronounced</span>
-														</>
-													) : (
-														<>
-															<span>Gentle</span>
-															<span>Balanced</span>
-															<span>Steep</span>
-														</>
-													)}
-												</div>
-												<CurvePreview
-													type={clip.fadeOutCurve}
-													shape={clip.fadeOutShape ?? 0.5}
-													width={120}
-													height={48}
-													className="mx-auto text-primary"
-												/>
+									{/* Fade Out Curve (Logic Pro style: -99 to +99) */}
+									{(clip.fadeOut ?? 0) > 0 && (
+										<div className="space-y-2">
+											<div className="flex items-center justify-between">
+												<label
+													htmlFor="fade-out-curve"
+													className="text-xs font-medium text-muted-foreground"
+												>
+													Fade Curve
+												</label>
+												<span className="text-xs font-mono text-muted-foreground tabular-nums">
+													{clip.fadeOutCurve ?? 0}
+												</span>
 											</div>
-										)}
+											<input
+												id="fade-out-curve"
+												type="range"
+												min={-99}
+												max={99}
+												step={1}
+												value={clip.fadeOutCurve ?? 0}
+												onChange={(e) =>
+													updateClip({
+														fadeOutCurve: parseInt(e.target.value, 10),
+													})
+												}
+												className="w-full h-2 cursor-pointer appearance-none rounded-lg bg-muted hover:bg-muted/80 transition-colors"
+												style={{
+													background: `linear-gradient(to right, 
+														hsl(var(--primary) / 0.3) 0%, 
+														hsl(var(--primary) / 0.6) ${(((clip.fadeOutCurve ?? 0) + 99) / 198) * 100}%, 
+														hsl(var(--muted)) ${(((clip.fadeOutCurve ?? 0) + 99) / 198) * 100}%
+													)`,
+												}}
+											/>
+											<div className="flex justify-between text-[10px] text-muted-foreground">
+												<span>-99 (Fast)</span>
+												<span>0 (Linear)</span>
+												<span>+99 (Slow)</span>
+											</div>
+											<div className="text-[10px] text-muted-foreground text-center">
+												{(clip.fadeOutCurve ?? 0) === 0
+													? "Linear"
+													: (clip.fadeOutCurve ?? 0) < 0
+														? `Exponential - Fast attack, slow end`
+														: `Logarithmic - Slow attack, fast end`}
+											</div>
+											<SegmentCurvePreview
+												curve={clip.fadeOutCurve ?? 0}
+												width={120}
+												height={48}
+												className="mx-auto text-primary"
+											/>
+										</div>
+									)}
 									</div>
 								</div>
 							</InspectorSection>
@@ -493,13 +324,12 @@ export function ClipEditorDrawer() {
 								}
 							>
 								{envelopeEnabled ? (
-									<EnvelopeEditor
-										points={envelopeDraft}
-										onChange={handleEnvelopeChange}
-										onSave={handleEnvelopeSave}
-										clipStartTime={clip.startTime}
-										trackVolume={track.volume}
-									/>
+								<EnvelopeEditor
+									envelope={envelope}
+									onChange={handleEnvelopeChange}
+									clipStartTime={clip.startTime}
+									trackVolume={track.volume}
+								/>
 								) : (
 									<InspectorCard>
 										<p className="text-sm text-muted-foreground">
