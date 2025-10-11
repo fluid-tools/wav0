@@ -168,61 +168,61 @@ export function ClipEditorDrawer() {
 											aria-label="Fade in duration in milliseconds"
 										/>
 
-									{/* Fade In Curve (Logic Pro style: -99 to +99) */}
-									{(clip.fadeIn ?? 0) > 0 && (
-										<div className="space-y-2">
-											<div className="flex items-center justify-between">
-												<label
-													htmlFor="fade-in-curve"
-													className="text-xs font-medium text-muted-foreground"
-												>
-													Fade Curve
-												</label>
-												<span className="text-xs font-mono text-muted-foreground tabular-nums">
-													{clip.fadeInCurve ?? 0}
-												</span>
-											</div>
-											<input
-												id="fade-in-curve"
-												type="range"
-												min={-99}
-												max={99}
-												step={1}
-												value={clip.fadeInCurve ?? 0}
-												onChange={(e) =>
-													updateClip({
-														fadeInCurve: parseInt(e.target.value, 10),
-													})
-												}
-												className="w-full h-2 cursor-pointer appearance-none rounded-lg bg-muted hover:bg-muted/80 transition-colors"
-												style={{
-													background: `linear-gradient(to right, 
+										{/* Fade In Curve (Logic Pro style: -99 to +99) */}
+										{(clip.fadeIn ?? 0) > 0 && (
+											<div className="space-y-2">
+												<div className="flex items-center justify-between">
+													<label
+														htmlFor="fade-in-curve"
+														className="text-xs font-medium text-muted-foreground"
+													>
+														Fade Curve
+													</label>
+													<span className="text-xs font-mono text-muted-foreground tabular-nums">
+														{clip.fadeInCurve ?? 0}
+													</span>
+												</div>
+												<input
+													id="fade-in-curve"
+													type="range"
+													min={-99}
+													max={99}
+													step={1}
+													value={clip.fadeInCurve ?? 0}
+													onChange={(e) =>
+														updateClip({
+															fadeInCurve: parseInt(e.target.value, 10),
+														})
+													}
+													className="w-full h-2 cursor-pointer appearance-none rounded-lg bg-muted hover:bg-muted/80 transition-colors"
+													style={{
+														background: `linear-gradient(to right, 
 														hsl(var(--primary) / 0.3) 0%, 
 														hsl(var(--primary) / 0.6) ${(((clip.fadeInCurve ?? 0) + 99) / 198) * 100}%, 
 														hsl(var(--muted)) ${(((clip.fadeInCurve ?? 0) + 99) / 198) * 100}%
 													)`,
-												}}
-											/>
-											<div className="flex justify-between text-[10px] text-muted-foreground">
-												<span>-99 (Fast)</span>
-												<span>0 (Linear)</span>
-												<span>+99 (Slow)</span>
+													}}
+												/>
+												<div className="flex justify-between text-[10px] text-muted-foreground">
+													<span>-99 (Fast)</span>
+													<span>0 (Linear)</span>
+													<span>+99 (Slow)</span>
+												</div>
+												<div className="text-[10px] text-muted-foreground text-center">
+													{(clip.fadeInCurve ?? 0) === 0
+														? "Linear"
+														: (clip.fadeInCurve ?? 0) < 0
+															? `Exponential - Fast attack, slow end`
+															: `Logarithmic - Slow attack, fast end`}
+												</div>
+												<SegmentCurvePreview
+													curve={clip.fadeInCurve ?? 0}
+													width={120}
+													height={48}
+													className="mx-auto text-primary"
+												/>
 											</div>
-											<div className="text-[10px] text-muted-foreground text-center">
-												{(clip.fadeInCurve ?? 0) === 0
-													? "Linear"
-													: (clip.fadeInCurve ?? 0) < 0
-														? `Exponential - Fast attack, slow end`
-														: `Logarithmic - Slow attack, fast end`}
-											</div>
-											<SegmentCurvePreview
-												curve={clip.fadeInCurve ?? 0}
-												width={120}
-												height={48}
-												className="mx-auto text-primary"
-											/>
-										</div>
-									)}
+										)}
 									</div>
 
 									{/* Fade Out */}
@@ -249,61 +249,61 @@ export function ClipEditorDrawer() {
 											aria-label="Fade out duration in milliseconds"
 										/>
 
-									{/* Fade Out Curve (Logic Pro style: -99 to +99) */}
-									{(clip.fadeOut ?? 0) > 0 && (
-										<div className="space-y-2">
-											<div className="flex items-center justify-between">
-												<label
-													htmlFor="fade-out-curve"
-													className="text-xs font-medium text-muted-foreground"
-												>
-													Fade Curve
-												</label>
-												<span className="text-xs font-mono text-muted-foreground tabular-nums">
-													{clip.fadeOutCurve ?? 0}
-												</span>
-											</div>
-											<input
-												id="fade-out-curve"
-												type="range"
-												min={-99}
-												max={99}
-												step={1}
-												value={clip.fadeOutCurve ?? 0}
-												onChange={(e) =>
-													updateClip({
-														fadeOutCurve: parseInt(e.target.value, 10),
-													})
-												}
-												className="w-full h-2 cursor-pointer appearance-none rounded-lg bg-muted hover:bg-muted/80 transition-colors"
-												style={{
-													background: `linear-gradient(to right, 
+										{/* Fade Out Curve (Logic Pro style: -99 to +99) */}
+										{(clip.fadeOut ?? 0) > 0 && (
+											<div className="space-y-2">
+												<div className="flex items-center justify-between">
+													<label
+														htmlFor="fade-out-curve"
+														className="text-xs font-medium text-muted-foreground"
+													>
+														Fade Curve
+													</label>
+													<span className="text-xs font-mono text-muted-foreground tabular-nums">
+														{clip.fadeOutCurve ?? 0}
+													</span>
+												</div>
+												<input
+													id="fade-out-curve"
+													type="range"
+													min={-99}
+													max={99}
+													step={1}
+													value={clip.fadeOutCurve ?? 0}
+													onChange={(e) =>
+														updateClip({
+															fadeOutCurve: parseInt(e.target.value, 10),
+														})
+													}
+													className="w-full h-2 cursor-pointer appearance-none rounded-lg bg-muted hover:bg-muted/80 transition-colors"
+													style={{
+														background: `linear-gradient(to right, 
 														hsl(var(--primary) / 0.3) 0%, 
 														hsl(var(--primary) / 0.6) ${(((clip.fadeOutCurve ?? 0) + 99) / 198) * 100}%, 
 														hsl(var(--muted)) ${(((clip.fadeOutCurve ?? 0) + 99) / 198) * 100}%
 													)`,
-												}}
-											/>
-											<div className="flex justify-between text-[10px] text-muted-foreground">
-												<span>-99 (Fast)</span>
-												<span>0 (Linear)</span>
-												<span>+99 (Slow)</span>
+													}}
+												/>
+												<div className="flex justify-between text-[10px] text-muted-foreground">
+													<span>-99 (Fast)</span>
+													<span>0 (Linear)</span>
+													<span>+99 (Slow)</span>
+												</div>
+												<div className="text-[10px] text-muted-foreground text-center">
+													{(clip.fadeOutCurve ?? 0) === 0
+														? "Linear"
+														: (clip.fadeOutCurve ?? 0) < 0
+															? `Exponential - Fast attack, slow end`
+															: `Logarithmic - Slow attack, fast end`}
+												</div>
+												<SegmentCurvePreview
+													curve={clip.fadeOutCurve ?? 0}
+													width={120}
+													height={48}
+													className="mx-auto text-primary"
+												/>
 											</div>
-											<div className="text-[10px] text-muted-foreground text-center">
-												{(clip.fadeOutCurve ?? 0) === 0
-													? "Linear"
-													: (clip.fadeOutCurve ?? 0) < 0
-														? `Exponential - Fast attack, slow end`
-														: `Logarithmic - Slow attack, fast end`}
-											</div>
-											<SegmentCurvePreview
-												curve={clip.fadeOutCurve ?? 0}
-												width={120}
-												height={48}
-												className="mx-auto text-primary"
-											/>
-										</div>
-									)}
+										)}
 									</div>
 								</div>
 							</InspectorSection>
@@ -324,12 +324,12 @@ export function ClipEditorDrawer() {
 								}
 							>
 								{envelopeEnabled ? (
-								<EnvelopeEditor
-									envelope={envelope}
-									onChange={handleEnvelopeChange}
-									clipStartTime={clip.startTime}
-									trackVolume={track.volume}
-								/>
+									<EnvelopeEditor
+										envelope={envelope}
+										onChange={handleEnvelopeChange}
+										clipStartTime={clip.startTime}
+										trackVolume={track.volume}
+									/>
 								) : (
 									<InspectorCard>
 										<p className="text-sm text-muted-foreground">

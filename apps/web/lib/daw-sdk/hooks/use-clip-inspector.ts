@@ -5,6 +5,7 @@ import {
 	clipInspectorOpenAtom,
 	clipInspectorTargetAtom,
 	type TrackEnvelope,
+	type TrackEnvelopePoint,
 	tracksAtom,
 	updateClipAtom,
 	updateTrackAtom,
@@ -73,17 +74,17 @@ export function useClipInspector() {
 		const { migrateAutomationToSegments } = require("@/lib/daw-sdk");
 		const migrated = migrateAutomationToSegments(envelope);
 
-		const normalized = {
-			...migrated,
-			enabled: true,
-			points: migrated.points
-				.map((point) => ({
-					...point,
-					time: Math.max(0, Math.round(point.time)),
-					value: Math.min(4, Math.max(0, point.value)),
-				}))
-				.sort((a, b) => a.time - b.time),
-		};
+	const normalized = {
+		...migrated,
+		enabled: true,
+		points: migrated.points
+			.map((point: TrackEnvelopePoint) => ({
+				...point,
+				time: Math.max(0, Math.round(point.time)),
+				value: Math.min(4, Math.max(0, point.value)),
+			}))
+			.sort((a: TrackEnvelopePoint, b: TrackEnvelopePoint) => a.time - b.time),
+	};
 
 		updateTrack(current.track.id, {
 			volumeEnvelope: normalized,

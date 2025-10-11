@@ -311,18 +311,18 @@ export function AutomationLane({
 				onDoubleClick={handleSvgDoubleClick}
 			>
 				<title>{`Volume automation: ${sorted.length} points (double-click to add)`}</title>
-				
+
 				{/* Clip fade overlays (non-interactive, view-only) */}
 				{track.clips?.map((clip) => {
 					const clipStartPx = clip.startTime * pxPerMs;
 					const clipDurationMs = clip.trimEnd - clip.trimStart;
 					const clipEndPx = clipStartPx + clipDurationMs * pxPerMs;
-					
+
 					const fadeInMs = Math.max(clip.fadeIn ?? 0, 0);
 					const fadeOutMs = Math.max(clip.fadeOut ?? 0, 0);
-					
+
 					if (fadeInMs === 0 && fadeOutMs === 0) return null;
-					
+
 					return (
 						<g key={`fade-${clip.id}`}>
 							{/* Fade In */}
@@ -336,10 +336,13 @@ export function AutomationLane({
 									opacity={0.5}
 									className="pointer-events-none"
 								>
-									<title>Fade in: {(fadeInMs / 1000).toFixed(2)}s (edit via fade handles)</title>
+									<title>
+										Fade in: {(fadeInMs / 1000).toFixed(2)}s (edit via fade
+										handles)
+									</title>
 								</rect>
 							)}
-							
+
 							{/* Fade Out */}
 							{fadeOutMs > 0 && (
 								<rect
@@ -351,7 +354,10 @@ export function AutomationLane({
 									opacity={0.5}
 									className="pointer-events-none"
 								>
-									<title>Fade out: {(fadeOutMs / 1000).toFixed(2)}s (edit via fade handles)</title>
+									<title>
+										Fade out: {(fadeOutMs / 1000).toFixed(2)}s (edit via fade
+										handles)
+									</title>
 								</rect>
 							)}
 						</g>
@@ -368,7 +374,7 @@ export function AutomationLane({
 					vectorEffect="non-scaling-stroke"
 				/>
 
-			{/* Note: Segment curves are now edited in the clip drawer, not here */}
+				{/* Note: Segment curves are now edited in the clip drawer, not here */}
 
 				{/* Automation points (draggable) */}
 				{sorted.map((point) => {
@@ -425,7 +431,7 @@ export function AutomationLane({
 						style={{ filter: "drop-shadow(0 0 4px rgba(239, 68, 68, 0.8))" }}
 					/>
 				)}
-		</svg>
-	</>
+			</svg>
+		</>
 	);
 }

@@ -39,15 +39,23 @@ export function EnvelopeEditor({
 	clipStartTime,
 	trackVolume,
 }: EnvelopeEditorProps) {
-	const handlePointChange = (pointId: string, time?: number, value?: number) => {
+	const handlePointChange = (
+		pointId: string,
+		time?: number,
+		value?: number,
+	) => {
 		const updatedEnvelope = {
 			...envelope,
 			points: envelope.points.map((point) =>
 				point.id === pointId
 					? {
 							...point,
-							...(time !== undefined ? { time: Math.max(0, Math.round(time)) } : {}),
-							...(value !== undefined ? { value: Math.max(0, Math.min(4, value)) } : {}),
+							...(time !== undefined
+								? { time: Math.max(0, Math.round(time)) }
+								: {}),
+							...(value !== undefined
+								? { value: Math.max(0, Math.min(4, value)) }
+								: {}),
 						}
 					: point,
 			),
@@ -122,17 +130,17 @@ export function EnvelopeEditor({
 										<div className="text-xs font-medium text-muted-foreground">
 											Point {index + 1}
 										</div>
-										{sortedPoints.length > 1 && (
-											<Button
-												variant="ghost"
-												size="icon-xs"
-												onClick={() => handlePointRemove(point.id)}
-												title="Remove point"
-												aria-label="Remove point"
-											>
-												<X className="size-3" />
-											</Button>
-										)}
+									{sortedPoints.length > 1 && (
+										<Button
+											variant="ghost"
+											size="icon-sm"
+											onClick={() => handlePointRemove(point.id)}
+											title="Remove point"
+											aria-label="Remove point"
+										>
+											<X className="size-3" />
+										</Button>
+									)}
 									</div>
 
 									<div className="grid grid-cols-2 gap-2">
@@ -184,8 +192,9 @@ export function EnvelopeEditor({
 									</div>
 
 									<div className="text-[10px] text-muted-foreground">
-										Effective: {formatDb(effectiveDb)} ({volumeToDb(trackVolume)}{" "}
-										track + {formatDb(multiplierToDb(point.value))} automation)
+										Effective: {formatDb(effectiveDb)} (
+										{volumeToDb(trackVolume)} track +{" "}
+										{formatDb(multiplierToDb(point.value))} automation)
 									</div>
 								</div>
 							</div>
