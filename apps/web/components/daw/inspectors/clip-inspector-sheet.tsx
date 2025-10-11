@@ -25,13 +25,12 @@ export function ClipInspectorSheet() {
 		current,
 		fadeInDraft,
 		fadeOutDraft,
-		envelopeDraft,
+		envelope,
 		setFadeInDraft,
 		setFadeOutDraft,
 		close,
 		handleToggleEnvelope,
 		handleEnvelopeChange,
-		handleEnvelopeSave,
 		commitFade,
 		MAX_FADE_MS,
 	} = useClipInspector();
@@ -45,7 +44,6 @@ export function ClipInspectorSheet() {
 	}
 
 	const { track, clip } = current;
-	const envelope = track.volumeEnvelope;
 	const envelopeEnabled = Boolean(envelope?.enabled);
 
 	return (
@@ -144,15 +142,14 @@ export function ClipInspectorSheet() {
 									</Badge>
 								</div>
 
-								{envelopeEnabled ? (
-									<EnvelopeEditor
-										points={envelopeDraft}
-										onChange={handleEnvelopeChange}
-										onSave={handleEnvelopeSave}
-										clipStartTime={clip.startTime}
-										trackVolume={track.volume}
-									/>
-								) : (
+						{envelopeEnabled ? (
+							<EnvelopeEditor
+								envelope={envelope}
+								onChange={handleEnvelopeChange}
+								clipStartTime={clip.startTime}
+								trackVolume={track.volume}
+							/>
+						) : (
 									<p className="rounded-xl border border-dashed border-border/60 bg-background/40 p-4 text-xs text-muted-foreground">
 										Envelope disabled — enable to author dynamic volume ramps.
 									</p>

@@ -27,22 +27,29 @@ export const updateClipAtom = atom(
 		const originalTrack = tracks.find((t) => t.id === trackId);
 		const originalClip = originalTrack?.clips?.find((c) => c.id === clipId);
 
-		// Detect if we need to move automation
-		const shouldMoveAutomation =
-			options?.moveAutomation &&
-			updates.startTime !== undefined &&
-			originalClip &&
-			originalClip.startTime !== updates.startTime &&
-			originalTrack?.volumeEnvelope?.enabled;
+	// Detect if we need to move automation
+	const shouldMoveAutomation =
+		options?.moveAutomation &&
+		updates.startTime !== undefined &&
+		originalClip &&
+		originalClip.startTime !== updates.startTime &&
+		originalTrack?.volumeEnvelope?.enabled;
 
-		let automationDelta = 0;
-		if (
-			shouldMoveAutomation &&
-			originalClip &&
-			updates.startTime !== undefined
-		) {
-			automationDelta = updates.startTime - originalClip.startTime;
-		}
+	let automationDelta = 0;
+	if (
+		shouldMoveAutomation &&
+		originalClip &&
+		updates.startTime !== undefined
+	) {
+		automationDelta = updates.startTime - originalClip.startTime;
+	}
+
+	// Detect clip movement for clip-bound automation (even without moveAutomation flag)
+	const clipMoved =
+		updates.startTime !== undefined &&
+		originalClip &&
+		originalClip.startTime !== updates.startTime;
+	const clipTimeDelta = clipMoved ? updates.startTime - originalClip.startTime : 0;
 
 		const updatedTracks = tracks.map((track) => {
 			if (track.id !== trackId || !track.clips) return track;
@@ -52,32 +59,43 @@ export const updateClipAtom = atom(
 				clip.id === clipId ? { ...clip, ...updates } : clip,
 			);
 
-			// Move automation if requested
-			if (shouldMoveAutomation && track.volumeEnvelope && originalClip) {
-				const clipEndTime =
-					originalClip.startTime +
-					(originalClip.trimEnd - originalClip.trimStart);
+		// Handle automation movement
+		if (track.volumeEnvelope && originalClip && clipMoved) {
+			const clipEndTime =
+				originalClip.startTime +
+				(originalClip.trimEnd - originalClip.trimStart);
 
-				// Shift automation points that fall within the clip's time range
-				const shiftedPoints = track.volumeEnvelope.points.map((point) => {
-					if (
-						point.time >= originalClip.startTime &&
-						point.time <= clipEndTime
-					) {
-						return { ...point, time: point.time + automationDelta };
-					}
-					return point;
-				});
+			// Move two types of automation:
+			// 1. Clip-bound automation (always moves with clip)
+			// 2. Range-based automation (if moveAutomation flag is set)
+			const shiftedPoints = track.volumeEnvelope.points.map((point) => {
+				// Clip-bound automation: always move with clip
+				if (point.clipId === clipId) {
+					return { ...point, time: point.time + clipTimeDelta };
+				}
 
-				return {
-					...track,
-					clips: updatedClips,
-					volumeEnvelope: {
-						...track.volumeEnvelope,
-						points: shiftedPoints,
-					},
-				};
-			}
+				// Range-based automation: only if moveAutomation flag is set
+				if (
+					shouldMoveAutomation &&
+					point.time >= originalClip.startTime &&
+					point.time <= clipEndTime &&
+					!point.clipId // Don't double-move clip-bound points
+				) {
+					return { ...point, time: point.time + automationDelta };
+				}
+
+				return point;
+			});
+
+			return {
+				...track,
+				clips: updatedClips,
+				volumeEnvelope: {
+					...track.volumeEnvelope,
+					points: shiftedPoints,
+				},
+			};
+		}
 
 			return {
 				...track,

@@ -9,17 +9,27 @@ export const CurveTypeSchema = z.enum([
 	"sCurve",
 ]);
 
+// Automation segment - owns curve between two points (Logic Pro style)
+export const TrackEnvelopeSegmentSchema = z.object({
+	id: z.string(),
+	fromPointId: z.string(),
+	toPointId: z.string(),
+	curve: z.number().min(-99).max(99).default(0), // -99 to +99, 0 = linear
+});
+
 export const TrackEnvelopePointSchema = z.object({
 	id: z.string(),
-	time: z.number().min(0), // milliseconds
+	time: z.number().min(0), // milliseconds (absolute for track-level, or resolved from clip-relative)
 	value: z.number().min(0).max(4), // gain multiplier
-	curve: CurveTypeSchema.optional(),
-	curveShape: z.number().min(0).max(1).optional(), // 0-1 curve parameter
+	// Curve removed - now stored on segments between points
+	clipId: z.string().optional(), // optional clip binding for clip-relative automation
+	clipRelativeTime: z.number().optional(), // time relative to clip start (when clipId is set)
 });
 
 export const TrackEnvelopeSchema = z.object({
 	enabled: z.boolean(),
 	points: z.array(TrackEnvelopePointSchema),
+	segments: z.array(TrackEnvelopeSegmentSchema).default([]), // NEW: segments own curves
 });
 
 export const ClipSchema = z.object({
@@ -34,10 +44,8 @@ export const ClipSchema = z.object({
 	sourceDurationMs: z.number().min(0),
 	fadeIn: z.number().min(0).max(120_000).optional(), // max 2 minutes
 	fadeOut: z.number().min(0).max(120_000).optional(),
-	fadeInCurve: CurveTypeSchema.optional(),
-	fadeOutCurve: CurveTypeSchema.optional(),
-	fadeInShape: z.number().min(0).max(1).optional(),
-	fadeOutShape: z.number().min(0).max(1).optional(),
+	fadeInCurve: z.number().min(-99).max(99).default(0), // -99 (exponential/fast) to +99 (logarithmic/slow), 0 = linear
+	fadeOutCurve: z.number().min(-99).max(99).default(0), // -99 (exponential/fast) to +99 (logarithmic/slow), 0 = linear
 	loop: z.boolean().optional(),
 	loopEnd: z.number().min(0).optional(),
 	color: z.string().optional(),
@@ -117,6 +125,7 @@ export const PlaybackOptionsSchema = z.object({
 // ===== Type Exports =====
 
 export type CurveType = z.infer<typeof CurveTypeSchema>;
+export type TrackEnvelopeSegment = z.infer<typeof TrackEnvelopeSegmentSchema>;
 export type TrackEnvelopePoint = z.infer<typeof TrackEnvelopePointSchema>;
 export type TrackEnvelope = z.infer<typeof TrackEnvelopeSchema>;
 export type Clip = z.infer<typeof ClipSchema>;

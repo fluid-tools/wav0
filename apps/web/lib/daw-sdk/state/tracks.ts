@@ -49,11 +49,14 @@ export const updateTrackAtom = atom(
 		const playback = get(playbackAtom);
 		const updatedTracks = tracks.map((track) => {
 			if (track.id !== trackId) return track;
-			if (updates.volumeEnvelope?.points) {
+			if (updates.volumeEnvelope) {
+				// Auto-migrate envelope if needed
+				const { migrateAutomationToSegments } = require("../utils/automation-utils");
+				const migrated = migrateAutomationToSegments(updates.volumeEnvelope);
+				
 				const normalizedEnvelope: TrackEnvelope = {
-					...track.volumeEnvelope,
-					...updates.volumeEnvelope,
-					points: updates.volumeEnvelope.points
+					...migrated,
+					points: migrated.points
 						.map((point) => ({
 							...point,
 							value: clampEnvelopeGain(point.value),
