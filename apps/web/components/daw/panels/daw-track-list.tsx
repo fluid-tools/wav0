@@ -36,6 +36,8 @@ import {
 	automationViewEnabledAtom,
 	dbToVolume,
 	formatDb,
+	playbackAtom,
+	playbackService,
 	removeTrackAtom,
 	selectedTrackIdAtom,
 	setTrackHeightZoomAtom,
@@ -58,6 +60,7 @@ export function DAWTrackList() {
 	const [trackAutomationTypes, setTrackAutomationTypes] = useAtom(
 		trackAutomationTypeAtom,
 	);
+	const [playback] = useAtom(playbackAtom);
 	const [editingTrackId, setEditingTrackId] = useState<string | null>(null);
 	const [editingTrackName, setEditingTrackName] = useState<string>("");
 	const [resizingTrack, setResizingTrack] = useState<{
@@ -79,7 +82,20 @@ export function DAWTrackList() {
 	};
 
 	const handleVolumeChange = (trackId: string, volume: number) => {
-		updateTrack(trackId, { volume });
+		// Convert volume percentage to dB
+		const volumeDb = volumeToDb(volume);
+		
+		// Check if track exists
+		const track = tracks.find(t => t.id === trackId);
+		if (!track) return;
+		
+		// Update state
+		updateTrack(trackId, { volume, volumeDb });
+		
+		// If playing, use realtime update to avoid disrupting automation
+		if (playback.isPlaying) {
+			playbackService.updateTrackVolumeRealtime(trackId, volumeDb);
+		}
 	};
 
 	const toggleMute = (trackId: string, currentMuted: boolean) => {

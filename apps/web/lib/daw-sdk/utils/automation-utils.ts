@@ -70,17 +70,21 @@ export function getAutomationPointsInRange(
 }
 
 /**
- * Transfer automation points from source to destination track
- * Preserves clip binding and converts to clip-relative if needed
+ * Transfer automation envelope (points + segments) from source to dest track
+ * Preserves curve data by transferring segments alongside points
  */
-export function transferAutomationPoints(
+export function transferAutomationEnvelope(
 	sourceTrack: Track,
 	_destTrack: Track,
 	clipStartTime: number,
 	clipEndTime: number,
 	newStartTime: number,
 	targetClipId?: string,
-): TrackEnvelopePoint[] {
+): {
+	pointsToTransfer: TrackEnvelopePoint[];
+	segmentsToTransfer: TrackEnvelopeSegment[];
+} {
+	// Get points in range
 	const points = getAutomationPointsInRange(
 		sourceTrack,
 		clipStartTime,
@@ -88,15 +92,21 @@ export function transferAutomationPoints(
 	);
 
 	if (points.length === 0) {
-		return [];
+		return { pointsToTransfer: [], segmentsToTransfer: [] };
 	}
 
+	const pointIds = points.map((p) => p.id);
 	const offset = newStartTime - clipStartTime;
 
-	return points.map((point) => {
+	// Map old point IDs to new point IDs
+	const idMap = new Map<string, string>();
+	const transferredPoints = points.map((point) => {
+		const newId = crypto.randomUUID();
+		idMap.set(point.id, newId);
+
 		const newPoint: TrackEnvelopePoint = {
 			...point,
-			id: crypto.randomUUID(), // Generate new ID for transferred point
+			id: newId,
 			time: point.time + offset,
 		};
 
@@ -108,10 +118,64 @@ export function transferAutomationPoints(
 
 		return newPoint;
 	});
+
+	// Find segments connecting the transferred points
+	const envelope = sourceTrack.volumeEnvelope;
+	if (!envelope?.segments) {
+		return { pointsToTransfer: transferredPoints, segmentsToTransfer: [] };
+	}
+
+	// Transfer segments that connect points within the range
+	const transferredSegments: TrackEnvelopeSegment[] = envelope.segments
+		.filter(
+			(seg) =>
+				pointIds.includes(seg.fromPointId) && pointIds.includes(seg.toPointId),
+		)
+		.map((seg) => {
+			const fromId = idMap.get(seg.fromPointId);
+			const toId = idMap.get(seg.toPointId);
+			if (!fromId || !toId) {
+				throw new Error("Invalid segment point ID mapping");
+			}
+			return {
+				id: crypto.randomUUID(),
+				fromPointId: fromId,
+				toPointId: toId,
+				curve: seg.curve,
+			};
+		});
+
+	return {
+		pointsToTransfer: transferredPoints,
+		segmentsToTransfer: transferredSegments,
+	};
 }
 
 /**
- * Remove automation points within time range
+ * @deprecated Use transferAutomationEnvelope instead
+ */
+export function transferAutomationPoints(
+	sourceTrack: Track,
+	destTrack: Track,
+	clipStartTime: number,
+	clipEndTime: number,
+	newStartTime: number,
+	targetClipId?: string,
+): TrackEnvelopePoint[] {
+	const { pointsToTransfer } = transferAutomationEnvelope(
+		sourceTrack,
+		destTrack,
+		clipStartTime,
+		clipEndTime,
+		newStartTime,
+		targetClipId,
+	);
+	return pointsToTransfer;
+}
+
+/**
+ * Remove automation points AND their segments within time range
+ * Prevents orphaned segments from referencing deleted points
  */
 export function removeAutomationPointsInRange(
 	track: Track,
@@ -123,14 +187,40 @@ export function removeAutomationPointsInRange(
 		return track;
 	}
 
+	// Points to remove
+	const pointsToRemove = envelope.points.filter(
+		(point) => point.time >= startTime && point.time <= endTime,
+	);
+	const removeIds = new Set(pointsToRemove.map((p) => p.id));
+
+	// Remove points
+	const remainingPoints = envelope.points.filter(
+		(point) => !removeIds.has(point.id),
+	);
+
+	// Remove segments that reference removed points
+	const remainingSegments = (envelope.segments || []).filter(
+		(seg) => !removeIds.has(seg.fromPointId) && !removeIds.has(seg.toPointId),
+	);
+
+	// Create cleaned envelope
+	const cleanedEnvelope: TrackEnvelope = {
+		...envelope,
+		points: remainingPoints,
+		segments: remainingSegments,
+	};
+
+	// If there are gaps after removal (points exist but no segments), regenerate
+	if (remainingPoints.length > 1 && remainingSegments.length === 0) {
+		return {
+			...track,
+			volumeEnvelope: generateSegmentsFromPoints(cleanedEnvelope),
+		};
+	}
+
 	return {
 		...track,
-		volumeEnvelope: {
-			...envelope,
-			points: envelope.points.filter(
-				(point) => point.time < startTime || point.time > endTime,
-			),
-		},
+		volumeEnvelope: cleanedEnvelope,
 	};
 }
 

@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import type { Clip, PlaybackOptions, Track } from "../types/schemas";
-import { evaluateCurve } from "../utils/curve-functions";
+import { dbToGain, volumeToDb } from "../utils/volume-utils";
 import { audioService } from "./audio-service";
 
 type ClipPlaybackState = {
@@ -37,6 +37,10 @@ export class PlaybackService {
 	private static instance: PlaybackService;
 	private audioContext: AudioContext | null = null;
 	private masterGainNode: GainNode | null = null;
+	private masterAnalyser: AnalyserNode | null = null;
+	private meterDataArray: Float32Array | null = null;
+	private currentMasterDb = Number.NEGATIVE_INFINITY;
+	private meterUpdateInterval: number | null = null;
 	private tracks = new Map<string, TrackPlaybackState>();
 	private isPlaying = false;
 	private startTime = 0;
@@ -61,7 +65,16 @@ export class PlaybackService {
 		if (!this.audioContext) {
 			this.audioContext = await audioService.getAudioContext();
 			this.masterGainNode = this.audioContext.createGain();
-			this.masterGainNode.connect(this.audioContext.destination);
+			
+			// Create analyser for master metering
+			this.masterAnalyser = this.audioContext.createAnalyser();
+			this.masterAnalyser.fftSize = 2048;
+			this.masterAnalyser.smoothingTimeConstant = 0.8;
+			this.meterDataArray = new Float32Array(this.masterAnalyser.fftSize) as Float32Array;
+			
+			// Chain: masterGain → analyser → destination
+			this.masterGainNode.connect(this.masterAnalyser);
+			this.masterAnalyser.connect(this.audioContext.destination);
 		}
 		return this.audioContext;
 	}
@@ -96,16 +109,30 @@ export class PlaybackService {
 		clipState.iterator = null;
 		clipState.generation = (clipState.generation ?? 0) + 1;
 
+		// Stop all audio sources
 		for (const node of clipState.audioSources) {
 			try {
 				node.stop();
+				node.disconnect(); // Explicitly disconnect
 			} catch (error) {
 				console.warn("Failed to stop clip source", trackId, clipId, error);
 			}
 		}
 		clipState.audioSources = [];
-		clipState.gainNode?.disconnect?.();
+		
+		// Explicitly disconnect and clean up gain node
+		if (clipState.gainNode) {
+			try {
+				clipState.gainNode.disconnect();
+				clipState.gainNode = null;
+			} catch (error) {
+				console.warn("Failed to disconnect clip gain node", trackId, clipId, error);
+			}
+		}
+		
+		// Remove from clip states
 		trackState.clipStates.delete(clipId);
+		
 		return clipState;
 	}
 
@@ -131,7 +158,9 @@ export class PlaybackService {
 		const now = this.audioContext.currentTime;
 		this.cancelGainAutomation(envelopeGain.gain, now);
 
-		const baseVolume = track.volume / 100;
+		// Convert volume to linear gain using pure dB math
+		const baseVolumeDb = track.volumeDb ?? volumeToDb(track.volume ?? 100);
+		const baseVolume = dbToGain(baseVolumeDb);
 
 		if (!envelope || !envelope.enabled || envelope.points.length === 0) {
 			envelopeGain.gain.setValueAtTime(baseVolume, now);
@@ -211,6 +240,209 @@ export class PlaybackService {
 		}
 	}
 
+	/**
+	 * Update track volume during playback without disrupting automation
+	 * Scales the base volume that automation multiplies against
+	 */
+	updateTrackVolumeRealtime(trackId: string, volumeDb: number): void {
+		if (!this.audioContext || !this.masterGainNode) return;
+		
+		const state = this.tracks.get(trackId);
+		if (!state?.envelopeGainNode) return;
+		
+		// Store the new base volume in currentTracks for next schedule
+		const currentTrack = this.currentTracks.get(trackId);
+		if (currentTrack) {
+			currentTrack.volumeDb = volumeDb;
+		}
+		
+		// If NOT playing, reschedule normally
+		if (!this.isPlaying) {
+			const track = this.currentTracks.get(trackId);
+			if (track) this.scheduleTrackEnvelope(track);
+			return;
+		}
+		
+		// If playing: Apply volume change smoothly without canceling automation
+		// Get current envelope multiplier at playback position
+		const currentTimeMs = this.getPlaybackTime() * 1000;
+		const envelope = currentTrack?.volumeEnvelope;
+		
+		let currentMultiplier = 1.0;
+		if (envelope?.enabled && envelope.points?.length > 0) {
+			// Find current automation multiplier
+			const sorted = [...envelope.points].sort((a, b) => a.time - b.time);
+			
+			// Find the segment we're currently in
+			for (let i = 0; i < sorted.length; i++) {
+				const point = sorted[i];
+				const nextPoint = sorted[i + 1];
+				
+				if (point.time <= currentTimeMs) {
+					currentMultiplier = point.value;
+					
+					// If we're between two points, interpolate with curve
+					if (nextPoint && nextPoint.time > currentTimeMs) {
+						const segment = envelope.segments?.find(
+							seg => seg.fromPointId === point.id && seg.toPointId === nextPoint.id
+						);
+						const t = (currentTimeMs - point.time) / (nextPoint.time - point.time);
+						const curve = segment?.curve ?? 0;
+						
+						const curvedT = curve === 0 ? t :
+							curve < 0 ? t ** (1 + (Math.abs(curve) / 99) * 3) :
+							1 - (1 - t) ** (1 + (curve / 99) * 3);
+						
+						currentMultiplier = point.value + (nextPoint.value - point.value) * curvedT;
+						break;
+					}
+				}
+			}
+		}
+		
+		// Apply new base volume immediately with smooth ramp
+		const newBaseGain = dbToGain(volumeDb);
+		const targetGain = newBaseGain * currentMultiplier;
+		const now = this.audioContext.currentTime;
+		
+		// Use short ramp to avoid clicks (20ms)
+		state.envelopeGainNode.gain.linearRampToValueAtTime(targetGain, now + 0.02);
+		
+		// Schedule future automation from this point forward
+		// Cancel only future scheduled values, not the ramp we just set
+		state.envelopeGainNode.gain.cancelScheduledValues(now + 0.021);
+		
+		// Re-schedule remaining automation with new base volume
+		const futurePoints = envelope?.points?.filter(p => p.time > currentTimeMs) ?? [];
+		if (futurePoints.length > 0 && currentTrack) {
+			// Re-schedule from current position forward
+			this.scheduleTrackEnvelopeFrom(currentTrack, currentTimeMs, newBaseGain);
+		}
+	}
+
+	/**
+	 * Schedule automation from a specific time forward (for mid-playback changes)
+	 */
+	private scheduleTrackEnvelopeFrom(
+		track: Track, 
+		fromTimeMs: number, 
+		baseVolume: number
+	): void {
+		const state = this.tracks.get(track.id);
+		if (!state?.envelopeGainNode) return;
+		
+		const envelope = track.volumeEnvelope;
+		if (!envelope?.enabled || !envelope.points?.length) return;
+		
+		const sorted = [...envelope.points].sort((a, b) => a.time - b.time);
+		const futurePoints = sorted.filter(p => p.time > fromTimeMs);
+		
+		if (futurePoints.length === 0) return;
+		
+		if (!this.audioContext) return;
+		const now = this.audioContext.currentTime;
+		const playbackStartMs = this.playbackTimeAtStart * 1000;
+		
+		// Find current multiplier at fromTimeMs
+		let lastMultiplier = 1.0;
+		for (const point of sorted) {
+			if (point.time <= fromTimeMs) lastMultiplier = point.value;
+			else break;
+		}
+		
+		let cumulativeACTime = now + 0.021; // Start after the ramp
+		let lastTime = fromTimeMs;
+		
+		for (const point of futurePoints) {
+			const segmentStart = Math.max(lastTime, playbackStartMs);
+			const segmentEnd = point.time;
+			if (segmentEnd <= segmentStart) {
+				lastTime = point.time;
+				lastMultiplier = point.value;
+				continue;
+			}
+			
+			const durationSec = (segmentEnd - segmentStart) / 1000;
+			if (durationSec < 0.001) {
+				lastTime = point.time;
+				lastMultiplier = point.value;
+				continue;
+			}
+			
+			const steps = Math.max(2, Math.ceil(durationSec * 60));
+			const values = new Float32Array(steps);
+			
+			const previousPoint = sorted.find(p => p.time === lastTime);
+			const currentSegment = envelope.segments?.find(
+				seg => seg.fromPointId === previousPoint?.id && seg.toPointId === point.id
+			);
+			const curveValue = currentSegment?.curve ?? 0;
+			
+			for (let i = 0; i < steps; i++) {
+				const t = i / (steps - 1);
+				const curvedT = curveValue === 0 ? t :
+					curveValue < 0 ? t ** (1 + (Math.abs(curveValue) / 99) * 3) :
+					1 - (1 - t) ** (1 + (curveValue / 99) * 3);
+				const multiplier = lastMultiplier + (point.value - lastMultiplier) * curvedT;
+				values[i] = baseVolume * multiplier;
+			}
+			
+			state.envelopeGainNode.gain.setValueCurveAtTime(values, cumulativeACTime, durationSec);
+			
+			cumulativeACTime += durationSec;
+			lastTime = point.time;
+			lastMultiplier = point.value;
+		}
+	}
+
+	/**
+	 * Start real-time master meter updates
+	 */
+	private startMeterUpdates(): void {
+		if (this.meterUpdateInterval) return;
+		
+		this.meterUpdateInterval = window.setInterval(() => {
+			this.updateMeterReading();
+		}, 50); // Update at 20Hz
+	}
+
+	/**
+	 * Stop real-time master meter updates
+	 */
+	private stopMeterUpdates(): void {
+		if (this.meterUpdateInterval) {
+			clearInterval(this.meterUpdateInterval);
+			this.meterUpdateInterval = null;
+		}
+	}
+
+	/**
+	 * Update master meter reading from analyser
+	 */
+	private updateMeterReading(): void {
+		if (!this.masterAnalyser || !this.meterDataArray) return;
+		
+		// @ts-expect-error - Float32Array type mismatch between ArrayBufferLike and ArrayBuffer
+		this.masterAnalyser.getFloatTimeDomainData(this.meterDataArray);
+		
+		// Calculate RMS
+		let sumSquares = 0;
+		for (let i = 0; i < this.meterDataArray.length; i++) {
+			sumSquares += this.meterDataArray[i] ** 2;
+		}
+		const rms = Math.sqrt(sumSquares / this.meterDataArray.length);
+		
+		// Convert to dB
+		this.currentMasterDb = rms > 0 ? 20 * Math.log10(rms) : Number.NEGATIVE_INFINITY;
+	}
+
+	/**
+	 * Get current master output level in dB
+	 */
+	getMasterDb(): number {
+		return this.currentMasterDb;
+	}
+
 	private applySnapshot(tracks: Track[]): void {
 		if (!this.audioContext || !this.masterGainNode) return;
 		const soloEngaged = tracks.some((track) => track.soloed);
@@ -285,6 +517,7 @@ export class PlaybackService {
 		this.startTime = this.audioContext.currentTime;
 		this.isPlaying = true;
 
+		this.startMeterUpdates();
 		this.applySnapshot(tracks);
 
 		for (const track of tracks) {
@@ -545,6 +778,7 @@ export class PlaybackService {
 	}
 
 	async pause(): Promise<void> {
+		this.stopMeterUpdates();
 		this.playbackTimeAtStart = this.getPlaybackTime();
 		this.isPlaying = false;
 
@@ -577,8 +811,10 @@ export class PlaybackService {
 	}
 
 	async stop(): Promise<void> {
+		this.stopMeterUpdates();
 		await this.pause();
 		this.playbackTimeAtStart = 0;
+		this.currentMasterDb = Number.NEGATIVE_INFINITY;
 		this.options.onTimeUpdate?.(0);
 	}
 
@@ -679,8 +915,13 @@ export class PlaybackService {
 	}
 
 	updateMasterVolume(volume: number): void {
-		if (this.masterGainNode) {
-			this.masterGainNode.gain.value = volume / 100;
+		if (this.masterGainNode && this.audioContext) {
+			// Convert volume percentage to dB, then to linear gain
+			const volumeDb = volumeToDb(volume);
+			const gain = dbToGain(volumeDb);
+			const now = this.audioContext.currentTime;
+			this.cancelGainAutomation(this.masterGainNode.gain, now);
+			this.masterGainNode.gain.setValueAtTime(gain, now);
 		}
 	}
 

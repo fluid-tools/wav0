@@ -24,13 +24,13 @@ import {
 	updateClipAtom,
 	updateTrackAtom,
 } from "@/lib/daw-sdk";
-import { formatDuration } from "@/lib/storage/opfs";
-import { cn } from "@/lib/utils";
 import {
 	countAutomationPointsInRange,
 	removeAutomationPointsInRange,
-	transferAutomationPoints,
-} from "@/lib/utils/automation-utils";
+	transferAutomationEnvelope,
+} from "@/lib/daw-sdk/utils/automation-utils";
+import { formatDuration } from "@/lib/storage/opfs";
+import { cn } from "@/lib/utils";
 
 export function DAWTrackContent() {
 	const [tracks, setTracks] = useAtom(tracksAtom);
@@ -281,24 +281,30 @@ export function DAWTrackContent() {
 					const deltaTime = deltaX / pixelsPerMs;
 					const newStartTime = Math.max(0, draggingClip.startTime + deltaTime);
 
-					// Vertical movement (track switching)
-					const deltaY = lastY - draggingClip.startY;
+					// Vertical movement - use ABSOLUTE position to find target track
 					const trackHeight = Math.round(
 						DAW_HEIGHTS.TRACK_ROW * trackHeightZoom,
 					);
-					const trackIndexOffset = Math.round(deltaY / trackHeight);
-					const newTrackIndex = Math.max(
-						0,
-						Math.min(
-							tracks.length - 1,
-							draggingClip.originalTrackIndex + trackIndexOffset,
-						),
-					);
+
+					// Get the container's bounding rect to calculate absolute Y
+					const container = containerRef.current;
+					let newTrackIndex = draggingClip.originalTrackIndex;
+					if (container) {
+						const rect = container.getBoundingClientRect();
+						const relativeY = lastY - rect.top + container.scrollTop;
+
+						// Find which track the cursor is over
+						const targetTrackIndex = Math.floor(relativeY / trackHeight);
+						newTrackIndex = Math.max(
+							0,
+							Math.min(tracks.length - 1, targetTrackIndex),
+						);
+					}
 
 					// Check if we need to move to a different track
 					if (newTrackIndex !== draggingClip.originalTrackIndex) {
 						const newTrack = tracks[newTrackIndex];
-						const oldTrack = tracks.find((t) => t.id === draggingClip.trackId);
+						const oldTrack = tracks[draggingClip.originalTrackIndex];
 
 						if (newTrack && oldTrack && newTrack.id !== oldTrack.id) {
 							// Find the clip
@@ -348,8 +354,8 @@ export function DAWTrackContent() {
 
 								// Move clip atomically
 								const updatedClip = { ...clip, startTime: newStartTime };
-								setTracks((prev) =>
-									prev.map((t) => {
+								setTracks((prev) => {
+									const updated = prev.map((t) => {
 										if (t.id === oldTrack.id) {
 											return {
 												...t,
@@ -363,8 +369,13 @@ export function DAWTrackContent() {
 											};
 										}
 										return t;
-									}),
-								);
+									});
+
+									// CRITICAL: Force synchronize playback service immediately
+									playbackService.synchronizeTracks(updated);
+
+									return updated;
+								});
 
 								// Update dragging state to track new location
 								setDraggingClip({
@@ -474,9 +485,11 @@ export function DAWTrackContent() {
 				return;
 			}
 
-			// Stop playback on old track if playing
+			// Stop playback on both tracks to prevent phantom audio
 			if (playback.isPlaying) {
 				await playbackService.stopClip(oldTrack.id, clipId);
+				// Also stop on new track in case of stale state
+				await playbackService.stopClip(newTrack.id, clipId);
 			}
 
 			const clipEndTime = clip.startTime + (clip.trimEnd - clip.trimStart);
@@ -486,14 +499,15 @@ export function DAWTrackContent() {
 			let updatedNewTrack = newTrack;
 
 			if (transferAutomation) {
-				// Transfer automation points to new track
-				const pointsToTransfer = transferAutomationPoints(
-					oldTrack,
-					newTrack,
-					clip.startTime,
-					clipEndTime,
-					newStartTime,
-				);
+				// Transfer automation envelope (points + segments) to new track
+				const { pointsToTransfer, segmentsToTransfer } =
+					transferAutomationEnvelope(
+						oldTrack,
+						newTrack,
+						clip.startTime,
+						clipEndTime,
+						newStartTime,
+					);
 
 				// Remove automation from old track
 				updatedOldTrack = removeAutomationPointsInRange(
@@ -502,28 +516,30 @@ export function DAWTrackContent() {
 					clipEndTime,
 				);
 
-			// Add automation to new track
-			const newEnvelope = updatedNewTrack.volumeEnvelope || {
-				enabled: true,
-				points: [],
-				segments: [],
-			};
-			updatedNewTrack = {
-				...updatedNewTrack,
-				volumeEnvelope: {
-					...newEnvelope,
-					points: [...(newEnvelope.points || []), ...pointsToTransfer].sort(
-						(a, b) => a.time - b.time,
-					),
-				},
-			};
+				// Add automation to new track with segments
+				const newEnvelope = updatedNewTrack.volumeEnvelope || {
+					enabled: true,
+					points: [],
+					segments: [],
+				};
+				updatedNewTrack = {
+					...updatedNewTrack,
+					volumeEnvelope: {
+						...newEnvelope,
+						enabled: true, // IMPORTANT: Enable automation on destination track
+						points: [...(newEnvelope.points || []), ...pointsToTransfer].sort(
+							(a, b) => a.time - b.time,
+						),
+						segments: [...(newEnvelope.segments || []), ...segmentsToTransfer],
+					},
+				};
 			}
 
 			// Move clip with updated automation
 			const updatedClip = { ...clip, startTime: newStartTime };
 
-			setTracks((prev) =>
-				prev.map((t) => {
+			setTracks((prev) => {
+				const updated = prev.map((t) => {
 					if (t.id === oldTrack.id) {
 						// Remove clip from source track and apply automation changes
 						return {
@@ -539,8 +555,13 @@ export function DAWTrackContent() {
 						};
 					}
 					return t;
-				}),
-			);
+				});
+
+				// CRITICAL: Force synchronize playback service immediately
+				playbackService.synchronizeTracks(updated);
+
+				return updated;
+			});
 
 			setSelectedTrackId(newTrack.id);
 			setAutomationTransferDialog(null);
