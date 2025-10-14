@@ -154,18 +154,43 @@ export function AutomationContextMenu({
 		const offset = contextMenuState.x / pxPerMs;
 		const minTime = Math.min(...copiedAutomation.points.map((p) => p.time));
 
-		// Shift all points by offset
-		const newPoints = copiedAutomation.points.map((p) => ({
-			...p,
-			id: crypto.randomUUID(),
-			time: p.time - minTime + offset,
-		}));
+		// Create mapping from old point IDs to new point IDs
+		const idMap = new Map<string, string>();
+
+		// Shift all points by offset and generate new IDs
+		const newPoints = copiedAutomation.points.map((p) => {
+			const newId = crypto.randomUUID();
+			idMap.set(p.id, newId);
+			return {
+				...p,
+				id: newId,
+				time: p.time - minTime + offset,
+			};
+		});
+
+		// Copy segments and remap point IDs
+		const newSegments = copiedAutomation.segments
+			.filter((seg) => idMap.has(seg.fromPointId) && idMap.has(seg.toPointId))
+			.map((seg) => {
+				const fromId = idMap.get(seg.fromPointId);
+				const toId = idMap.get(seg.toPointId);
+				// IDs guaranteed to exist due to filter above
+				if (!fromId || !toId) throw new Error("Segment point ID not found");
+				return {
+					...seg,
+					id: crypto.randomUUID(),
+					fromPointId: fromId,
+					toPointId: toId,
+				};
+			});
 
 		updateTrack(track.id, {
 			volumeEnvelope: {
 				enabled: true,
-				points: [...(track.volumeEnvelope?.points || []), ...newPoints],
-				segments: [...(track.volumeEnvelope?.segments || [])],
+				points: [...(track.volumeEnvelope?.points || []), ...newPoints].sort(
+					(a, b) => a.time - b.time,
+				),
+				segments: [...(track.volumeEnvelope?.segments || []), ...newSegments],
 			},
 		});
 	};

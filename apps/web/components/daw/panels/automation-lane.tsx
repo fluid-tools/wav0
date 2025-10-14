@@ -312,6 +312,7 @@ export function AutomationLane({
 			trackHeight={trackHeight}
 			pxPerMs={pxPerMs}
 		>
+			{/* biome-ignore lint/a11y/useKeyWithClickEvents: Click requires mouse coordinates; keyboard access via context menu */}
 			<svg
 				ref={svgRef}
 				className="pointer-events-auto absolute inset-0"
@@ -320,11 +321,6 @@ export function AutomationLane({
 				style={{ zIndex: 10 }}
 				aria-label={`Volume automation for ${track.name}`}
 				onClick={handleSvgClick}
-				onKeyDown={(e) => {
-					if (e.key === "Enter" || e.key === " ") {
-						handleSvgClick(e as unknown as React.MouseEvent<SVGSVGElement>);
-					}
-				}}
 			>
 				<title>{`Volume automation: ${sorted.length} points (Cmd/Ctrl+Click or double-click to add)`}</title>
 
