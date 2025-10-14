@@ -2,6 +2,7 @@
 
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AutomationContextMenu } from "@/components/daw/context-menus/automation-context-menu";
 import type { Track, TrackEnvelopePoint } from "@/lib/daw-sdk";
 import {
 	addAutomationPoint,
@@ -125,10 +126,16 @@ export function AutomationLane({
 		[draggingPoint],
 	);
 
-	// Add new automation point on double-click (segments auto-generated)
-	const handleSvgDoubleClick = useCallback(
+	// Add new automation point on double-click or Cmd/Ctrl+Click (segments auto-generated)
+	const handleSvgClick = useCallback(
 		(e: React.MouseEvent<SVGSVGElement>) => {
 			if (!svgRef.current || !envelope) return;
+
+			// Add point on Cmd/Ctrl+Click or double-click
+			const isCmdCtrlClick = e.metaKey || e.ctrlKey;
+			const isDoubleClick = e.detail === 2;
+
+			if (!isCmdCtrlClick && !isDoubleClick) return;
 
 			const rect = svgRef.current.getBoundingClientRect();
 			const x = e.clientX - rect.left;
@@ -300,7 +307,11 @@ export function AutomationLane({
 	})();
 
 	return (
-		<>
+		<AutomationContextMenu
+			track={track}
+			trackHeight={trackHeight}
+			pxPerMs={pxPerMs}
+		>
 			<svg
 				ref={svgRef}
 				className="pointer-events-auto absolute inset-0"
@@ -308,9 +319,14 @@ export function AutomationLane({
 				height={trackHeight}
 				style={{ zIndex: 10 }}
 				aria-label={`Volume automation for ${track.name}`}
-				onDoubleClick={handleSvgDoubleClick}
+				onClick={handleSvgClick}
+				onKeyDown={(e) => {
+					if (e.key === "Enter" || e.key === " ") {
+						handleSvgClick(e as unknown as React.MouseEvent<SVGSVGElement>);
+					}
+				}}
 			>
-				<title>{`Volume automation: ${sorted.length} points (double-click to add)`}</title>
+				<title>{`Volume automation: ${sorted.length} points (Cmd/Ctrl+Click or double-click to add)`}</title>
 
 				{/* Clip fade overlays (non-interactive, view-only) */}
 				{track.clips?.map((clip) => {
@@ -432,6 +448,6 @@ export function AutomationLane({
 					/>
 				)}
 			</svg>
-		</>
+		</AutomationContextMenu>
 	);
 }

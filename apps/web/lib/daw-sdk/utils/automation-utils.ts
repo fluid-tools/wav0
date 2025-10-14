@@ -480,6 +480,36 @@ export function addAutomationPoint(
 }
 
 /**
+ * Shift automation points in a time range by a delta (for same-track clip moves)
+ */
+export function shiftAutomationInRange(
+	track: Track,
+	startTime: number,
+	endTime: number,
+	deltaMs: number,
+): Track {
+	const envelope = track.volumeEnvelope;
+	if (!envelope || !envelope.enabled || !envelope.points) {
+		return track;
+	}
+
+	const shiftedPoints = envelope.points.map((point) => {
+		if (point.time >= startTime && point.time <= endTime) {
+			return { ...point, time: Math.max(0, point.time + deltaMs) };
+		}
+		return point;
+	});
+
+	return {
+		...track,
+		volumeEnvelope: {
+			...envelope,
+			points: shiftedPoints,
+		},
+	};
+}
+
+/**
  * Remove automation point and clean up segments
  */
 export function removeAutomationPoint(

@@ -1,6 +1,7 @@
 import { atom } from "jotai";
 import { generateTrackId } from "@/lib/storage/opfs";
 import { audioService, playbackService } from "../index";
+import { volumeToDb } from "../utils/volume-utils";
 import {
 	playbackAtom,
 	projectEndOverrideAtom,
@@ -10,7 +11,6 @@ import {
 } from "./atoms";
 import type { Clip, Track, TrackEnvelope, TrackEnvelopePoint } from "./types";
 import { clampEnvelopeGain, createDefaultEnvelope } from "./types";
-import { volumeToDb } from "../utils/volume-utils";
 
 export const addTrackAtom = atom(null, (get, set, track: Omit<Track, "id">) => {
 	const tracks = get(tracksAtom);
@@ -58,15 +58,17 @@ export const updateTrackAtom = atom(
 				} = require("../utils/automation-utils");
 				const migrated = migrateAutomationToSegments(updates.volumeEnvelope);
 
-			const normalizedEnvelope: TrackEnvelope = {
-				...migrated,
-				points: migrated.points
-					.map((point: TrackEnvelopePoint) => ({
-						...point,
-						value: clampEnvelopeGain(point.value),
-					}))
-					.sort((a: TrackEnvelopePoint, b: TrackEnvelopePoint) => a.time - b.time),
-			};
+				const normalizedEnvelope: TrackEnvelope = {
+					...migrated,
+					points: migrated.points
+						.map((point: TrackEnvelopePoint) => ({
+							...point,
+							value: clampEnvelopeGain(point.value),
+						}))
+						.sort(
+							(a: TrackEnvelopePoint, b: TrackEnvelopePoint) => a.time - b.time,
+						),
+				};
 				return { ...track, ...updates, volumeEnvelope: normalizedEnvelope };
 			}
 			return { ...track, ...updates };
@@ -150,21 +152,21 @@ export const loadAudioFileAtom = atom(
 			const tracks = get(tracksAtom);
 			const existingTrack = tracks.find((t) => t.id === existingTrackId);
 			if (existingTrack) {
-			const clipId = crypto.randomUUID();
-			const clip: Clip = {
-				id: clipId,
-				name: file.name.replace(/\.[^/.]+$/, ""),
-				opfsFileId,
-				audioFileName: audioInfo.fileName,
-				audioFileType: audioInfo.fileType,
-				startTime: opts?.startTimeMs ?? existingTrack.startTime,
-				trimStart: 0,
-				trimEnd: audioInfo.duration * 1000,
-				sourceDurationMs: audioInfo.duration * 1000,
-				fadeInCurve: 0,
-				fadeOutCurve: 0,
-				color: existingTrack.color,
-			};
+				const clipId = crypto.randomUUID();
+				const clip: Clip = {
+					id: clipId,
+					name: file.name.replace(/\.[^/.]+$/, ""),
+					opfsFileId,
+					audioFileName: audioInfo.fileName,
+					audioFileType: audioInfo.fileType,
+					startTime: opts?.startTimeMs ?? existingTrack.startTime,
+					trimStart: 0,
+					trimEnd: audioInfo.duration * 1000,
+					sourceDurationMs: audioInfo.duration * 1000,
+					fadeInCurve: 0,
+					fadeOutCurve: 0,
+					color: existingTrack.color,
+				};
 
 				const updatedTrack: Track = {
 					...existingTrack,
@@ -200,22 +202,22 @@ export const loadAudioFileAtom = atom(
 			}
 		}
 
-	const newTrackId = generateTrackId();
-	const clipId = crypto.randomUUID();
-	const clip: Clip = {
-		id: clipId,
-		name: file.name.replace(/\.[^/.]+$/, ""),
-		opfsFileId,
-		audioFileName: audioInfo.fileName,
-		audioFileType: audioInfo.fileType,
-		startTime: opts?.startTimeMs ?? 0,
-		trimStart: 0,
-		trimEnd: audioInfo.duration * 1000,
-		sourceDurationMs: audioInfo.duration * 1000,
-		fadeInCurve: 0,
-		fadeOutCurve: 0,
-		color: "#3b82f6",
-	};
+		const newTrackId = generateTrackId();
+		const clipId = crypto.randomUUID();
+		const clip: Clip = {
+			id: clipId,
+			name: file.name.replace(/\.[^/.]+$/, ""),
+			opfsFileId,
+			audioFileName: audioInfo.fileName,
+			audioFileType: audioInfo.fileType,
+			startTime: opts?.startTimeMs ?? 0,
+			trimStart: 0,
+			trimEnd: audioInfo.duration * 1000,
+			sourceDurationMs: audioInfo.duration * 1000,
+			fadeInCurve: 0,
+			fadeOutCurve: 0,
+			color: "#3b82f6",
+		};
 		const newTrack: Track = {
 			id: newTrackId,
 			name: clip.name,
@@ -261,7 +263,7 @@ export const selectedTrackAtom = atom((get) => {
 /**
  * Clear all tracks and create a default Track 1
  */
-export const clearTracksAtom = atom(null, (get, set) => {
+export const clearTracksAtom = atom(null, (_get, set) => {
 	// Clear all tracks and create default Track 1
 	const defaultTrack: Track = {
 		id: crypto.randomUUID(),
@@ -285,6 +287,36 @@ export const clearTracksAtom = atom(null, (get, set) => {
 
 	// Reset playback
 	playbackService.stop().catch(console.error);
+});
+
+/**
+ * Reset entire project to default state
+ */
+export const resetProjectAtom = atom(null, (_get, set) => {
+	// Stop playback
+	playbackService.stop().catch(console.error);
+
+	// Clear persisted tracks
+	const defaultTrack: Track = {
+		id: crypto.randomUUID(),
+		name: "Track 1",
+		duration: 0,
+		startTime: 0,
+		trimStart: 0,
+		trimEnd: 0,
+		volume: 75,
+		volumeDb: volumeToDb(75),
+		muted: false,
+		soloed: false,
+		color: "#3b82f6",
+		clips: [],
+		volumeEnvelope: createDefaultEnvelope(75),
+	};
+
+	set(tracksAtom, [defaultTrack]);
+	set(selectedTrackIdAtom, null);
+	set(selectedClipIdAtom, null);
+	set(projectEndOverrideAtom, null);
 });
 
 export const totalDurationAtom = atom((get) => {
