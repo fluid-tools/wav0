@@ -14,6 +14,7 @@ import {
 	trackHeightZoomAtom,
 } from "./atoms";
 import type { AutomationType, Tool } from "./types";
+import type { TrackEnvelopePoint, TrackEnvelopeSegment } from "./types";
 
 export const setSelectedTrackAtom = atom(
 	null,
@@ -74,3 +75,44 @@ export const setProjectNameAtom = atom(null, (_get, set, name: string) => {
 	if (!trimmed) return;
 	set(projectNameAtom, trimmed);
 });
+
+/**
+ * Visual drag preview state (UI only, no data changes)
+ */
+export const dragPreviewAtom = atom<{
+    clipId: string;
+    originalTrackId: string;
+    originalStartTime: number;
+    previewTrackId: string;
+    previewStartTime: number;
+    cursorOffsetX: number;
+    cursorOffsetY: number;
+} | null>(null);
+
+/**
+ * Pending drag operation (for commit on drop)
+ */
+export const pendingDragOperationAtom = atom<{
+    clipId: string;
+    fromTrackId: string;
+    toTrackId: string;
+    fromStartTime: number;
+    toStartTime: number;
+    automationPointCount: number;
+} | null>(null);
+
+/**
+ * Undo history for clip moves (for toast undo functionality)
+ */
+export const clipMoveHistoryAtom = atom<Array<{
+    clipId: string;
+    fromTrackId: string;
+    toTrackId: string;
+    fromStartTime: number;
+    toStartTime: number;
+    automationData: {
+        points: TrackEnvelopePoint[];
+        segments: TrackEnvelopeSegment[];
+    } | null;
+    timestamp: number;
+}>>([]);

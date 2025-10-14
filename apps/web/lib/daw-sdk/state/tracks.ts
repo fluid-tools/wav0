@@ -4,11 +4,13 @@ import { audioService, playbackService } from "../index";
 import {
 	playbackAtom,
 	projectEndOverrideAtom,
+	selectedClipIdAtom,
 	selectedTrackIdAtom,
 	tracksAtom,
 } from "./atoms";
 import type { Clip, Track, TrackEnvelope, TrackEnvelopePoint } from "./types";
 import { clampEnvelopeGain, createDefaultEnvelope } from "./types";
+import { volumeToDb } from "../utils/volume-utils";
 
 export const addTrackAtom = atom(null, (get, set, track: Omit<Track, "id">) => {
 	const tracks = get(tracksAtom);
@@ -254,6 +256,35 @@ export const selectedTrackAtom = atom((get) => {
 	const tracks = get(tracksAtom);
 	const selectedId = get(selectedTrackIdAtom);
 	return tracks.find((track) => track.id === selectedId) || null;
+});
+
+/**
+ * Clear all tracks and create a default Track 1
+ */
+export const clearTracksAtom = atom(null, (get, set) => {
+	// Clear all tracks and create default Track 1
+	const defaultTrack: Track = {
+		id: crypto.randomUUID(),
+		name: "Track 1",
+		duration: 0,
+		startTime: 0,
+		trimStart: 0,
+		trimEnd: 0,
+		volume: 75,
+		volumeDb: volumeToDb(75),
+		muted: false,
+		soloed: false,
+		color: "#3b82f6",
+		clips: [],
+		volumeEnvelope: createDefaultEnvelope(75),
+	};
+
+	set(tracksAtom, [defaultTrack]);
+	set(selectedTrackIdAtom, null);
+	set(selectedClipIdAtom, null);
+
+	// Reset playback
+	playbackService.stop().catch(console.error);
 });
 
 export const totalDurationAtom = atom((get) => {

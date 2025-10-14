@@ -186,7 +186,11 @@ export class PlaybackService {
 
 		let lastMultiplier = currentMultiplier;
 		let lastTime = playbackStartMs;
-		let cumulativeACTime = now;
+		// Cancel existing scheduled values before re-scheduling to avoid overlaps
+		envelopeGain.gain.cancelScheduledValues(now);
+		envelopeGain.gain.setValueAtTime(envelopeGain.gain.value, now);
+
+		// cumulativeACTime no longer needed; scheduling uses acStart per segment
 
 		for (const point of futurePoints) {
 			const segmentStart = Math.max(lastTime, playbackStartMs);
@@ -197,7 +201,15 @@ export class PlaybackService {
 				continue;
 			}
 
-			const durationSec = (segmentEnd - segmentStart) / 1000;
+			// Skip segments entirely in the past relative to current playback time
+			const currentTimeMs = this.getPlaybackTime() * 1000;
+			if (segmentEnd <= currentTimeMs) {
+				lastTime = point.time;
+				lastMultiplier = point.value;
+				continue;
+			}
+			const startAtMs = Math.max(segmentStart, currentTimeMs);
+			const durationSec = Math.max(0.001, (segmentEnd - startAtMs) / 1000);
 			if (durationSec < 0.001) {
 				lastTime = point.time;
 				lastMultiplier = point.value;
@@ -228,13 +240,8 @@ export class PlaybackService {
 				values[i] = baseVolume * multiplier;
 			}
 
-			envelopeGain.gain.setValueCurveAtTime(
-				values,
-				cumulativeACTime,
-				durationSec,
-			);
-
-			cumulativeACTime += durationSec;
+			const acStart = now + Math.max(0, (startAtMs - currentTimeMs) / 1000);
+			envelopeGain.gain.setValueCurveAtTime(values, acStart, durationSec);
 			lastTime = point.time;
 			lastMultiplier = point.value;
 		}
@@ -300,33 +307,40 @@ export class PlaybackService {
 			}
 		}
 		
-		// Apply new base volume immediately with smooth ramp
+		// Apply new base volume with proper scheduling order
 		const newBaseGain = dbToGain(volumeDb);
 		const targetGain = newBaseGain * currentMultiplier;
 		const now = this.audioContext.currentTime;
 		
-		// Use short ramp to avoid clicks (20ms)
+		// CORRECT ORDER to avoid overlapping scheduled values:
+		// 1. Cancel ALL existing automation from now
+		state.envelopeGainNode.gain.cancelScheduledValues(now);
+		
+		// 2. Set current value at now (prevent discontinuity)
+		state.envelopeGainNode.gain.setValueAtTime(
+			state.envelopeGainNode.gain.value,
+			now
+		);
+		
+		// 3. Ramp to target over 20ms
 		state.envelopeGainNode.gain.linearRampToValueAtTime(targetGain, now + 0.02);
 		
-		// Schedule future automation from this point forward
-		// Cancel only future scheduled values, not the ramp we just set
-		state.envelopeGainNode.gain.cancelScheduledValues(now + 0.021);
-		
-		// Re-schedule remaining automation with new base volume
+		// 4. Re-schedule automation starting after ramp completes
 		const futurePoints = envelope?.points?.filter(p => p.time > currentTimeMs) ?? [];
 		if (futurePoints.length > 0 && currentTrack) {
-			// Re-schedule from current position forward
-			this.scheduleTrackEnvelopeFrom(currentTrack, currentTimeMs, newBaseGain);
+			this.scheduleTrackEnvelopeFrom(currentTrack, currentTimeMs, newBaseGain, now + 0.02);
 		}
 	}
 
 	/**
 	 * Schedule automation from a specific time forward (for mid-playback changes)
+	 * @param startAudioContextTime Optional - when to start scheduling in AudioContext time
 	 */
 	private scheduleTrackEnvelopeFrom(
 		track: Track, 
 		fromTimeMs: number, 
-		baseVolume: number
+		baseVolume: number,
+		startAudioContextTime?: number
 	): void {
 		const state = this.tracks.get(track.id);
 		if (!state?.envelopeGainNode) return;
@@ -340,7 +354,7 @@ export class PlaybackService {
 		if (futurePoints.length === 0) return;
 		
 		if (!this.audioContext) return;
-		const now = this.audioContext.currentTime;
+		const now = startAudioContextTime ?? this.audioContext.currentTime;
 		const playbackStartMs = this.playbackTimeAtStart * 1000;
 		
 		// Find current multiplier at fromTimeMs
@@ -350,7 +364,7 @@ export class PlaybackService {
 			else break;
 		}
 		
-		let cumulativeACTime = now + 0.021; // Start after the ramp
+		let cumulativeACTime = now; // Start at provided time (or current time)
 		let lastTime = fromTimeMs;
 		
 		for (const point of futurePoints) {

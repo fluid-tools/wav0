@@ -16,8 +16,49 @@ import type {
 	Tool,
 	Track,
 } from "./types";
+import { volumeToDb } from "../utils/volume-utils";
+import { createDefaultEnvelope } from "./types";
 
-export const tracksAtom = atomWithStorage<Track[]>("daw-tracks", []);
+/**
+ * Initialize tracks with default Track 1 if empty
+ */
+function getInitialTracks(): Track[] {
+	if (typeof window === "undefined") return []; // SSR guard
+	
+	const stored = localStorage.getItem("daw-tracks");
+	if (stored) {
+		try {
+			const parsed = JSON.parse(stored);
+			if (Array.isArray(parsed) && parsed.length > 0) {
+				return parsed;
+			}
+		} catch {}
+	}
+	
+	// Return default Track 1
+	return [
+		{
+			id: crypto.randomUUID(),
+			name: "Track 1",
+			duration: 0,
+			startTime: 0,
+			trimStart: 0,
+			trimEnd: 0,
+			volume: 75,
+			volumeDb: volumeToDb(75),
+			muted: false,
+			soloed: false,
+			color: "#3b82f6",
+			clips: [],
+			volumeEnvelope: createDefaultEnvelope(75),
+		},
+	];
+}
+
+export const tracksAtom = atomWithStorage<Track[]>(
+	"daw-tracks",
+	getInitialTracks(),
+);
 
 export const playbackAtom = atom<PlaybackState>({
 	isPlaying: false,

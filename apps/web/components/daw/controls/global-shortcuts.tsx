@@ -4,6 +4,7 @@ import { useAtom } from "jotai";
 import { useEffect } from "react";
 import {
 	automationViewEnabledAtom,
+	clearTracksAtom,
 	playbackAtom,
 	projectEndOverrideAtom,
 	selectedClipIdAtom,
@@ -32,6 +33,7 @@ export function GlobalShortcuts() {
 	const [automationViewEnabled, setAutomationViewEnabled] = useAtom(
 		automationViewEnabledAtom,
 	);
+	const [, clearTracks] = useAtom(clearTracksAtom);
 
 	useEffect(() => {
 		const ensureSelection = () => {
@@ -273,6 +275,19 @@ export function GlobalShortcuts() {
 				setCurrentTime(e.key === "ArrowLeft" ? 0 : totalDuration);
 				return;
 			}
+
+			// Cmd/Ctrl+Shift+Backspace: Clear all tracks
+			if (
+				(e.metaKey || e.ctrlKey) &&
+				e.shiftKey &&
+				e.key === "Backspace"
+			) {
+				e.preventDefault();
+				if (confirm("Clear all tracks and start fresh?")) {
+					clearTracks();
+				}
+				return;
+			}
 		};
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
@@ -293,6 +308,7 @@ export function GlobalShortcuts() {
 		setSelectedTrackId,
 		automationViewEnabled,
 		setAutomationViewEnabled,
+		clearTracks,
 	]);
 
 	return null;

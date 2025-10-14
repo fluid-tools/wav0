@@ -9,20 +9,22 @@ import { AutomationLane } from "@/components/daw/panels/automation-lane";
 import { DAW_HEIGHTS } from "@/lib/constants/daw-design";
 import type { Clip } from "@/lib/daw-sdk";
 import {
-	activeToolAtom,
-	loadAudioFileAtom,
-	playbackAtom,
-	playbackService,
-	projectEndPositionAtom,
-	selectedClipIdAtom,
-	selectedTrackIdAtom,
-	timelineAtom,
-	timelinePxPerMsAtom,
-	totalDurationAtom,
-	trackHeightZoomAtom,
-	tracksAtom,
-	updateClipAtom,
-	updateTrackAtom,
+    activeToolAtom,
+    loadAudioFileAtom,
+    playbackAtom,
+    playbackService,
+    projectEndPositionAtom,
+    selectedClipIdAtom,
+    selectedTrackIdAtom,
+    timelineAtom,
+    timelinePxPerMsAtom,
+    totalDurationAtom,
+    trackHeightZoomAtom,
+    tracksAtom,
+    updateClipAtom,
+    updateTrackAtom,
+    dragPreviewAtom,
+    clipMoveHistoryAtom,
 } from "@/lib/daw-sdk";
 import {
 	countAutomationPointsInRange,
@@ -56,15 +58,17 @@ export function DAWTrackContent() {
 		startClipStartTime: number;
 	} | null>(null);
 
-	const [draggingClip, setDraggingClip] = useState<{
-		trackId: string;
-		clipId: string;
-		startX: number;
-		startY: number;
-		startTime: number;
-		originalTrackIndex: number;
-		sourceTrackId: string;
-	} | null>(null);
+    const [draggingClip, setDraggingClip] = useState<{
+        trackId: string;
+        clipId: string;
+        startX: number;
+        startY: number;
+        startTime: number;
+        originalTrackIndex: number;
+        sourceTrackId: string;
+    } | null>(null);
+    const [dragPreview, setDragPreview] = useAtom(dragPreviewAtom);
+    const [, setMoveHistory] = useAtom(clipMoveHistoryAtom);
 
 	const [loopDragging, setLoopDragging] = useState<{
 		trackId: string;
@@ -83,6 +87,8 @@ export function DAWTrackContent() {
 		automationPointCount: number;
 		newStartTime: number;
 	} | null>(null);
+
+    // Remove pendingAutomationTransfer & dialog usage in redesigned flow
 
 	const containerRef = useRef<HTMLDivElement>(null);
 	const scrollRef = useRef<{ left: number; width: number }>({
@@ -275,141 +281,37 @@ export function DAWTrackContent() {
 					}
 				}
 
-				if (draggingClip) {
-					// Horizontal movement (time)
-					const deltaX = lastX - draggingClip.startX;
-					const deltaTime = deltaX / pixelsPerMs;
-					const newStartTime = Math.max(0, draggingClip.startTime + deltaTime);
+                if (draggingClip) {
+                    // Compute preview-only position
+                    const deltaX = lastX - draggingClip.startX;
+                    const deltaTime = deltaX / pixelsPerMs;
+                    let previewStartTime = Math.max(0, draggingClip.startTime + deltaTime);
+                    if (timeline.snapToGrid && timeline.gridSize > 0) {
+                        previewStartTime = Math.round(previewStartTime / timeline.gridSize) * timeline.gridSize;
+                    }
 
-					// Vertical movement - use ABSOLUTE position to find target track
-					const trackHeight = Math.round(
-						DAW_HEIGHTS.TRACK_ROW * trackHeightZoom,
-					);
+                    const trackHeight = Math.round(DAW_HEIGHTS.TRACK_ROW * trackHeightZoom);
+                    const container = containerRef.current;
+                    let newTrackIndex = draggingClip.originalTrackIndex;
+                    if (container) {
+                        const rect = container.getBoundingClientRect();
+                        const relativeY = lastY - rect.top + container.scrollTop;
+                        const targetTrackIndex = Math.floor(relativeY / trackHeight);
+                        newTrackIndex = Math.max(0, Math.min(tracks.length - 1, targetTrackIndex));
+                    }
+                    const previewTrackId = tracks[newTrackIndex]?.id ?? draggingClip.trackId;
 
-					// Get the container's bounding rect to calculate absolute Y
-					const container = containerRef.current;
-					let newTrackIndex = draggingClip.originalTrackIndex;
-					if (container) {
-						const rect = container.getBoundingClientRect();
-						const relativeY = lastY - rect.top + container.scrollTop;
-
-						// Find which track the cursor is over
-						const targetTrackIndex = Math.floor(relativeY / trackHeight);
-						newTrackIndex = Math.max(
-							0,
-							Math.min(tracks.length - 1, targetTrackIndex),
-						);
-					}
-
-					// Check if we need to move to a different track
-					if (newTrackIndex !== draggingClip.originalTrackIndex) {
-						const newTrack = tracks[newTrackIndex];
-						const oldTrack = tracks[draggingClip.originalTrackIndex];
-
-						if (newTrack && oldTrack && newTrack.id !== oldTrack.id) {
-							// Find the clip
-							const clip = oldTrack.clips?.find(
-								(c) => c.id === draggingClip.clipId,
-							);
-							if (clip) {
-								// Check for automation in clip's time range
-								// Skip automation logic if envelope is disabled
-								const clipEndTime =
-									clip.startTime + (clip.trimEnd - clip.trimStart);
-								const hasEnabledAutomation =
-									oldTrack.volumeEnvelope?.enabled ?? false;
-								const automationCount = hasEnabledAutomation
-									? countAutomationPointsInRange(
-											oldTrack,
-											clip.startTime,
-											clipEndTime,
-										)
-									: 0;
-
-								// If automation exists AND is enabled, show dialog; otherwise move immediately
-								if (automationCount > 0) {
-									// Show dialog to confirm automation transfer
-									setAutomationTransferDialog({
-										open: true,
-										clipId: clip.id,
-										clipName: clip.name || "Untitled",
-										sourceTrack: { id: oldTrack.id, name: oldTrack.name },
-										targetTrack: { id: newTrack.id, name: newTrack.name },
-										automationPointCount: automationCount,
-										newStartTime,
-									});
-
-									// Pause further dragging until dialog is resolved
-									setDraggingClip(null);
-									return;
-								}
-
-								// No automation - proceed with immediate move
-								// Stop playback on old track if playing
-								if (playback.isPlaying) {
-									playbackService
-										.stopClip(oldTrack.id, clip.id)
-										.catch(console.error);
-								}
-
-								// Move clip atomically
-								const updatedClip = { ...clip, startTime: newStartTime };
-								setTracks((prev) => {
-									const updated = prev.map((t) => {
-										if (t.id === oldTrack.id) {
-											return {
-												...t,
-												clips: t.clips?.filter((c) => c.id !== clip.id) ?? [],
-											};
-										}
-										if (t.id === newTrack.id) {
-											return {
-												...t,
-												clips: [...(t.clips ?? []), updatedClip],
-											};
-										}
-										return t;
-									});
-
-									// CRITICAL: Force synchronize playback service immediately
-									playbackService.synchronizeTracks(updated);
-
-									return updated;
-								});
-
-								// Update dragging state to track new location
-								setDraggingClip({
-									...draggingClip,
-									trackId: newTrack.id,
-									startTime: newStartTime,
-									sourceTrackId: newTrack.id,
-								});
-								setSelectedTrackId(newTrack.id);
-								return;
-							}
-						}
-					}
-
-					// Normal horizontal-only update within same track
-					// Automatically move automation if enabled and points exist in range
-					const track = tracks.find((t) => t.id === draggingClip.trackId);
-					const clip = track?.clips?.find((c) => c.id === draggingClip.clipId);
-					const shouldMoveAutomation =
-						track?.volumeEnvelope?.enabled &&
-						clip &&
-						countAutomationPointsInRange(
-							track,
-							clip.startTime,
-							clip.startTime + (clip.trimEnd - clip.trimStart),
-						) > 0;
-
-					updateClip(
-						draggingClip.trackId,
-						draggingClip.clipId,
-						{ startTime: newStartTime },
-						{ moveAutomation: shouldMoveAutomation },
-					);
-				}
+                    // Update only drag preview atom
+                    setDragPreview({
+                        clipId: draggingClip.clipId,
+                        originalTrackId: draggingClip.sourceTrackId,
+                        originalStartTime: draggingClip.startTime,
+                        previewTrackId,
+                        previewStartTime,
+                        cursorOffsetX: draggingClip.startX - (containerRef.current?.getBoundingClientRect().left ?? 0),
+                        cursorOffsetY: draggingClip.startY - (containerRef.current?.getBoundingClientRect().top ?? 0),
+                    });
+                }
 
 				if (loopDragging) {
 					const deltaX = lastX - loopDragging.startX;
@@ -436,13 +338,103 @@ export function DAWTrackContent() {
 			});
 		};
 
-		const onUp = () => {
-			lastPointer.current = null;
-			setResizingClip(null);
-			setDraggingClip(null);
-			setLoopDragging(null);
-			if (raf) cancelAnimationFrame(raf);
-		};
+        const onUp = () => {
+            // Commit drag if preview exists
+            if (dragPreview) {
+                const originalTrack = tracks.find(t => t.id === dragPreview.originalTrackId);
+                const targetTrack = tracks.find(t => t.id === dragPreview.previewTrackId);
+                const clip = originalTrack?.clips?.find(c => c.id === dragPreview.clipId);
+
+                if (originalTrack && targetTrack && clip) {
+                    const moved = dragPreview.originalTrackId !== dragPreview.previewTrackId ||
+                        dragPreview.originalStartTime !== dragPreview.previewStartTime;
+
+                    if (moved) {
+                        const clipEndTime = clip.startTime + (clip.trimEnd - clip.trimStart);
+                        const hasAutomation = originalTrack.volumeEnvelope?.enabled ?? false;
+                        const automationCount = hasAutomation
+                            ? countAutomationPointsInRange(originalTrack, clip.startTime, clipEndTime)
+                            : 0;
+
+                        let automationData: { points: any[]; segments: any[] } | null = null;
+                        if (automationCount > 0) {
+                            const { pointsToTransfer, segmentsToTransfer } = transferAutomationEnvelope(
+                                originalTrack,
+                                targetTrack,
+                                clip.startTime,
+                                clipEndTime,
+                                dragPreview.previewStartTime,
+                                clip.id,
+                            );
+                            automationData = { points: pointsToTransfer, segments: segmentsToTransfer };
+                        }
+
+                        if (playback.isPlaying) {
+                            playbackService.stopClip(originalTrack.id, clip.id).catch(console.error);
+                        }
+
+                        setTracks((prev) => {
+                            const updated = prev.map((t) => {
+                                if (t.id === originalTrack.id) {
+                                    const updatedTrack = {
+                                        ...t,
+                                        clips: t.clips?.filter((c) => c.id !== clip.id) ?? [],
+                                    };
+                                    if (automationData && t.id !== targetTrack.id) {
+                                        return removeAutomationPointsInRange(updatedTrack, clip.startTime, clipEndTime);
+                                    }
+                                    return updatedTrack;
+                                }
+                                if (t.id === targetTrack.id) {
+                                    const movedClip = { ...clip, startTime: dragPreview.previewStartTime };
+                                    let updatedTrack: typeof t = {
+                                        ...t,
+                                        clips: [...(t.clips ?? []), movedClip],
+                                    };
+                                    if (automationData) {
+                                        const currentEnv = updatedTrack.volumeEnvelope || { enabled: true, points: [], segments: [] };
+                                        updatedTrack = {
+                                            ...updatedTrack,
+                                            volumeEnvelope: {
+                                                ...currentEnv,
+                                                enabled: true,
+                                                points: [...(currentEnv.points || []), ...automationData.points].sort((a: any, b: any) => a.time - b.time),
+                                                segments: [...(currentEnv.segments || []), ...automationData.segments],
+                                            },
+                                        };
+                                    }
+                                    return updatedTrack;
+                                }
+                                return t;
+                            });
+                            playbackService.synchronizeTracks(updated);
+                            return updated;
+                        });
+
+                        setMoveHistory((prev) => [
+                            {
+                                clipId: clip.id,
+                                fromTrackId: originalTrack.id,
+                                toTrackId: targetTrack.id,
+                                fromStartTime: dragPreview.originalStartTime,
+                                toStartTime: dragPreview.previewStartTime,
+                                automationData,
+                                timestamp: Date.now(),
+                            },
+                            ...prev.slice(0, 9),
+                        ]);
+                    }
+                }
+            }
+
+            // Clear states
+            setDragPreview(null);
+            lastPointer.current = null;
+            setResizingClip(null);
+            setDraggingClip(null);
+            setLoopDragging(null);
+            if (raf) cancelAnimationFrame(raf);
+        };
 
 		window.addEventListener("mousemove", onMove);
 		window.addEventListener("mouseup", onUp);
@@ -451,7 +443,7 @@ export function DAWTrackContent() {
 			window.removeEventListener("mouseup", onUp);
 			if (raf) cancelAnimationFrame(raf);
 		};
-	}, [
+    }, [
 		interactionActive,
 		resizingClip,
 		draggingClip,
@@ -465,6 +457,7 @@ export function DAWTrackContent() {
 		playback.isPlaying,
 		setSelectedTrackId,
 		setTracks,
+        dragPreview,
 	]);
 
 	// Handle automation transfer dialog confirmation
@@ -577,7 +570,7 @@ export function DAWTrackContent() {
 
 	return (
 		<>
-			<div ref={containerRef} className="relative w-full h-full" data-daw-grid>
+            <div ref={containerRef} className="relative w-full h-full" data-daw-grid>
 				{tracks.map((track, index) => {
 					// Track row layout
 					const trackHeight = Math.round(
@@ -698,12 +691,12 @@ export function DAWTrackContent() {
 											>
 												{/* Full-body interactive area with context menu */}
 												{/* biome-ignore lint/a11y/useSemanticElements: clip overlay must stay a div to avoid nested buttons while preserving keyboard access */}
-												<div
+                                                <div
 													role="button"
 													tabIndex={0}
 													className="absolute inset-0 rounded-md bg-transparent cursor-default"
 													aria-label={`Select audio clip: ${clip.name}`}
-													onMouseDown={(e) => {
+                                                    onMouseDown={(e) => {
 														const rect =
 															e.currentTarget.getBoundingClientRect();
 														const localX = e.clientX - rect.left;
@@ -712,15 +705,24 @@ export function DAWTrackContent() {
 														setSelectedTrackId(track.id);
 														setSelectedClipId(clip.id);
 														if (!nearLeft && !nearRight) {
-															setDraggingClip({
-																trackId: track.id,
-																clipId: clip.id,
-																startX: e.clientX,
-																startY: e.clientY,
-																startTime: clip.startTime,
-																originalTrackIndex: index,
-																sourceTrackId: track.id,
-															});
+                                                            setDraggingClip({
+                                                                trackId: track.id,
+                                                                clipId: clip.id,
+                                                                startX: e.clientX,
+                                                                startY: e.clientY,
+                                                                startTime: clip.startTime,
+                                                                originalTrackIndex: index,
+                                                                sourceTrackId: track.id,
+                                                            });
+                                                            setDragPreview({
+                                                                clipId: clip.id,
+                                                                originalTrackId: track.id,
+                                                                originalStartTime: clip.startTime,
+                                                                previewTrackId: track.id,
+                                                                previewStartTime: clip.startTime,
+                                                                cursorOffsetX: e.clientX - rect.left,
+                                                                cursorOffsetY: e.clientY - rect.top,
+                                                            });
 														}
 													}}
 													onKeyDown={(e) => {
@@ -744,26 +746,38 @@ export function DAWTrackContent() {
 												</div>
 
 												{/* Visible grab handle on hover */}
-												<button
+                                                <button
 													type="button"
 													className="absolute top-1/2 -translate-y-1/2 left-2 h-8 w-2 rounded-sm opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing"
 													style={{
 														background:
 															"repeating-linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.35) 2px, transparent 2px, transparent 4px)",
 													}}
-													onMouseDown={(e) => {
+                                                    onMouseDown={(e) => {
 														e.stopPropagation();
 														setSelectedTrackId(track.id);
 														setSelectedClipId(clip.id);
-														setDraggingClip({
-															trackId: track.id,
-															clipId: clip.id,
-															startX: e.clientX,
-															startY: e.clientY,
-															startTime: clip.startTime,
-															originalTrackIndex: index,
-															sourceTrackId: track.id,
-														});
+                                                        setDraggingClip({
+                                                            trackId: track.id,
+                                                            clipId: clip.id,
+                                                            startX: e.clientX,
+                                                            startY: e.clientY,
+                                                            startTime: clip.startTime,
+                                                            originalTrackIndex: index,
+                                                            sourceTrackId: track.id,
+                                                        });
+                                                        const rect = e.currentTarget.parentElement?.getBoundingClientRect();
+                                                        if (rect) {
+                                                            setDragPreview({
+                                                                clipId: clip.id,
+                                                                originalTrackId: track.id,
+                                                                originalStartTime: clip.startTime,
+                                                                previewTrackId: track.id,
+                                                                previewStartTime: clip.startTime,
+                                                                cursorOffsetX: e.clientX - rect.left,
+                                                                cursorOffsetY: e.clientY - rect.top,
+                                                            });
+                                                        }
 													}}
 													aria-label="Drag clip"
 												/>
@@ -957,6 +971,34 @@ export function DAWTrackContent() {
 					);
 				})}
 
+                {/* Drag Preview Overlay */}
+                {dragPreview && (() => {
+                    const originalTrack = tracks.find(t => t.id === dragPreview.originalTrackId);
+                    const clip = originalTrack?.clips?.find(c => c.id === dragPreview.clipId);
+                    if (!clip) return null;
+                    const trackHeight = Math.round(DAW_HEIGHTS.TRACK_ROW * trackHeightZoom);
+                    const targetIndex = tracks.findIndex(t => t.id === dragPreview.previewTrackId);
+                    const left = dragPreview.previewStartTime * pixelsPerMs;
+                    const top = Math.max(0, targetIndex) * trackHeight;
+                    const width = Math.max((clip.trimEnd - clip.trimStart) * pixelsPerMs, 8);
+                    const color = clip.color ?? originalTrack?.color ?? '#3b82f6';
+                    return (
+                        <div
+                            key="drag-preview"
+                            className="absolute rounded-md pointer-events-none"
+                            style={{
+                                left,
+                                top,
+                                width,
+                                height: trackHeight - 2,
+                                backgroundColor: `${color}33`,
+                                border: `2px dashed ${color}`,
+                                zIndex: 1000,
+                            }}
+                        />
+                    );
+                })()}
+
 				{/* Project end marker */}
 				<div
 					className="absolute top-0 bottom-0 w-px bg-yellow-500/70 z-40"
@@ -988,20 +1030,7 @@ export function DAWTrackContent() {
 				</div>
 			</div>
 
-			{/* Automation Transfer Dialog */}
-			{automationTransferDialog && (
-				<AutomationTransferDialog
-					open={automationTransferDialog.open}
-					onOpenChange={(open) => {
-						if (!open) setAutomationTransferDialog(null);
-					}}
-					onConfirm={handleAutomationTransfer}
-					clipName={automationTransferDialog.clipName}
-					sourceTrackName={automationTransferDialog.sourceTrack.name}
-					targetTrackName={automationTransferDialog.targetTrack.name}
-					automationPointCount={automationTransferDialog.automationPointCount}
-				/>
-			)}
+    {/* Automation dialog removed in favor of default-move with Undo */}
 		</>
 	);
 }
