@@ -194,25 +194,60 @@ export class PlaybackService {
 		const sorted = [...envelope.points].sort((a, b) => a.time - b.time);
 		const currentTimeMs = this.getPlaybackTime() * 1000;
 
-		// Find current multiplier at playback position
+		// Find current multiplier at playback position with proper interpolation
 		let currentMultiplier = 1.0;
-		for (const point of sorted) {
-			if (point.time <= currentTimeMs) currentMultiplier = point.value;
-			else break;
+		let prevPoint: (typeof sorted)[0] | null = null;
+		let nextPoint: (typeof sorted)[0] | null = null;
+
+		for (let i = 0; i < sorted.length; i++) {
+			const point = sorted[i];
+			if (point.time <= currentTimeMs) {
+				currentMultiplier = point.value;
+				prevPoint = point;
+				nextPoint = sorted[i + 1] || null;
+			} else {
+				nextPoint = point;
+				break;
+			}
+		}
+
+		// If we're between two points, interpolate with curve
+		if (prevPoint && nextPoint && currentTimeMs < nextPoint.time) {
+			const segment = envelope.segments?.find(
+				(seg) =>
+					seg.fromPointId === prevPoint.id && seg.toPointId === nextPoint.id,
+			);
+			const t =
+				(currentTimeMs - prevPoint.time) / (nextPoint.time - prevPoint.time);
+			const curve = segment?.curve ?? 0;
+
+			const curvedT =
+				curve === 0
+					? t
+					: curve < 0
+						? t ** (1 + (Math.abs(curve) / 99) * 3)
+						: 1 - (1 - t) ** (1 + (curve / 99) * 3);
+
+			currentMultiplier =
+				prevPoint.value + (nextPoint.value - prevPoint.value) * curvedT;
 		}
 
 		// Step 3: Schedule only future segments relative to transport
 		const futurePoints = sorted.filter((point) => point.time > currentTimeMs);
 		if (futurePoints.length === 0) {
-			// No future points, set constant gain
+			// No future points, set constant gain (only if different from current)
 			const targetGain = baseVolume * currentMultiplier;
-			envelopeGain.gain.setValueAtTime(targetGain, now);
+			if (Math.abs(envelopeGain.gain.value - targetGain) > 0.00001) {
+				envelopeGain.gain.setValueAtTime(targetGain, now);
+			}
 			return;
 		}
 
-		// Set initial value
+		// Set initial value only if different from current (avoid redundant calls)
 		const initialGain = baseVolume * currentMultiplier;
-		envelopeGain.gain.setValueAtTime(initialGain, now);
+		if (Math.abs(envelopeGain.gain.value - initialGain) > 0.00001) {
+			envelopeGain.gain.setValueAtTime(initialGain, now);
+		}
 
 		let lastMultiplier = currentMultiplier;
 		let lastTime = currentTimeMs;
