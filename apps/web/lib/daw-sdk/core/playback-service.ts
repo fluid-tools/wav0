@@ -20,6 +20,7 @@ type TrackPlaybackState = {
 	envelopeGainNode: GainNode | null;
 	muteSoloGainNode: GainNode | null;
 	isPlaying: boolean;
+	automationGeneration: number;
 };
 
 /**
@@ -65,13 +66,15 @@ export class PlaybackService {
 		if (!this.audioContext) {
 			this.audioContext = await audioService.getAudioContext();
 			this.masterGainNode = this.audioContext.createGain();
-			
+
 			// Create analyser for master metering
 			this.masterAnalyser = this.audioContext.createAnalyser();
 			this.masterAnalyser.fftSize = 2048;
 			this.masterAnalyser.smoothingTimeConstant = 0.8;
-			this.meterDataArray = new Float32Array(this.masterAnalyser.fftSize) as Float32Array;
-			
+			this.meterDataArray = new Float32Array(
+				this.masterAnalyser.fftSize,
+			) as Float32Array;
+
 			// Chain: masterGain → analyser → destination
 			this.masterGainNode.connect(this.masterAnalyser);
 			this.masterAnalyser.connect(this.audioContext.destination);
@@ -119,20 +122,25 @@ export class PlaybackService {
 			}
 		}
 		clipState.audioSources = [];
-		
+
 		// Explicitly disconnect and clean up gain node
 		if (clipState.gainNode) {
 			try {
 				clipState.gainNode.disconnect();
 				clipState.gainNode = null;
 			} catch (error) {
-				console.warn("Failed to disconnect clip gain node", trackId, clipId, error);
+				console.warn(
+					"Failed to disconnect clip gain node",
+					trackId,
+					clipId,
+					error,
+				);
 			}
 		}
-		
+
 		// Remove from clip states
 		trackState.clipStates.delete(clipId);
-		
+
 		return clipState;
 	}
 
@@ -146,17 +154,33 @@ export class PlaybackService {
 	}
 
 	/**
-	 * Schedule track volume envelope automation
-	 * Applies curve-based gain scheduling to envelopeGainNode
+	 * Central automation rescheduler - all automation mutations funnel through here
+	 * Enforces:
+	 * 1. cancelScheduledValues(now) to clear existing schedules
+	 * 2. setValueAtTime(gain.value, now) to anchor current value
+	 * 3. Schedule only future segments relative to transport
+	 * 4. No setValueCurveAtTime overlaps
+	 * 5. Generation token to drop late schedules
 	 */
-	private scheduleTrackEnvelope(track: Track): void {
+	private rescheduleTrackAutomation(track: Track, generation?: number): void {
 		if (!this.audioContext || !this.masterGainNode) return;
 		const state = this.tracks.get(track.id);
 		if (!state?.envelopeGainNode) return;
+
+		// Check generation token to drop late schedules
+		if (generation !== undefined && generation !== state.automationGeneration) {
+			return;
+		}
+
 		const envelope = track.volumeEnvelope;
 		const envelopeGain = state.envelopeGainNode;
 		const now = this.audioContext.currentTime;
-		this.cancelGainAutomation(envelopeGain.gain, now);
+
+		// Step 1: Cancel all existing scheduled values
+		envelopeGain.gain.cancelScheduledValues(now);
+
+		// Step 2: Anchor current value at now
+		envelopeGain.gain.setValueAtTime(envelopeGain.gain.value, now);
 
 		// Convert volume to linear gain using pure dB math
 		const baseVolumeDb = track.volumeDb ?? volumeToDb(track.volume ?? 100);
@@ -168,48 +192,78 @@ export class PlaybackService {
 		}
 
 		const sorted = [...envelope.points].sort((a, b) => a.time - b.time);
-		const playbackStartMs = this.playbackTimeAtStart * 1000;
+		const currentTimeMs = this.getPlaybackTime() * 1000;
 
+		// Find current multiplier at playback position with proper interpolation
 		let currentMultiplier = 1.0;
-		for (const point of sorted) {
-			if (point.time <= playbackStartMs) currentMultiplier = point.value;
-			else break;
+		let prevPoint: (typeof sorted)[0] | null = null;
+		let nextPoint: (typeof sorted)[0] | null = null;
+
+		for (let i = 0; i < sorted.length; i++) {
+			const point = sorted[i];
+			if (point.time <= currentTimeMs) {
+				currentMultiplier = point.value;
+				prevPoint = point;
+				nextPoint = sorted[i + 1] || null;
+			} else {
+				nextPoint = point;
+				break;
+			}
 		}
 
-		const currentGain = baseVolume * currentMultiplier;
-		envelopeGain.gain.setValueAtTime(currentGain, now);
+		// If we're between two points, interpolate with curve
+		if (prevPoint && nextPoint && currentTimeMs < nextPoint.time) {
+			const segment = envelope.segments?.find(
+				(seg) =>
+					seg.fromPointId === prevPoint.id && seg.toPointId === nextPoint.id,
+			);
+			const t =
+				(currentTimeMs - prevPoint.time) / (nextPoint.time - prevPoint.time);
+			const curve = segment?.curve ?? 0;
 
-		const futurePoints = sorted.filter(
-			(point) => point.time >= playbackStartMs,
-		);
-		if (futurePoints.length === 0) return;
+			const curvedT =
+				curve === 0
+					? t
+					: curve < 0
+						? t ** (1 + (Math.abs(curve) / 99) * 3)
+						: 1 - (1 - t) ** (1 + (curve / 99) * 3);
+
+			currentMultiplier =
+				prevPoint.value + (nextPoint.value - prevPoint.value) * curvedT;
+		}
+
+		// Step 3: Schedule only future segments relative to transport
+		const futurePoints = sorted.filter((point) => point.time > currentTimeMs);
+		if (futurePoints.length === 0) {
+			// No future points, set constant gain (only if different from current)
+			const targetGain = baseVolume * currentMultiplier;
+			if (Math.abs(envelopeGain.gain.value - targetGain) > 0.00001) {
+				envelopeGain.gain.setValueAtTime(targetGain, now);
+			}
+			return;
+		}
+
+		// Set initial value only if different from current (avoid redundant calls)
+		const initialGain = baseVolume * currentMultiplier;
+		if (Math.abs(envelopeGain.gain.value - initialGain) > 0.00001) {
+			envelopeGain.gain.setValueAtTime(initialGain, now);
+		}
 
 		let lastMultiplier = currentMultiplier;
-		let lastTime = playbackStartMs;
-		// Cancel existing scheduled values before re-scheduling to avoid overlaps
-		envelopeGain.gain.cancelScheduledValues(now);
-		envelopeGain.gain.setValueAtTime(envelopeGain.gain.value, now);
+		let lastTime = currentTimeMs;
 
-		// cumulativeACTime no longer needed; scheduling uses acStart per segment
-
+		// Schedule future segments without overlaps
 		for (const point of futurePoints) {
-			const segmentStart = Math.max(lastTime, playbackStartMs);
+			const segmentStart = lastTime;
 			const segmentEnd = point.time;
+
 			if (segmentEnd <= segmentStart) {
 				lastTime = point.time;
 				lastMultiplier = point.value;
 				continue;
 			}
 
-			// Skip segments entirely in the past relative to current playback time
-			const currentTimeMs = this.getPlaybackTime() * 1000;
-			if (segmentEnd <= currentTimeMs) {
-				lastTime = point.time;
-				lastMultiplier = point.value;
-				continue;
-			}
-			const startAtMs = Math.max(segmentStart, currentTimeMs);
-			const durationSec = Math.max(0.001, (segmentEnd - startAtMs) / 1000);
+			const durationSec = (segmentEnd - segmentStart) / 1000;
 			if (durationSec < 0.001) {
 				lastTime = point.time;
 				lastMultiplier = point.value;
@@ -240,11 +294,21 @@ export class PlaybackService {
 				values[i] = baseVolume * multiplier;
 			}
 
-			const acStart = now + Math.max(0, (startAtMs - currentTimeMs) / 1000);
+			// Calculate absolute AudioContext time for this segment
+			const acStart = now + (segmentStart - currentTimeMs) / 1000;
 			envelopeGain.gain.setValueCurveAtTime(values, acStart, durationSec);
+
 			lastTime = point.time;
 			lastMultiplier = point.value;
 		}
+	}
+
+	/**
+	 * Schedule track volume envelope automation
+	 * @deprecated Use rescheduleTrackAutomation instead
+	 */
+	private scheduleTrackEnvelope(track: Track): void {
+		this.rescheduleTrackAutomation(track);
 	}
 
 	/**
@@ -253,159 +317,22 @@ export class PlaybackService {
 	 */
 	updateTrackVolumeRealtime(trackId: string, volumeDb: number): void {
 		if (!this.audioContext || !this.masterGainNode) return;
-		
+
 		const state = this.tracks.get(trackId);
 		if (!state?.envelopeGainNode) return;
-		
+
 		// Store the new base volume in currentTracks for next schedule
 		const currentTrack = this.currentTracks.get(trackId);
 		if (currentTrack) {
 			currentTrack.volumeDb = volumeDb;
 		}
-		
-		// If NOT playing, reschedule normally
-		if (!this.isPlaying) {
-			const track = this.currentTracks.get(trackId);
-			if (track) this.scheduleTrackEnvelope(track);
-			return;
-		}
-		
-		// If playing: Apply volume change smoothly without canceling automation
-		// Get current envelope multiplier at playback position
-		const currentTimeMs = this.getPlaybackTime() * 1000;
-		const envelope = currentTrack?.volumeEnvelope;
-		
-		let currentMultiplier = 1.0;
-		if (envelope?.enabled && envelope.points?.length > 0) {
-			// Find current automation multiplier
-			const sorted = [...envelope.points].sort((a, b) => a.time - b.time);
-			
-			// Find the segment we're currently in
-			for (let i = 0; i < sorted.length; i++) {
-				const point = sorted[i];
-				const nextPoint = sorted[i + 1];
-				
-				if (point.time <= currentTimeMs) {
-					currentMultiplier = point.value;
-					
-					// If we're between two points, interpolate with curve
-					if (nextPoint && nextPoint.time > currentTimeMs) {
-						const segment = envelope.segments?.find(
-							seg => seg.fromPointId === point.id && seg.toPointId === nextPoint.id
-						);
-						const t = (currentTimeMs - point.time) / (nextPoint.time - point.time);
-						const curve = segment?.curve ?? 0;
-						
-						const curvedT = curve === 0 ? t :
-							curve < 0 ? t ** (1 + (Math.abs(curve) / 99) * 3) :
-							1 - (1 - t) ** (1 + (curve / 99) * 3);
-						
-						currentMultiplier = point.value + (nextPoint.value - point.value) * curvedT;
-						break;
-					}
-				}
-			}
-		}
-		
-		// Apply new base volume with proper scheduling order
-		const newBaseGain = dbToGain(volumeDb);
-		const targetGain = newBaseGain * currentMultiplier;
-		const now = this.audioContext.currentTime;
-		
-		// CORRECT ORDER to avoid overlapping scheduled values:
-		// 1. Cancel ALL existing automation from now
-		state.envelopeGainNode.gain.cancelScheduledValues(now);
-		
-		// 2. Set current value at now (prevent discontinuity)
-		state.envelopeGainNode.gain.setValueAtTime(
-			state.envelopeGainNode.gain.value,
-			now
-		);
-		
-		// 3. Ramp to target over 20ms
-		state.envelopeGainNode.gain.linearRampToValueAtTime(targetGain, now + 0.02);
-		
-		// 4. Re-schedule automation starting after ramp completes
-		const futurePoints = envelope?.points?.filter(p => p.time > currentTimeMs) ?? [];
-		if (futurePoints.length > 0 && currentTrack) {
-			this.scheduleTrackEnvelopeFrom(currentTrack, currentTimeMs, newBaseGain, now + 0.02);
-		}
-	}
 
-	/**
-	 * Schedule automation from a specific time forward (for mid-playback changes)
-	 * @param startAudioContextTime Optional - when to start scheduling in AudioContext time
-	 */
-	private scheduleTrackEnvelopeFrom(
-		track: Track, 
-		fromTimeMs: number, 
-		baseVolume: number,
-		startAudioContextTime?: number
-	): void {
-		const state = this.tracks.get(track.id);
-		if (!state?.envelopeGainNode) return;
-		
-		const envelope = track.volumeEnvelope;
-		if (!envelope?.enabled || !envelope.points?.length) return;
-		
-		const sorted = [...envelope.points].sort((a, b) => a.time - b.time);
-		const futurePoints = sorted.filter(p => p.time > fromTimeMs);
-		
-		if (futurePoints.length === 0) return;
-		
-		if (!this.audioContext) return;
-		const now = startAudioContextTime ?? this.audioContext.currentTime;
-		const playbackStartMs = this.playbackTimeAtStart * 1000;
-		
-		// Find current multiplier at fromTimeMs
-		let lastMultiplier = 1.0;
-		for (const point of sorted) {
-			if (point.time <= fromTimeMs) lastMultiplier = point.value;
-			else break;
-		}
-		
-		let cumulativeACTime = now; // Start at provided time (or current time)
-		let lastTime = fromTimeMs;
-		
-		for (const point of futurePoints) {
-			const segmentStart = Math.max(lastTime, playbackStartMs);
-			const segmentEnd = point.time;
-			if (segmentEnd <= segmentStart) {
-				lastTime = point.time;
-				lastMultiplier = point.value;
-				continue;
-			}
-			
-			const durationSec = (segmentEnd - segmentStart) / 1000;
-			if (durationSec < 0.001) {
-				lastTime = point.time;
-				lastMultiplier = point.value;
-				continue;
-			}
-			
-			const steps = Math.max(2, Math.ceil(durationSec * 60));
-			const values = new Float32Array(steps);
-			
-			const previousPoint = sorted.find(p => p.time === lastTime);
-			const currentSegment = envelope.segments?.find(
-				seg => seg.fromPointId === previousPoint?.id && seg.toPointId === point.id
-			);
-			const curveValue = currentSegment?.curve ?? 0;
-			
-			for (let i = 0; i < steps; i++) {
-				const t = i / (steps - 1);
-				const curvedT = curveValue === 0 ? t :
-					curveValue < 0 ? t ** (1 + (Math.abs(curveValue) / 99) * 3) :
-					1 - (1 - t) ** (1 + (curveValue / 99) * 3);
-				const multiplier = lastMultiplier + (point.value - lastMultiplier) * curvedT;
-				values[i] = baseVolume * multiplier;
-			}
-			
-			state.envelopeGainNode.gain.setValueCurveAtTime(values, cumulativeACTime, durationSec);
-			
-			cumulativeACTime += durationSec;
-			lastTime = point.time;
-			lastMultiplier = point.value;
+		// Increment generation to invalidate any pending schedules
+		state.automationGeneration++;
+
+		// Reschedule using centralized rescheduler
+		if (currentTrack) {
+			this.rescheduleTrackAutomation(currentTrack, state.automationGeneration);
 		}
 	}
 
@@ -414,7 +341,7 @@ export class PlaybackService {
 	 */
 	private startMeterUpdates(): void {
 		if (this.meterUpdateInterval) return;
-		
+
 		this.meterUpdateInterval = window.setInterval(() => {
 			this.updateMeterReading();
 		}, 50); // Update at 20Hz
@@ -435,19 +362,20 @@ export class PlaybackService {
 	 */
 	private updateMeterReading(): void {
 		if (!this.masterAnalyser || !this.meterDataArray) return;
-		
+
 		// @ts-expect-error - Float32Array type mismatch between ArrayBufferLike and ArrayBuffer
 		this.masterAnalyser.getFloatTimeDomainData(this.meterDataArray);
-		
+
 		// Calculate RMS
 		let sumSquares = 0;
 		for (let i = 0; i < this.meterDataArray.length; i++) {
 			sumSquares += this.meterDataArray[i] ** 2;
 		}
 		const rms = Math.sqrt(sumSquares / this.meterDataArray.length);
-		
+
 		// Convert to dB
-		this.currentMasterDb = rms > 0 ? 20 * Math.log10(rms) : Number.NEGATIVE_INFINITY;
+		this.currentMasterDb =
+			rms > 0 ? 20 * Math.log10(rms) : Number.NEGATIVE_INFINITY;
 	}
 
 	/**
@@ -505,6 +433,7 @@ export class PlaybackService {
 					envelopeGainNode: null,
 					muteSoloGainNode: null,
 					isPlaying: false,
+					automationGeneration: 0,
 				});
 			}
 		}
@@ -844,6 +773,7 @@ export class PlaybackService {
 				envelopeGainNode: null,
 				muteSoloGainNode: null,
 				isPlaying: true,
+				automationGeneration: 0,
 			};
 			this.tracks.set(updatedTrack.id, trackState);
 		}
