@@ -1,6 +1,7 @@
 "use client";
 
 import { atom } from "jotai";
+import { atomWithMachine } from "jotai-xstate";
 import {
 	activeToolAtom,
 	automationViewEnabledAtom,
@@ -13,8 +14,13 @@ import {
 	trackAutomationTypeAtom,
 	trackHeightZoomAtom,
 } from "./atoms";
-import type { AutomationType, Tool } from "./types";
-import type { TrackEnvelopePoint, TrackEnvelopeSegment } from "./types";
+import { dragMachine } from "./machines/drag-machine";
+import type {
+	AutomationType,
+	Tool,
+	TrackEnvelopePoint,
+	TrackEnvelopeSegment,
+} from "./types";
 
 export const setSelectedTrackAtom = atom(
 	null,
@@ -77,42 +83,46 @@ export const setProjectNameAtom = atom(null, (_get, set, name: string) => {
 });
 
 /**
- * Visual drag preview state (UI only, no data changes)
+ * Drag state machine atom (XState-powered)
  */
-export const dragPreviewAtom = atom<{
-    clipId: string;
-    originalTrackId: string;
-    originalStartTime: number;
-    previewTrackId: string;
-    previewStartTime: number;
-    cursorOffsetX: number;
-    cursorOffsetY: number;
-} | null>(null);
+export const dragMachineAtom = atomWithMachine(() => dragMachine);
 
 /**
- * Pending drag operation (for commit on drop)
+ * Read-only drag preview atom derived from machine state
  */
-export const pendingDragOperationAtom = atom<{
-    clipId: string;
-    fromTrackId: string;
-    toTrackId: string;
-    fromStartTime: number;
-    toStartTime: number;
-    automationPointCount: number;
-} | null>(null);
+export const dragPreviewAtom = atom((get) => {
+	const snapshot = get(dragMachineAtom);
+	const { context, value } = snapshot;
+
+	if (value === "idle" || !context.clipId) {
+		return null;
+	}
+
+	return {
+		clipId: context.clipId,
+		originalTrackId: context.originTrackId ?? "",
+		originalStartTime: context.originStartTime,
+		previewTrackId: context.previewTrackId ?? "",
+		previewStartTime: context.previewStartTime,
+		cursorOffsetX: context.cursorOffsetX,
+		cursorOffsetY: context.cursorOffsetY,
+	};
+});
 
 /**
  * Undo history for clip moves (for toast undo functionality)
  */
-export const clipMoveHistoryAtom = atom<Array<{
-    clipId: string;
-    fromTrackId: string;
-    toTrackId: string;
-    fromStartTime: number;
-    toStartTime: number;
-    automationData: {
-        points: TrackEnvelopePoint[];
-        segments: TrackEnvelopeSegment[];
-    } | null;
-    timestamp: number;
-}>>([]);
+export const clipMoveHistoryAtom = atom<
+	Array<{
+		clipId: string;
+		fromTrackId: string;
+		toTrackId: string;
+		fromStartTime: number;
+		toStartTime: number;
+		automationData: {
+			points: TrackEnvelopePoint[];
+			segments: TrackEnvelopeSegment[];
+		} | null;
+		timestamp: number;
+	}>
+>([]);
