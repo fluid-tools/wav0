@@ -456,8 +456,9 @@ export function addAutomationPoint(
 
 /**
  * Shift automation points in a time range by a delta (for same-track clip moves)
+ * @deprecated Use envelope-based shiftAutomationInRange instead
  */
-export function shiftAutomationInRange(
+export function shiftAutomationInRangeTrack(
 	track: Track,
 	startTime: number,
 	endTime: number,
@@ -468,19 +469,16 @@ export function shiftAutomationInRange(
 		return track;
 	}
 
-	const shiftedPoints = envelope.points.map((point) => {
-		if (point.time >= startTime && point.time <= endTime) {
-			return { ...point, time: Math.max(0, point.time + deltaMs) };
-		}
-		return point;
-	});
+	const updatedEnvelope = shiftAutomationInRange(
+		envelope,
+		startTime,
+		endTime,
+		deltaMs,
+	);
 
 	return {
 		...track,
-		volumeEnvelope: {
-			...envelope,
-			points: shiftedPoints,
-		},
+		volumeEnvelope: updatedEnvelope,
 	};
 }
 
