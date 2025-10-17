@@ -35,9 +35,13 @@ function getQueryClient() {
 
 /**
  * DAW Initialization - Non-blocking background init
+ * Only runs in browser to prevent SSR/prerender issues on Vercel
  */
 function DAWInitializer({ children }: { children: ReactNode }) {
 	useEffect(() => {
+		// Only initialize in browser (not during SSR/prerender)
+		if (typeof window === "undefined") return;
+
 		// Initialize in background, don't block render
 		audioService.getAudioContext().catch((err) => {
 			console.error("[DAW] Init failed:", err);
