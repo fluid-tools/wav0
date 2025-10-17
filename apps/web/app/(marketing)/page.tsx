@@ -8,8 +8,6 @@ import { useEffect, useRef, useState } from "react";
 import { ThemeToggleGroup } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 
-export const dynamic = "force-dynamic";
-
 export default function Home() {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [scrollDirection, setScrollDirection] = useState<"up" | "down">("up");
