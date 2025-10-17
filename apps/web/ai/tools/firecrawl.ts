@@ -8,15 +8,15 @@ import { z } from "zod";
 let client: FirecrawlApp | null = null;
 
 function getFirecrawlClient() {
-  if (client) return client;
+	if (client) return client;
 
-  const apiKey = process.env.FIRECRAWL_API_KEY;
-  if (!apiKey) {
-    throw new Error("FIRECRAWL_API_KEY is required at runtime");
-  }
+	const apiKey = process.env.FIRECRAWL_API_KEY;
+	if (!apiKey) {
+		throw new Error("FIRECRAWL_API_KEY is required at runtime");
+	}
 
-  client = new FirecrawlApp({ apiKey });
-  return client;
+	client = new FirecrawlApp({ apiKey });
+	return client;
 }
 
 export const webSearch = tool({
@@ -29,8 +29,8 @@ export const webSearch = tool({
 			.describe("The URL to crawl (including http:// or https://)"),
 	}),
 	execute: async ({ urlToCrawl }) => {
-    const firecrawl = getFirecrawlClient();
-    const crawlResponse = await firecrawl.crawl(urlToCrawl, {
+		const firecrawl = getFirecrawlClient();
+		const crawlResponse = await firecrawl.crawl(urlToCrawl, {
 			limit: 1,
 			scrapeOptions: {
 				formats: ["markdown", "html"],
