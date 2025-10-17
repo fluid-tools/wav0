@@ -1,5 +1,9 @@
 "use client";
 
+// WORKAROUND: Next.js 16 beta has a bug where prerendering error boundaries
+// triggers workUnitAsyncStorage errors. Remove this in stable release.
+export const dynamic = "force-dynamic";
+
 export default function GlobalError({
 	reset,
 }: {
