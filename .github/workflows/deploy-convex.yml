@@ -16,6 +16,7 @@ jobs:
       cancel-in-progress: true
     environment: production
     env:
+      FIRECRWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
       CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
       CONVEX_DEPLOYMENT: ${{ secrets.CONVEX_DEPLOYMENT }}
     steps:
@@ -42,7 +43,7 @@ jobs:
       - name: Deploy Convex (prod)
         run: |
           cd packages/server
-          bunx convex deploy
+          bun run deploy
 
   deploy-preview:
     runs-on: ubuntu-latest
@@ -54,6 +55,7 @@ jobs:
     permissions:
       contents: read
     env:
+      FIRECRWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
       CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
       CONVEX_DEPLOYMENT: ${{ secrets.CONVEX_DEPLOYMENT }}
     steps:
@@ -80,4 +82,4 @@ jobs:
       - name: Deploy Convex (preview)
         run: |
           cd packages/server
-          bunx convex deploy
+          bun run deploy

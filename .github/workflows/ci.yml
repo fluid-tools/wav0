@@ -3,7 +3,10 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [ main ]
+    branches:
+      - main
+      - 'preview/**'
+      - 'staging/**'
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -13,6 +16,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
+      FIRECRWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
       NEXT_TELEMETRY_DISABLED: 1
       TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
       TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
