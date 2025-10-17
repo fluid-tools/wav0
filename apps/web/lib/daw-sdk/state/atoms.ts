@@ -7,6 +7,7 @@
 
 import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
+import { volumeToDb } from "../utils/volume-utils";
 import type {
 	AutomationType,
 	ClipInspectorTarget,
@@ -16,7 +17,6 @@ import type {
 	Tool,
 	Track,
 } from "./types";
-import { volumeToDb } from "../utils/volume-utils";
 import { createDefaultEnvelope } from "./types";
 
 /**
@@ -24,7 +24,7 @@ import { createDefaultEnvelope } from "./types";
  */
 function getInitialTracks(): Track[] {
 	if (typeof window === "undefined") return []; // SSR guard
-	
+
 	const stored = localStorage.getItem("daw-tracks");
 	if (stored) {
 		try {
@@ -34,7 +34,7 @@ function getInitialTracks(): Track[] {
 			}
 		} catch {}
 	}
-	
+
 	// Return default Track 1
 	return [
 		{

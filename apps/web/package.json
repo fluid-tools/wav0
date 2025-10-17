@@ -9,7 +9,7 @@
 		"build:client": "tsc --noEmit && next build --turbopack",
 		"deploy:convex+build": "cd ../../packages/server && bunx convex deploy --cmd='cd ../../apps/web && next build --turbopack'",
 		"start": "next start",
-		"typecheck": "tsc --noEmit",
+		"check-types": "tsc --noEmit",
 		"lint": "biome check",
 		"format": "biome format --write"
 	},
@@ -85,7 +85,9 @@
 		"use-stick-to-bottom": "^1.1.1",
 		"vaul": "^1.1.2",
 		"wavesurfer.js": "^7.11.0",
-		"zod": "^4.1.11"
+		"zod": "^4.1.11",
+		"jotai-xstate": "^0.6.1",
+		"xstate": "^5.23.0"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.2.0",

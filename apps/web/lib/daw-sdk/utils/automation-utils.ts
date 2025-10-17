@@ -105,9 +105,9 @@ export function transferAutomationEnvelope(
 		idMap.set(point.id, newId);
 
 		const newPoint: TrackEnvelopePoint = {
-		...point,
+			...point,
 			id: newId,
-		time: point.time + offset,
+			time: point.time + offset,
 		};
 
 		// If target clip ID provided, bind the point to the clip

@@ -130,17 +130,17 @@ export function EnvelopeEditor({
 										<div className="text-xs font-medium text-muted-foreground">
 											Point {index + 1}
 										</div>
-									{sortedPoints.length > 1 && (
-										<Button
-											variant="ghost"
-											size="icon-sm"
-											onClick={() => handlePointRemove(point.id)}
-											title="Remove point"
-											aria-label="Remove point"
-										>
-											<X className="size-3" />
-										</Button>
-									)}
+										{sortedPoints.length > 1 && (
+											<Button
+												variant="ghost"
+												size="icon-sm"
+												onClick={() => handlePointRemove(point.id)}
+												title="Remove point"
+												aria-label="Remove point"
+											>
+												<X className="size-3" />
+											</Button>
+										)}
 									</div>
 
 									<div className="grid grid-cols-2 gap-2">

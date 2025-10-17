@@ -3,7 +3,8 @@
 	"version": "1.0.0",
 	"scripts": {
 		"dev": "convex dev",
-		"dev:setup": "convex dev --configure --until-success"
+		"dev:setup": "convex dev --configure --until-success",
+		"deploy": "bunx convex deploy --cmd='cd ../../apps/web && next build --turbopack'"
 	},
 	"author": "",
 	"license": "ISC",

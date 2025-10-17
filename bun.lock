@@ -3,10 +3,6 @@
   "workspaces": {
     "": {
       "name": "wav0",
-      "dependencies": {
-        "jotai-xstate": "^0.6.1",
-        "xstate": "^5.23.0",
-      },
       "devDependencies": {
         "@biomejs/biome": "2.2.4",
         "turbo": "^2.5.8",
@@ -67,6 +63,7 @@
         "embla-carousel-react": "^8.6.0",
         "idb-keyval": "^6.2.2",
         "jotai": "^2.15.0",
+        "jotai-xstate": "^0.6.1",
         "lucide-react": "^0.544.0",
         "mediabunny": "^1.23.0",
         "motion": "^12.23.22",
@@ -88,6 +85,7 @@
         "use-stick-to-bottom": "^1.1.1",
         "vaul": "^1.1.2",
         "wavesurfer.js": "^7.11.0",
+        "xstate": "^5.23.0",
         "zod": "^4.1.11",
       },
       "devDependencies": {

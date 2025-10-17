@@ -84,14 +84,14 @@ export function DAWTrackList() {
 	const handleVolumeChange = (trackId: string, volume: number) => {
 		// Convert volume percentage to dB
 		const volumeDb = volumeToDb(volume);
-		
+
 		// Check if track exists
-		const track = tracks.find(t => t.id === trackId);
+		const track = tracks.find((t) => t.id === trackId);
 		if (!track) return;
-		
+
 		// Update state
 		updateTrack(trackId, { volume, volumeDb });
-		
+
 		// If playing, use realtime update to avoid disrupting automation
 		if (playback.isPlaying) {
 			playbackService.updateTrackVolumeRealtime(trackId, volumeDb);

@@ -1,32 +1,28 @@
 {
-    "name": "wav0",
-    "private": true,
-    "type": "module",
-    "workspaces": [
-        "apps/*",
-        "packages/*",
-        "tooling/*"
-    ],
-    "scripts": {
-        "check": "biome check --write .",
-        "format": "biome format --write .",
-        "dev": "turbo dev",
-        "build": "turbo build",
-        "lint": "turbo lint",
-        "check-types": "turbo check-types",
-        "dev:native": "turbo -F native dev",
-        "dev:web": "turbo -F web dev",
-        "dev:server": "turbo -F @wav0/backend dev",
-        "dev:setup": "turbo -F @wav0/backend dev:setup"
-    },
-    "dependencies": {
-        "jotai-xstate": "^0.6.1",
-        "xstate": "^5.23.0"
-    },
-    "devDependencies": {
-        "turbo": "^2.5.8",
-        "@biomejs/biome": "2.2.4",
-        "ultracite": "5.4.7"
-    },
-    "packageManager": "bun@1.2.23"
+	"name": "wav0",
+	"private": true,
+	"type": "module",
+	"workspaces": [
+		"apps/*",
+		"packages/*",
+		"tooling/*"
+	],
+	"scripts": {
+		"check": "biome check --write .",
+		"format": "biome format --write .",
+		"dev": "turbo dev",
+		"build": "turbo build",
+		"lint": "turbo lint",
+		"deploy": "turbo deploy",
+		"check-types": "turbo check-types",
+		"dev:web": "turbo -F @wav0/web dev",
+		"dev:server": "turbo -F @wav0/backend dev",
+		"dev:setup": "turbo -F @wav0/backend dev:setup"
+	},
+	"devDependencies": {
+		"turbo": "^2.5.8",
+		"@biomejs/biome": "2.2.4",
+		"ultracite": "5.4.7"
+	},
+	"packageManager": "bun@1.2.23"
 }
