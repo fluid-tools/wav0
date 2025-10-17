@@ -4,6 +4,7 @@ import {
 	type Clip,
 	clipInspectorOpenAtom,
 	clipInspectorTargetAtom,
+	migrateAutomationToSegments,
 	type TrackEnvelope,
 	type TrackEnvelopePoint,
 	tracksAtom,
@@ -71,7 +72,6 @@ export function useClipInspector() {
 		if (!current) return;
 
 		// Auto-migrate and normalize
-		const { migrateAutomationToSegments } = require("@/lib/daw-sdk");
 		const migrated = migrateAutomationToSegments(envelope);
 
 		const normalized = {

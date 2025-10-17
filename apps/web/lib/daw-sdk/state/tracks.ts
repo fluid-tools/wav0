@@ -1,6 +1,7 @@
 import { atom } from "jotai";
 import { generateTrackId } from "@/lib/storage/opfs";
 import { audioService, playbackService } from "../index";
+import { migrateAutomationToSegments } from "../utils/automation-utils";
 import { volumeToDb } from "../utils/volume-utils";
 import {
 	playbackAtom,
@@ -53,9 +54,6 @@ export const updateTrackAtom = atom(
 			if (track.id !== trackId) return track;
 			if (updates.volumeEnvelope) {
 				// Auto-migrate envelope if needed
-				const {
-					migrateAutomationToSegments,
-				} = require("../utils/automation-utils");
 				const migrated = migrateAutomationToSegments(updates.volumeEnvelope);
 
 				const normalizedEnvelope: TrackEnvelope = {

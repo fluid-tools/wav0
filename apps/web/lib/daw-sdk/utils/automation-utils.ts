@@ -6,6 +6,7 @@ import type {
 	TrackEnvelopePoint,
 	TrackEnvelopeSegment,
 } from "../types/schemas";
+import { evaluateSegmentCurve } from "./curve-functions";
 
 /**
  * Convert absolute automation point to clip-relative
@@ -235,7 +236,6 @@ export function getEnvelopeMultiplierAtTime(
 			const curve = segment?.curve ?? 0;
 
 			// Use new curve evaluation
-			const { evaluateSegmentCurve } = require("./curve-functions");
 			return evaluateSegmentCurve(p1.value, p2.value, progress, curve);
 		}
 	}
