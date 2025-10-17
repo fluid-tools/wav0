@@ -60,6 +60,8 @@ const models = [
 	},
 ];
 
+export const dynamic = "force-dynamic";
+
 export default function ChatBotDemo() {
 	const [input, setInput] = useState("");
 	const [model, setModel] = useState<string>(models[0].value);
