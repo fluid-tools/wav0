@@ -306,9 +306,15 @@ export function migrateAutomationToSegments(
 		return envelope; // Already migrated
 	}
 
+	// Old envelope point format with curve/curveShape on points
+	type LegacyEnvelopePoint = TrackEnvelopePoint & {
+		curve?: string;
+		curveShape?: number;
+	};
+
 	// Check if old format (points with curve/curveShape)
 	const hasOldFormat = envelope.points.some(
-		(p: any) => p.curve !== undefined || p.curveShape !== undefined,
+		(p): p is LegacyEnvelopePoint => "curve" in p || "curveShape" in p,
 	);
 
 	if (!hasOldFormat) {
@@ -317,7 +323,8 @@ export function migrateAutomationToSegments(
 	}
 
 	// Migrate old format
-	const points: TrackEnvelopePoint[] = envelope.points.map((p: any) => ({
+	const legacyPoints = envelope.points as LegacyEnvelopePoint[];
+	const points: TrackEnvelopePoint[] = legacyPoints.map((p) => ({
 		id: p.id,
 		time: p.time,
 		value: p.value,
@@ -328,14 +335,12 @@ export function migrateAutomationToSegments(
 
 	// Generate segments from old point curves
 	const segments: TrackEnvelopeSegment[] = [];
-	for (let i = 0; i < envelope.points.length - 1; i++) {
-		const fromPoint: any = envelope.points[i];
-		const toPoint: any = envelope.points[i + 1];
+	for (let i = 0; i < legacyPoints.length - 1; i++) {
+		const fromPoint = legacyPoints[i];
+		const toPoint = legacyPoints[i + 1];
 
-		const curve = convertOldCurveToNew(
-			fromPoint.curve ?? "linear",
-			fromPoint.curveShape ?? 0.5,
-		);
+		const curveType = (fromPoint.curve ?? "linear") as CurveType;
+		const curve = convertOldCurveToNew(curveType, fromPoint.curveShape ?? 0.5);
 
 		segments.push({
 			id: crypto.randomUUID(),

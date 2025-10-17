@@ -25,7 +25,7 @@ export const addTrackAtom = atom(null, (get, set, track: Omit<Track, "id">) => {
 						value: clampEnvelopeGain(point.value),
 					})),
 				}
-			: createDefaultEnvelope(track.volume),
+			: createDefaultEnvelope(track.volume ?? 75),
 	};
 	set(tracksAtom, [...tracks, newTrack]);
 	return newTrack.id;

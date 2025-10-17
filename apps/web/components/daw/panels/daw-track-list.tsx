@@ -159,9 +159,10 @@ export function DAWTrackList() {
 					const trackHeight = Math.round(
 						DAW_HEIGHTS.TRACK_ROW * trackHeightZoom,
 					);
-					const dbValue = volumeToDb(track.volume);
+					const trackVolume = track.volume ?? 75;
+					const dbValue = volumeToDb(trackVolume);
 					const volumeLabel =
-						track.volume <= 0 || track.muted ? "Muted" : formatDb(dbValue);
+						trackVolume <= 0 || track.muted ? "Muted" : formatDb(dbValue);
 					const setVolumeFromDb = (db: number) => {
 						const volumeValue = dbToVolume(db);
 						updateTrack(track.id, {

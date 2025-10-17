@@ -225,7 +225,7 @@ export function EnvelopeEditor({
 													onChange={(e) =>
 														handleSegmentCurveChange(
 															segment.id,
-															parseInt(e.target.value),
+															parseInt(e.target.value, 10),
 														)
 													}
 													className="w-full h-2 rounded-lg appearance-none cursor-pointer bg-muted"
@@ -289,7 +289,7 @@ function parseDuration(str: string): number | null {
 	}
 	if (parts.length === 2) {
 		// Minutes:seconds
-		const minutes = parseInt(parts[0]);
+		const minutes = parseInt(parts[0], 10);
 		const seconds = parseFloat(parts[1]);
 		if (Number.isFinite(minutes) && Number.isFinite(seconds)) {
 			return minutes * 60 * 1000 + seconds * 1000;
