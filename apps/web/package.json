@@ -5,8 +5,9 @@
 	"type": "module",
 	"scripts": {
 		"dev": "next dev --turbopack",
-		"build": "tsc --noEmit && cd ../../packages/server && bunx convex deploy --cmd='cd ../../apps/web && next build --turbopack'",
+		"build": "tsc --noEmit && next build --turbopack",
 		"build:client": "tsc --noEmit && next build --turbopack",
+		"deploy:convex+build": "cd ../../packages/server && bunx convex deploy --cmd='cd ../../apps/web && next build --turbopack'",
 		"start": "next start",
 		"typecheck": "tsc --noEmit",
 		"lint": "biome check",

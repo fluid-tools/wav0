@@ -418,6 +418,50 @@ export class PlaybackService {
 
 	synchronizeTracks(tracks: Track[]): void {
 		this.applySnapshot(tracks);
+
+		// If playing, stop lingering sources and reschedule all clips
+		if (!this.isPlaying || !this.audioContext) return;
+
+		for (const track of tracks) {
+			const trackState = this.tracks.get(track.id);
+			if (!trackState) continue;
+
+			const clips =
+				track.clips && track.clips.length > 0
+					? track.clips
+					: track.opfsFileId
+						? [
+								{
+									id: track.id,
+									name: track.name,
+									opfsFileId: track.opfsFileId,
+									startTime: track.startTime,
+									trimStart: track.trimStart,
+									trimEnd: track.trimEnd,
+									color: track.color,
+									sourceDurationMs: track.duration,
+								} as Clip,
+							]
+						: [];
+
+			// 1) Stop lingering clip states for clips no longer on this track
+			const presentIds = new Set(clips.map((c) => c.id));
+			for (const [clipId] of trackState.clipStates) {
+				if (!presentIds.has(clipId)) {
+					this.stopClipState(track.id, clipId).catch(console.error);
+				}
+			}
+
+			// 2) Stop+reschedule all clips to realign absolute AC times post-move
+			for (const clip of clips) {
+				if (!clip.opfsFileId) continue;
+				this.stopClipState(track.id, clip.id)
+					.then(() => {
+						this.scheduleClip(track, clip, trackState);
+					})
+					.catch(console.error);
+			}
+		}
 	}
 
 	async initializeWithTracks(tracks: Track[]): Promise<void> {

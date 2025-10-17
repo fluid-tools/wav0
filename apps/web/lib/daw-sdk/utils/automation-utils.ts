@@ -105,9 +105,9 @@ export function transferAutomationEnvelope(
 		idMap.set(point.id, newId);
 
 		const newPoint: TrackEnvelopePoint = {
-			...point,
+		...point,
 			id: newId,
-			time: point.time + offset,
+		time: point.time + offset,
 		};
 
 		// If target clip ID provided, bind the point to the clip
@@ -187,7 +187,7 @@ export function removeAutomationPointsInRangeTrack(
 		return track;
 	}
 
-	const updatedEnvelope = removeAutomationPointsInRange(
+	const updatedEnvelope = removeEnvelopeAutomationPointsInRange(
 		envelope,
 		startTime,
 		endTime,
@@ -469,7 +469,7 @@ export function shiftAutomationInRangeTrack(
 		return track;
 	}
 
-	const updatedEnvelope = shiftAutomationInRange(
+	const updatedEnvelope = shiftEnvelopeAutomationInRange(
 		envelope,
 		startTime,
 		endTime,
@@ -616,20 +616,22 @@ export function rebuildAdjacencyEnvelope(
 }
 
 /**
- * Shift automation points in range [startMs, endMs] by deltaMs
+ * Shift envelope automation points in range [startMs, endMs] by deltaMs
  * Range is inclusive on both endpoints
  * Preserves segment curves and enforces invariants
+ * @internal Use shiftTrackAutomationInRange for track-level operations
  */
-export function shiftAutomationInRange(
+export function shiftEnvelopeAutomationInRange(
 	envelope: TrackEnvelope,
 	startMs: number,
 	endMs: number,
 	deltaMs: number,
 ): TrackEnvelope {
-	const shifted = envelope.points.map((point) => {
+	const points = envelope.points || [];
+	const shifted = points.map((point) => {
 		// Inclusive range check
 		if (point.time >= startMs && point.time <= endMs) {
-			return { ...point, time: point.time + deltaMs };
+			return { ...point, time: Math.max(0, point.time + deltaMs) };
 		}
 		return point;
 	});
@@ -644,24 +646,26 @@ export function shiftAutomationInRange(
 }
 
 /**
- * Remove automation points in range [startMs, endMs]
+ * Remove envelope automation points in range [startMs, endMs]
  * Range is inclusive on both endpoints
  * Removes segments referencing deleted points and enforces invariants
+ * @internal Use removeTrackAutomationPointsInRange for track-level operations
  */
-export function removeAutomationPointsInRange(
+export function removeEnvelopeAutomationPointsInRange(
 	envelope: TrackEnvelope,
 	startMs: number,
 	endMs: number,
 ): TrackEnvelope {
+	const points = envelope.points || [];
 	// Find points to remove (inclusive range)
 	const removeIds = new Set(
-		envelope.points
+		points
 			.filter((point) => point.time >= startMs && point.time <= endMs)
 			.map((p) => p.id),
 	);
 
 	// Remove points
-	const remainingPoints = envelope.points.filter((p) => !removeIds.has(p.id));
+	const remainingPoints = points.filter((p) => !removeIds.has(p.id));
 
 	// Remove segments that reference removed points
 	const remainingSegments = (envelope.segments || []).filter(
@@ -676,4 +680,70 @@ export function removeAutomationPointsInRange(
 
 	// Rebuild to enforce invariants
 	return rebuildAdjacencyEnvelope(updated);
+}
+
+/**
+ * Shift track automation points in range [startMs, endMs] by deltaMs
+ * Null-safe track-level wrapper that handles missing envelopes
+ * Range is inclusive; clamps times to ≥ 0; rebuilds adjacency
+ */
+export function shiftTrackAutomationInRange(
+	track: Track,
+	startMs: number,
+	endMs: number,
+	deltaMs: number,
+): Track {
+	const envelope = track.volumeEnvelope ?? {
+		enabled: true,
+		points: [],
+		segments: [],
+	};
+
+	if (!envelope.points || envelope.points.length === 0) {
+		return track;
+	}
+
+	const updatedEnvelope = shiftEnvelopeAutomationInRange(
+		envelope,
+		startMs,
+		endMs,
+		deltaMs,
+	);
+
+	return {
+		...track,
+		volumeEnvelope: updatedEnvelope,
+	};
+}
+
+/**
+ * Remove track automation points in range [startMs, endMs]
+ * Null-safe track-level wrapper that handles missing envelopes
+ * Range is inclusive; cleans up orphan segments; rebuilds adjacency
+ */
+export function removeTrackAutomationPointsInRange(
+	track: Track,
+	startMs: number,
+	endMs: number,
+): Track {
+	const envelope = track.volumeEnvelope ?? {
+		enabled: true,
+		points: [],
+		segments: [],
+	};
+
+	if (!envelope.points || envelope.points.length === 0) {
+		return track;
+	}
+
+	const updatedEnvelope = removeEnvelopeAutomationPointsInRange(
+		envelope,
+		startMs,
+		endMs,
+	);
+
+	return {
+		...track,
+		volumeEnvelope: updatedEnvelope,
+	};
 }

@@ -32,8 +32,8 @@ import {
 } from "@/lib/daw-sdk";
 import {
 	countAutomationPointsInRange,
-	removeAutomationPointsInRange,
-	shiftAutomationInRange,
+	removeTrackAutomationPointsInRange,
+	shiftTrackAutomationInRange,
 	transferAutomationEnvelope,
 } from "@/lib/daw-sdk/utils/automation-utils";
 import { formatDuration } from "@/lib/storage/opfs";
@@ -339,212 +339,221 @@ export function DAWTrackContent() {
 		};
 
 		const onUp = () => {
-			// Commit drag if preview exists
-			if (dragPreview && draggingClip) {
-				const originalTrack = tracks.find(
-					(t) => t.id === dragPreview.originalTrackId,
-				);
-				const targetTrack = tracks.find(
-					(t) => t.id === dragPreview.previewTrackId,
-				);
-				const clip = originalTrack?.clips?.find(
-					(c) => c.id === dragPreview.clipId,
-				);
+			try {
+				// Commit drag if preview exists
+				if (dragPreview && draggingClip) {
+					const originalTrack = tracks.find(
+						(t) => t.id === dragPreview.originalTrackId,
+					);
+					const targetTrack = tracks.find(
+						(t) => t.id === dragPreview.previewTrackId,
+					);
+					const clip = originalTrack?.clips?.find(
+						(c) => c.id === dragPreview.clipId,
+					);
 
-				if (originalTrack && targetTrack && clip) {
-					const isSameTrack =
-						dragPreview.originalTrackId === dragPreview.previewTrackId;
-					const moved =
-						!isSameTrack ||
-						dragPreview.originalStartTime !== dragPreview.previewStartTime;
+					if (originalTrack && targetTrack && clip) {
+						const isSameTrack =
+							dragPreview.originalTrackId === dragPreview.previewTrackId;
+						const moved =
+							!isSameTrack ||
+							dragPreview.originalStartTime !== dragPreview.previewStartTime;
 
-					if (moved) {
-						const clipDurationMs = clip.trimEnd - clip.trimStart;
-						const clipEndTime = clip.startTime + clipDurationMs;
-						const deltaMs =
-							dragPreview.previewStartTime - dragPreview.originalStartTime;
+						if (moved) {
+							const clipDurationMs = clip.trimEnd - clip.trimStart;
+							const clipEndTime = clip.startTime + clipDurationMs;
+							const deltaMs =
+								dragPreview.previewStartTime - dragPreview.originalStartTime;
 
-						if (isSameTrack) {
-							// Same track: in-place update with automation shift
-							if (playback.isPlaying) {
-								playbackService
-									.stopClip(originalTrack.id, clip.id)
-									.catch(console.error);
-							}
+							if (isSameTrack) {
+								// Same track: in-place update with automation shift
+								if (playback.isPlaying) {
+									playbackService
+										.stopClip(originalTrack.id, clip.id)
+										.catch(console.error);
+								}
 
-							setTracks((prev) => {
-								const updated = prev.map((t) => {
-									if (t.id === originalTrack.id) {
-										const updatedClip = {
-											...clip,
-											startTime: dragPreview.previewStartTime,
-										};
-										const updatedTrack = {
-											...t,
-											clips: (t.clips ?? []).map((c) =>
-												c.id === clip.id ? updatedClip : c,
-											),
-										};
-										// Shift automation points by delta
-										return shiftAutomationInRange(
-											updatedTrack,
+								setTracks((prev) => {
+									const updated = prev.map((t) => {
+										if (t.id === originalTrack.id) {
+											const updatedClip = {
+												...clip,
+												startTime: dragPreview.previewStartTime,
+											};
+											const updatedTrack = {
+												...t,
+												clips: (t.clips ?? []).map((c) =>
+													c.id === clip.id ? updatedClip : c,
+												),
+											};
+											// Shift automation points by delta using track wrapper
+											return shiftTrackAutomationInRange(
+												updatedTrack,
+												clip.startTime,
+												clipEndTime,
+												deltaMs,
+											);
+										}
+										return t;
+									});
+									playbackService.synchronizeTracks(updated);
+									return updated;
+								});
+
+								setMoveHistory((prev) => {
+									const now = Date.now();
+									const recent = prev[0];
+									// Coalesce undo toasts within 100ms
+									if (recent && now - recent.timestamp < 100) {
+										return prev;
+									}
+									return [
+										{
+											clipId: clip.id,
+											fromTrackId: originalTrack.id,
+											toTrackId: targetTrack.id,
+											fromStartTime: dragPreview.originalStartTime,
+											toStartTime: dragPreview.previewStartTime,
+											automationData: null,
+											timestamp: now,
+										},
+										...prev.slice(0, 9),
+									];
+								});
+							} else {
+								// Cross-track: transfer automation
+								const hasAutomation =
+									originalTrack.volumeEnvelope?.enabled ?? false;
+								const automationCount = hasAutomation
+									? countAutomationPointsInRange(
+											originalTrack,
 											clip.startTime,
 											clipEndTime,
-											deltaMs,
-										);
-									}
-									return t;
-								});
-								playbackService.synchronizeTracks(updated);
-								return updated;
-							});
+										)
+									: 0;
 
-							setMoveHistory((prev) => {
-								const now = Date.now();
-								const recent = prev[0];
-								// Coalesce undo toasts within 100ms
-								if (recent && now - recent.timestamp < 100) {
-									return prev;
+								let automationData: {
+									points: TrackEnvelopePoint[];
+									segments: TrackEnvelopeSegment[];
+								} | null = null;
+								if (automationCount > 0) {
+									const { pointsToTransfer, segmentsToTransfer } =
+										transferAutomationEnvelope(
+											originalTrack,
+											targetTrack,
+											clip.startTime,
+											clipEndTime,
+											dragPreview.previewStartTime,
+											clip.id,
+										);
+									automationData = {
+										points: pointsToTransfer,
+										segments: segmentsToTransfer,
+									};
 								}
-								return [
+
+								if (playback.isPlaying) {
+									playbackService
+										.stopClip(originalTrack.id, clip.id)
+										.catch(console.error);
+								}
+
+								setTracks((prev) => {
+									const updated = prev.map((t) => {
+										if (t.id === originalTrack.id) {
+											const updatedTrack = {
+												...t,
+												clips: t.clips?.filter((c) => c.id !== clip.id) ?? [],
+											};
+											if (automationData) {
+												// Use track wrapper to remove automation
+												return removeTrackAutomationPointsInRange(
+													updatedTrack,
+													clip.startTime,
+													clipEndTime,
+												);
+											}
+											return updatedTrack;
+										}
+										if (t.id === targetTrack.id) {
+											const movedClip = {
+												...clip,
+												startTime: dragPreview.previewStartTime,
+											};
+											let updatedTrack: typeof t = {
+												...t,
+												clips: [...(t.clips ?? []), movedClip],
+											};
+											if (automationData) {
+												const currentEnv = updatedTrack.volumeEnvelope || {
+													enabled: true,
+													points: [],
+													segments: [],
+												};
+												updatedTrack = {
+													...updatedTrack,
+													volumeEnvelope: {
+														...currentEnv,
+														enabled: true,
+														points: [
+															...(currentEnv.points || []),
+															...automationData.points,
+														].sort((a, b) => a.time - b.time),
+														segments: [
+															...(currentEnv.segments || []),
+															...automationData.segments,
+														],
+													},
+												};
+											}
+											return updatedTrack;
+										}
+										return t;
+									});
+									playbackService.synchronizeTracks(updated);
+									return updated;
+								});
+
+								setMoveHistory((prev) => [
 									{
 										clipId: clip.id,
 										fromTrackId: originalTrack.id,
 										toTrackId: targetTrack.id,
 										fromStartTime: dragPreview.originalStartTime,
 										toStartTime: dragPreview.previewStartTime,
-										automationData: null,
-										timestamp: now,
+										automationData,
+										timestamp: Date.now(),
 									},
 									...prev.slice(0, 9),
-								];
-							});
-						} else {
-							// Cross-track: transfer automation
-							const hasAutomation =
-								originalTrack.volumeEnvelope?.enabled ?? false;
-							const automationCount = hasAutomation
-								? countAutomationPointsInRange(
-										originalTrack,
-										clip.startTime,
-										clipEndTime,
-									)
-								: 0;
-
-							let automationData: {
-								points: TrackEnvelopePoint[];
-								segments: TrackEnvelopeSegment[];
-							} | null = null;
-							if (automationCount > 0) {
-								const { pointsToTransfer, segmentsToTransfer } =
-									transferAutomationEnvelope(
-										originalTrack,
-										targetTrack,
-										clip.startTime,
-										clipEndTime,
-										dragPreview.previewStartTime,
-										clip.id,
-									);
-								automationData = {
-									points: pointsToTransfer,
-									segments: segmentsToTransfer,
-								};
+								]);
 							}
-
-							if (playback.isPlaying) {
-								playbackService
-									.stopClip(originalTrack.id, clip.id)
-									.catch(console.error);
-							}
-
-							setTracks((prev) => {
-								const updated = prev.map((t) => {
-									if (t.id === originalTrack.id) {
-										const updatedTrack = {
-											...t,
-											clips: t.clips?.filter((c) => c.id !== clip.id) ?? [],
-										};
-										if (automationData) {
-											return removeAutomationPointsInRange(
-												updatedTrack,
-												clip.startTime,
-												clipEndTime,
-											);
-										}
-										return updatedTrack;
-									}
-									if (t.id === targetTrack.id) {
-										const movedClip = {
-											...clip,
-											startTime: dragPreview.previewStartTime,
-										};
-										let updatedTrack: typeof t = {
-											...t,
-											clips: [...(t.clips ?? []), movedClip],
-										};
-										if (automationData) {
-											const currentEnv = updatedTrack.volumeEnvelope || {
-												enabled: true,
-												points: [],
-												segments: [],
-											};
-											updatedTrack = {
-												...updatedTrack,
-												volumeEnvelope: {
-													...currentEnv,
-													enabled: true,
-													points: [
-														...(currentEnv.points || []),
-														...automationData.points,
-													].sort((a, b) => a.time - b.time),
-													segments: [
-														...(currentEnv.segments || []),
-														...automationData.segments,
-													],
-												},
-											};
-										}
-										return updatedTrack;
-									}
-									return t;
-								});
-								playbackService.synchronizeTracks(updated);
-								return updated;
-							});
-
-							setMoveHistory((prev) => [
-								{
-									clipId: clip.id,
-									fromTrackId: originalTrack.id,
-									toTrackId: targetTrack.id,
-									fromStartTime: dragPreview.originalStartTime,
-									toStartTime: dragPreview.previewStartTime,
-									automationData,
-									timestamp: Date.now(),
-								},
-								...prev.slice(0, 9),
-							]);
 						}
 					}
 				}
-
-				// Send DROP event to machine
+			} catch (error) {
+				console.error("Error committing drag:", error);
+			} finally {
+				// Always finalize drag state
 				sendDragEvent({ type: "DROP" });
+				lastPointer.current = null;
+				setResizingClip(null);
+				setDraggingClip(null);
+				setLoopDragging(null);
+				if (raf) cancelAnimationFrame(raf);
 			}
-
-			// Clear states
-			lastPointer.current = null;
-			setResizingClip(null);
-			setDraggingClip(null);
-			setLoopDragging(null);
-			if (raf) cancelAnimationFrame(raf);
 		};
+
+		const onCancel = onUp; // Same finalization logic
 
 		window.addEventListener("mousemove", onMove);
 		window.addEventListener("mouseup", onUp);
+		window.addEventListener("pointercancel", onCancel);
+		window.addEventListener("blur", onCancel);
 		return () => {
 			window.removeEventListener("mousemove", onMove);
 			window.removeEventListener("mouseup", onUp);
+			window.removeEventListener("pointercancel", onCancel);
+			window.removeEventListener("blur", onCancel);
 			if (raf) cancelAnimationFrame(raf);
 		};
 	}, [
@@ -567,7 +576,12 @@ export function DAWTrackContent() {
 
 	return (
 		<>
-			<div ref={containerRef} className="relative w-full h-full" data-daw-grid>
+			<div
+				ref={containerRef}
+				className="relative w-full h-full"
+				data-daw-grid
+				data-dragging={draggingClip ? "true" : undefined}
+			>
 				{tracks.map((track, index) => {
 					// Track row layout
 					const trackHeight = Math.round(
