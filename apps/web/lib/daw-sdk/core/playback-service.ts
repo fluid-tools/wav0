@@ -52,6 +52,11 @@ export class PlaybackService {
 	private nodeStartTimes = new WeakMap<AudioBufferSourceNode, number>();
 	private trackMuteState = new Map<string, boolean>();
 	private currentTracks = new Map<string, Track>();
+	// Global clip registry: enforces one-track-per-clip ownership
+	private activeClips = new Map<
+		string,
+		{ trackId: string; clipState: ClipPlaybackState }
+	>();
 
 	private constructor() {}
 
@@ -146,6 +151,83 @@ export class PlaybackService {
 
 	async stopClip(trackId: string, clipId: string): Promise<void> {
 		await this.stopClipState(trackId, clipId);
+	}
+
+	/**
+	 * Stop clip globally (removes from global registry)
+	 * Ensures clip audio fully disconnects before removal
+	 */
+	private async stopClipGlobal(clipId: string): Promise<void> {
+		const active = this.activeClips.get(clipId);
+		if (!active) return;
+
+		const clipState = active.clipState;
+
+		// Stop iterator
+		try {
+			if (clipState.iterator?.return) {
+				await clipState.iterator.return();
+			}
+		} catch (error) {
+			console.warn("Failed to close clip iterator", clipId, error);
+		}
+		clipState.iterator = null;
+		clipState.generation = (clipState.generation ?? 0) + 1;
+
+		// Stop all audio sources
+		for (const node of clipState.audioSources) {
+			try {
+				node.stop();
+				node.disconnect();
+			} catch (error) {
+				console.warn("Failed to stop audio source", clipId, error);
+			}
+		}
+		clipState.audioSources = [];
+
+		// Disconnect gain node
+		if (clipState.gainNode) {
+			try {
+				clipState.gainNode.disconnect();
+			} catch (error) {
+				console.warn("Failed to disconnect clip gain", clipId, error);
+			}
+			clipState.gainNode = null;
+		}
+
+		// Remove from global registry
+		this.activeClips.delete(clipId);
+	}
+
+	/**
+	 * Start clip globally (adds to global registry)
+	 * Creates gain chain and schedules audio playback
+	 */
+	private async startClipGlobal(
+		clip: Clip,
+		track: Track,
+		trackState: TrackPlaybackState,
+	): Promise<void> {
+		if (!this.audioContext || !clip.opfsFileId) return;
+
+		// Create clip-level gain node for fades
+		const gainNode = this.audioContext.createGain();
+		if (trackState.envelopeGainNode) {
+			gainNode.connect(trackState.envelopeGainNode);
+		}
+
+		const clipState: ClipPlaybackState = {
+			iterator: null,
+			gainNode,
+			audioSources: [],
+			generation: 0,
+		};
+
+		// Register globally BEFORE scheduling audio
+		this.activeClips.set(clip.id, { trackId: track.id, clipState });
+
+		// Schedule audio using existing logic
+		await this.scheduleClipWithState(track, clip, trackState, clipState);
 	}
 
 	private cancelGainAutomation(gain: AudioParam, atTime: number): void {
@@ -419,13 +501,24 @@ export class PlaybackService {
 	synchronizeTracks(tracks: Track[]): void {
 		this.applySnapshot(tracks);
 
-		// If playing, stop lingering sources and reschedule all clips
-		if (!this.isPlaying || !this.audioContext) return;
+		// Fire async sync without blocking (use global registry)
+		if (this.isPlaying && this.audioContext) {
+			this.synchronizeClipsGlobal(tracks).catch((err) => {
+				console.error("Failed to synchronize clips during playback:", err);
+			});
+		}
+	}
 
+	/**
+	 * Synchronize clips using global registry
+	 * Sequential: await all stops, then fire all starts
+	 */
+	private async synchronizeClipsGlobal(tracks: Track[]): Promise<void> {
+		if (!this.audioContext) return;
+
+		// Build desired state: which clips should be on which tracks
+		const desiredState = new Map<string, { clip: Clip; trackId: string }>();
 		for (const track of tracks) {
-			const trackState = this.tracks.get(track.id);
-			if (!trackState) continue;
-
 			const clips =
 				track.clips && track.clips.length > 0
 					? track.clips
@@ -444,24 +537,48 @@ export class PlaybackService {
 							]
 						: [];
 
-			// 1) Stop lingering clip states for clips no longer on this track
-			const presentIds = new Set(clips.map((c) => c.id));
-			for (const [clipId] of trackState.clipStates) {
-				if (!presentIds.has(clipId)) {
-					this.stopClipState(track.id, clipId).catch(console.error);
+			for (const clip of clips) {
+				if (clip.opfsFileId) {
+					desiredState.set(clip.id, { clip, trackId: track.id });
 				}
 			}
+		}
 
-			// 2) Stop+reschedule all clips to realign absolute AC times post-move
-			for (const clip of clips) {
-				if (!clip.opfsFileId) continue;
-				this.stopClipState(track.id, clip.id)
-					.then(() => {
-						this.scheduleClip(track, clip, trackState);
-					})
-					.catch(console.error);
+		// Phase 1: Stop clips that shouldn't be playing or are on wrong track
+		const stopsNeeded: string[] = [];
+		for (const [clipId, active] of this.activeClips) {
+			const desired = desiredState.get(clipId);
+			if (!desired || desired.trackId !== active.trackId) {
+				stopsNeeded.push(clipId);
 			}
 		}
+
+		// Await all stops sequentially to prevent race conditions
+		await Promise.all(stopsNeeded.map((clipId) => this.stopClipGlobal(clipId)));
+
+		// Phase 2: Start clips that should be playing but aren't
+		const startsNeeded: Array<{ clip: Clip; trackId: string }> = [];
+		for (const [clipId, { clip, trackId }] of desiredState) {
+			const active = this.activeClips.get(clipId);
+			if (!active || active.trackId !== trackId) {
+				const trackState = this.tracks.get(trackId);
+				if (trackState) {
+					startsNeeded.push({ clip, trackId });
+				}
+			}
+		}
+
+		// Fire all starts (can be parallel after stops complete)
+		await Promise.all(
+			startsNeeded.map(({ clip, trackId }) => {
+				const track = tracks.find((t) => t.id === trackId);
+				const trackState = this.tracks.get(trackId);
+				if (track && trackState) {
+					return this.startClipGlobal(clip, track, trackState);
+				}
+				return Promise.resolve();
+			}),
+		);
 	}
 
 	async initializeWithTracks(tracks: Track[]): Promise<void> {
@@ -507,6 +624,9 @@ export class PlaybackService {
 		this.startMeterUpdates();
 		this.applySnapshot(tracks);
 
+		// Clear global registry before fresh play
+		this.activeClips.clear();
+
 		for (const track of tracks) {
 			const trackState = this.tracks.get(track.id);
 			if (!trackState) continue;
@@ -540,7 +660,8 @@ export class PlaybackService {
 
 			for (const clip of clips) {
 				if (!clip.opfsFileId) continue;
-				await this.scheduleClip(track, clip, trackState);
+				// Use global start method
+				await this.startClipGlobal(clip, track, trackState);
 			}
 		}
 
@@ -551,6 +672,31 @@ export class PlaybackService {
 		track: Track,
 		clip: Clip,
 		trackState: TrackPlaybackState,
+	): Promise<void> {
+		// Get or create clip state from per-track map (legacy path)
+		let cps = trackState.clipStates.get(clip.id);
+		if (!cps && this.audioContext) {
+			cps = {
+				iterator: null,
+				gainNode: this.audioContext.createGain(),
+				audioSources: [],
+				generation: 0,
+			};
+			if (cps.gainNode && trackState.envelopeGainNode) {
+				cps.gainNode.connect(trackState.envelopeGainNode);
+			}
+			trackState.clipStates.set(clip.id, cps);
+		}
+		if (!cps) return;
+
+		await this.scheduleClipWithState(track, clip, trackState, cps);
+	}
+
+	private async scheduleClipWithState(
+		track: Track,
+		clip: Clip,
+		_trackState: TrackPlaybackState,
+		cps: ClipPlaybackState,
 	): Promise<void> {
 		if (!this.audioContext || !this.masterGainNode) return;
 
@@ -598,20 +744,6 @@ export class PlaybackService {
 
 		const audioFileReadStart = clipTrimStartSec + timeIntoClip;
 		if (audioFileReadStart >= clipTrimEndSec) return;
-
-		let cps = trackState.clipStates.get(clip.id);
-		if (!cps) {
-			cps = {
-				iterator: null,
-				gainNode: this.audioContext.createGain(),
-				audioSources: [],
-				generation: 0,
-			};
-			if (cps.gainNode && trackState.envelopeGainNode) {
-				cps.gainNode.connect(trackState.envelopeGainNode);
-			}
-			trackState.clipStates.set(clip.id, cps);
-		}
 
 		// Apply fade envelopes
 		try {
@@ -769,6 +901,11 @@ export class PlaybackService {
 		this.playbackTimeAtStart = this.getPlaybackTime();
 		this.isPlaying = false;
 
+		// Stop all clips via global registry
+		const clipIds = Array.from(this.activeClips.keys());
+		await Promise.all(clipIds.map((clipId) => this.stopClipGlobal(clipId)));
+
+		// Legacy per-track cleanup (for any orphaned states)
 		for (const trackState of this.tracks.values()) {
 			trackState.isPlaying = false;
 			for (const cps of trackState.clipStates.values()) {
