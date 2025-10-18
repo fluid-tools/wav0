@@ -108,27 +108,9 @@ export const updateClipAtom = atom(
 
 		set(tracksAtom, updatedTracks);
 
-		const updatedTrack = updatedTracks.find((track) => track.id === trackId);
-		if (!updatedTrack) return;
-
-		if (
-			playback.isPlaying &&
-			(updates.startTime !== undefined ||
-				updates.trimStart !== undefined ||
-				updates.trimEnd !== undefined ||
-				updates.loop !== undefined ||
-				updates.loopEnd !== undefined)
-		) {
-			try {
-				await playbackService.rescheduleTrack(updatedTrack);
-			} catch (error) {
-				console.error(
-					"Failed to reschedule track after clip update",
-					trackId,
-					clipId,
-					error,
-				);
-			}
+		// Synchronize via global path (no direct reschedule)
+		if (playback.isPlaying) {
+			playbackService.synchronizeTracks(updatedTracks);
 		}
 	},
 );
@@ -163,27 +145,9 @@ export const removeClipAtom = atom(
 			set(selectedClipIdAtom, null);
 		}
 
-		const updatedTrack = updatedTracks.find((track) => track.id === trackId);
-		if (!updatedTrack) return;
-
+		// Synchronize via global path (no direct stop/reschedule)
 		if (playback.isPlaying) {
-			try {
-				const sourceTrack = tracks.find(
-					(track) =>
-						track.id !== trackId &&
-						track.clips?.some((clip) => clip.id === clipId),
-				);
-				if (sourceTrack) {
-					await playbackService.stopClip(sourceTrack.id, clipId);
-				}
-				await playbackService.rescheduleTrack(updatedTrack);
-			} catch (error) {
-				console.error(
-					"Failed to reschedule track after clip removal",
-					trackId,
-					error,
-				);
-			}
+			playbackService.synchronizeTracks(updatedTracks);
 		}
 	},
 );
