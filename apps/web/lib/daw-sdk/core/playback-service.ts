@@ -385,7 +385,6 @@ export class PlaybackService {
 		}
 	}
 
-
 	/**
 	 * Update track volume during playback without disrupting automation
 	 * Scales the base volume that automation multiplies against
