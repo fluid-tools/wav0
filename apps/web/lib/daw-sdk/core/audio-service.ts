@@ -176,12 +176,22 @@ export class AudioService {
 	/**
 	 * Get full AudioBuffer for a track (for export/offline rendering)
 	 */
-	async getAudioBuffer(opfsFileId: string): Promise<AudioBuffer | null> {
-		const sink = this.getAudioBufferSink(opfsFileId);
-		if (!sink) return null;
-		const duration = await sink.track.computeDuration();
+	async getAudioBuffer(opfsFileId: string, fileName = ""): Promise<AudioBuffer | null> {
+		let loadedTrack = this.loadedTracks.get(opfsFileId);
+		if (!loadedTrack) {
+			// Load from OPFS if not already loaded
+			try {
+				await this.loadTrackFromOPFS(opfsFileId, fileName);
+				loadedTrack = this.loadedTracks.get(opfsFileId);
+			} catch (e) {
+				console.error(`Failed to load audio for ${opfsFileId}:`, e);
+				return null;
+			}
+		}
+		if (!loadedTrack) return null;
+		const duration = await loadedTrack.audioTrack.computeDuration();
 		const buffers: AudioBuffer[] = [];
-		for await (const { buffer } of sink.buffers(0, duration)) {
+		for await (const { buffer } of loadedTrack.sink.buffers(0, duration)) {
 			buffers.push(buffer);
 		}
 		if (buffers.length === 0) return null;

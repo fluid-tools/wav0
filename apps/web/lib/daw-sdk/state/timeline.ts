@@ -1,6 +1,7 @@
 "use client";
 
 import { atom } from "jotai";
+import { atomWithStorage } from "jotai/utils";
 import {
 	horizontalScrollAtom,
 	timelineAtom,
@@ -8,6 +9,12 @@ import {
 	zoomLimitsAtom,
 } from "./atoms";
 import type { TimelineSection } from "./types";
+
+export const loopRegionAtom = atomWithStorage("daw-loop-region", {
+	enabled: false,
+	startMs: 0,
+	endMs: 60000,
+});
 
 export const addTimelineSectionAtom = atom(
 	null,

@@ -47,13 +47,18 @@ export async function scheduleClipNodes(
 
     // Fades (basic linear; curve integration later)
     const now = (ac as AudioContext).currentTime ?? 0
-    const startT = Math.max(now, absStartSec)
+    // For OfflineAudioContext, absStartSec is timeline 0-based; schedule from absStartSec
+    const startT = Math.max(0, absStartSec)
     if (clip.fadeIn && clip.fadeIn > 0) {
+        // Cancel any previous on this param from envelope scheduling overlapping this window
+        gainNode.gain.cancelScheduledValues(startT)
         gainNode.gain.setValueAtTime(0, startT)
         gainNode.gain.linearRampToValueAtTime(1, startT + clip.fadeIn / 1000)
     }
     if (clip.fadeOut && clip.fadeOut > 0) {
-        gainNode.gain.setValueAtTime(1, startT + duration - clip.fadeOut / 1000)
+        const fadeOutStart = Math.max(0, startT + duration - clip.fadeOut / 1000)
+        gainNode.gain.cancelScheduledValues(fadeOutStart)
+        gainNode.gain.setValueAtTime(1, fadeOutStart)
         gainNode.gain.linearRampToValueAtTime(0, startT + duration)
     }
 

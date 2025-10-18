@@ -33,11 +33,15 @@ export async function renderProjectToAudioBuffer(
         const clips = track.clips || []
         for (const clip of clips) {
             if (!clip.opfsFileId) continue
-            const buf = await audioService.getAudioBuffer(clip.opfsFileId)
+            const buf = await audioService.getAudioBuffer(clip.opfsFileId, clip.audioFileName ?? clip.name ?? "")
             if (!buf) continue
             const absStartSec = clip.startTime / 1000 - startMs / 1000
             if (absStartSec + (clip.trimEnd - clip.trimStart) / 1000 < 0) continue
-            await scheduleClipNodes(ac as unknown as AudioContext, clip, trackGain, buf, Math.max(0, absStartSec))
+            // Create per-clip gain to isolate fades from track envelope automation
+            const clipGain = ac.createGain()
+            clipGain.gain.value = 1
+            clipGain.connect(trackGain)
+            await scheduleClipNodes(ac as unknown as AudioContext, clip, clipGain, buf, Math.max(0, absStartSec))
         }
     }
 
