@@ -1,0 +1,1 @@
+Spawn 1-2 background agents using cursor mcp for independent tasks that can be reviewed independently as well. Try not to overlap any major tasks, only do so when required, carefully or when specified.

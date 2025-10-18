@@ -49,7 +49,7 @@ export function useLiveAutomationGain(trackId: string): {
 			envelope.segments || [],
 			currentTimeMs,
 		);
-		const effectiveDb = getEffectiveDb(track.volume, multiplier);
+		const effectiveDb = getEffectiveDb(track.volume ?? 75, multiplier);
 		const envelopeDbValue = multiplierToDb(multiplier);
 
 		setCurrentDb(effectiveDb);

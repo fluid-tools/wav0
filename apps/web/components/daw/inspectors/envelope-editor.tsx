@@ -130,17 +130,17 @@ export function EnvelopeEditor({
 										<div className="text-xs font-medium text-muted-foreground">
 											Point {index + 1}
 										</div>
-									{sortedPoints.length > 1 && (
-										<Button
-											variant="ghost"
-											size="icon-sm"
-											onClick={() => handlePointRemove(point.id)}
-											title="Remove point"
-											aria-label="Remove point"
-										>
-											<X className="size-3" />
-										</Button>
-									)}
+										{sortedPoints.length > 1 && (
+											<Button
+												variant="ghost"
+												size="icon-sm"
+												onClick={() => handlePointRemove(point.id)}
+												title="Remove point"
+												aria-label="Remove point"
+											>
+												<X className="size-3" />
+											</Button>
+										)}
 									</div>
 
 									<div className="grid grid-cols-2 gap-2">
@@ -225,7 +225,7 @@ export function EnvelopeEditor({
 													onChange={(e) =>
 														handleSegmentCurveChange(
 															segment.id,
-															parseInt(e.target.value),
+															parseInt(e.target.value, 10),
 														)
 													}
 													className="w-full h-2 rounded-lg appearance-none cursor-pointer bg-muted"
@@ -289,7 +289,7 @@ function parseDuration(str: string): number | null {
 	}
 	if (parts.length === 2) {
 		// Minutes:seconds
-		const minutes = parseInt(parts[0]);
+		const minutes = parseInt(parts[0], 10);
 		const seconds = parseFloat(parts[1]);
 		if (Number.isFinite(minutes) && Number.isFinite(seconds)) {
 			return minutes * 60 * 1000 + seconds * 1000;

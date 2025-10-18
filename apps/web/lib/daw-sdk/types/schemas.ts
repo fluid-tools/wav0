@@ -60,7 +60,10 @@ export const TrackSchema = z.object({
 	startTime: z.number().min(0),
 	trimStart: z.number().min(0),
 	trimEnd: z.number().min(0),
-	volume: z.number().min(0).max(100),
+	// Volume in dB (pure dB system like Logic Pro)
+	volumeDb: z.number().min(Number.NEGATIVE_INFINITY).max(6).optional(),
+	// Legacy volume percentage (0-100) - kept for backward compatibility
+	volume: z.number().min(0).max(100).optional(),
 	muted: z.boolean(),
 	soloed: z.boolean(),
 	color: z.string(),
@@ -69,6 +72,7 @@ export const TrackSchema = z.object({
 	audioFileType: z.string().optional(),
 	clips: z.array(ClipSchema).optional(),
 	volumeEnvelope: TrackEnvelopeSchema.optional(),
+	schemaVersion: z.number().optional(), // Track schema version for migration
 });
 
 export const PlaybackStateSchema = z.object({

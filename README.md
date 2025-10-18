@@ -174,7 +174,7 @@ We love contributions! WAV0 is meant to be built by the community, for the commu
 
 ### Quick Start for Contributors
 
-1. **Read our [Contributing Guide](CONTRIBUTING.md)** - Comprehensive guide to getting started
+1. **Read our [Contributing Guide](.github/CONTRIBUTING.md)** - Comprehensive guide to getting started
 2. **Join our [Discord](https://discord.gg/wav0)** - Connect with other contributors and get help
 3. **Check our [Issues](https://github.com/yourusername/wav0/issues)** - Find something to work on
 4. **Fork and contribute** - Make your first contribution!
@@ -199,7 +199,7 @@ bun install
 bun dev
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed setup instructions.
+See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for detailed setup instructions.
 
 ## 📄 License
 

@@ -1,11 +1,53 @@
 /**
  * Volume and dB conversion utilities
+ *
+ * Pure dB system for accurate audio representation (Logic Pro style)
  */
 
 export const VOLUME_MIN_DB = -30;
 export const VOLUME_MAX_DB = 6;
 export const AUTOMATION_MIN_DB = -60;
 export const AUTOMATION_MAX_DB = 12;
+
+/**
+ * Convert dB to linear gain for Web Audio API
+ *
+ * Formula: gain = 10^(dB/20)
+ *
+ * Examples:
+ * - -Infinity dB → 0 gain (silence)
+ * - -60 dB → 0.001 gain (very quiet)
+ * - 0 dB → 1 gain (unity, no change)
+ * - +6 dB → ~2 gain (double amplitude)
+ *
+ * @param db Decibel value
+ * @returns Linear gain value for Web Audio API
+ */
+export function dbToGain(db: number): number {
+	if (!Number.isFinite(db) || db === Number.NEGATIVE_INFINITY) {
+		return 0;
+	}
+	return 10 ** (db / 20);
+}
+
+/**
+ * Convert linear gain to dB
+ *
+ * Formula: dB = 20 * log10(gain)
+ *
+ * Examples:
+ * - 0 gain → -Infinity dB (silence)
+ * - 0.5 gain → -6 dB (half amplitude)
+ * - 1 gain → 0 dB (unity)
+ * - 2 gain → +6 dB (double amplitude)
+ *
+ * @param gain Linear gain value
+ * @returns Decibel value
+ */
+export function gainToDb(gain: number): number {
+	if (gain <= 0) return Number.NEGATIVE_INFINITY;
+	return 20 * Math.log10(gain);
+}
 
 /**
  * Convert volume percentage (0-100) to dB

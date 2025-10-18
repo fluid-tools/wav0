@@ -5,7 +5,19 @@ import FirecrawlApp from "@mendable/firecrawl-js";
 import { tool } from "ai";
 import { z } from "zod";
 
-const app = new FirecrawlApp({ apiKey: process.env.FIRECRAWL_API_KEY });
+let client: FirecrawlApp | null = null;
+
+function getFirecrawlClient() {
+	if (client) return client;
+
+	const apiKey = process.env.FIRECRAWL_API_KEY;
+	if (!apiKey) {
+		throw new Error("FIRECRAWL_API_KEY is required at runtime");
+	}
+
+	client = new FirecrawlApp({ apiKey });
+	return client;
+}
 
 export const webSearch = tool({
 	description: "Search the web for up-to-date information",
@@ -17,7 +29,8 @@ export const webSearch = tool({
 			.describe("The URL to crawl (including http:// or https://)"),
 	}),
 	execute: async ({ urlToCrawl }) => {
-		const crawlResponse = await app.crawl(urlToCrawl, {
+		const firecrawl = getFirecrawlClient();
+		const crawlResponse = await firecrawl.crawl(urlToCrawl, {
 			limit: 1,
 			scrapeOptions: {
 				formats: ["markdown", "html"],
