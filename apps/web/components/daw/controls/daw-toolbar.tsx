@@ -34,12 +34,14 @@ import {
 	automationViewEnabledAtom,
 	eventListOpenAtom,
 	gridAtom,
+	musicalMetadataAtom,
 	projectNameAtom,
 	tracksAtom,
 } from "@/lib/daw-sdk";
 
 export function DAWToolbar() {
 	const [grid, setGrid] = useAtom(gridAtom);
+	const [music, setMusic] = useAtom(musicalMetadataAtom);
 	const [projectName, setProjectName] = useAtom(projectNameAtom);
 	const [tracks] = useAtom(tracksAtom);
 	const [, setEventListOpen] = useAtom(eventListOpenAtom);
@@ -110,6 +112,64 @@ export function DAWToolbar() {
 					style={{ height: DAW_HEIGHTS.BUTTON_MD }}
 					placeholder="Project name"
 				/>
+				{/* Tempo & Signature */}
+				<div className="flex items-center gap-2 ml-2">
+					<label className="text-xs flex items-center gap-1">
+						BPM
+						<input
+							type="number"
+							min={30}
+							max={300}
+							value={music.tempoBpm}
+							onChange={(e) =>
+								setMusic({ ...music, tempoBpm: Number(e.target.value) || 120 })
+							}
+							className="w-16 h-7 border rounded px-1 text-xs"
+						/>
+					</label>
+					<label className="text-xs flex items-center gap-1">
+						TS
+						<select
+							className="h-7 border rounded px-1 text-xs"
+							value={music.timeSignature.num}
+							onChange={(e) =>
+								setMusic({
+									...music,
+									timeSignature: {
+										num: Number(e.target.value) as any,
+										den: music.timeSignature.den,
+									},
+								})
+							}
+						>
+							{[2, 3, 4, 5, 7].map((n) => (
+								<option key={n} value={n}>
+									{n}
+								</option>
+							))}
+						</select>
+						<span>/</span>
+						<select
+							className="h-7 border rounded px-1 text-xs"
+							value={music.timeSignature.den}
+							onChange={(e) =>
+								setMusic({
+									...music,
+									timeSignature: {
+										num: music.timeSignature.num,
+										den: Number(e.target.value) as any,
+									},
+								})
+							}
+						>
+							{[2, 4, 8].map((d) => (
+								<option key={d} value={d}>
+									{d}
+								</option>
+							))}
+						</select>
+					</label>
+				</div>
 				{/* Timebase */}
 				<div className="flex items-center gap-1 ml-2">
 					<Button

@@ -216,3 +216,68 @@ export function formatBarsBeatsTicks(
     const tickStr = tick.toString().padStart(3, "0")
     return `${bar}.${beat}.${tickStr}`
 }
+
+// === Bars grid generation ===
+export function getDivisionBeats(
+    res: "1/1"|"1/2"|"1/4"|"1/8"|"1/16",
+    signature: { num: number; den: number },
+): number {
+    const denom = Number(res.split("/")[1])
+    // One division equals barsPerDivision * beatsPerBar, where beats are notated beats
+    const beatsPerBar = signature.num
+    return beatsPerBar / denom
+}
+
+export function generateBarsGrid(
+    widthPx: number,
+    pxPerMs: number,
+    bpm: number,
+    signature: { num: number; den: number },
+    res: "1/1"|"1/2"|"1/4"|"1/8"|"1/16",
+    triplet: boolean,
+    swing: number,
+): Array<{ timeMs: number; posPx: number; emphasis: "measure"|"beat"|"sub" }> {
+    if (pxPerMs <= 0 || widthPx <= 0) return []
+    const out: Array<{ timeMs: number; posPx: number; emphasis: "measure"|"beat"|"sub" }> = []
+    const secondsPerBeat = (60 / bpm) * (4 / signature.den)
+    const beatsPerBar = signature.num
+    const divisionBeats = getDivisionBeats(res, signature)
+    const subdivBeats = triplet ? divisionBeats / 3 : divisionBeats
+
+    // Iterate bars until width covered
+    const msPerBeat = secondsPerBeat * 1000
+    const msPerBar = beatsPerBar * msPerBeat
+    const maxBars = Math.ceil((widthPx / pxPerMs) / msPerBar) + 2
+
+    for (let bar = 0; bar < maxBars; bar++) {
+        const barStartMs = bar * msPerBar
+        const barPx = barStartMs * pxPerMs
+        if (barPx > widthPx) break
+        out.push({ timeMs: barStartMs, posPx: barPx, emphasis: "measure" })
+
+        for (let beat = 1; beat < beatsPerBar; beat++) {
+            const beatMs = barStartMs + beat * msPerBeat
+            const beatPx = beatMs * pxPerMs
+            if (beatPx > widthPx) break
+            out.push({ timeMs: beatMs, posPx: beatPx, emphasis: "beat" })
+        }
+
+        // Subdivisions within each beat/measure granularity
+        const subdivMs = subdivBeats * msPerBeat
+        const divisionsPerBar = beatsPerBar / subdivBeats
+        for (let i = 1; i < divisionsPerBar; i++) {
+            const subTime = barStartMs + i * subdivMs
+            let subPx = subTime * pxPerMs
+            if (swing > 0 && !triplet) {
+                // Visual bias only on even subdivisions
+                const isEven = i % 2 === 0
+                const bias = isEven ? 0 : swing * (2 / 3 - 1 / 2) * subdivMs * pxPerMs
+                subPx += bias
+            }
+            if (subPx > widthPx) break
+            out.push({ timeMs: subTime, posPx: subPx, emphasis: "sub" })
+        }
+    }
+
+    return out
+}

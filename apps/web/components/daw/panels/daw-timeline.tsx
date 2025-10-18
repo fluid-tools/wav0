@@ -40,7 +40,7 @@ export function DAWTimeline() {
 	const [, addMarker] = useAtom(addMarkerAtom);
 	const [grid] = useAtom(gridAtom);
 	const [music] = useAtom(musicalMetadataAtom);
-	const { grid: tGrid } = useTimebase();
+    const { grid: tGrid, getGridSubdivisions } = useTimebase();
 
 	// legacy marker drag removed in favor of dedicated MarkerTrack
 
@@ -180,29 +180,33 @@ export function DAWTimeline() {
 			style={{ width: timelineWidth }}
 			aria-label="Timeline - click to set playback position"
 		>
-			{/* Grids */}
-			{tGrid.mode === "bars"
-				? beatMarkers.map((marker) => (
-						<div
-							key={`beat-${marker.beat}`}
-							className={`absolute top-0 bottom-0 ${
-								marker.isMeasure ? "w-0.5 bg-border" : "w-px bg-border/50"
-							}`}
-							style={{ left: marker.position }}
-						/>
-					))
-				: timeMarkers.map((marker) => (
-						<div
-							key={`time-${marker.time}`}
-							className="absolute top-0"
-							style={{ left: marker.position }}
-						>
-							<div className="w-px h-3 bg-foreground" />
-							<span className="text-xs text-muted-foreground ml-1 font-mono">
-								{marker.label}
-							</span>
-						</div>
-					))}
+            {/* Grids */}
+            {tGrid.mode === "bars"
+                ? getGridSubdivisions(timelineWidth, pxPerMs).map((g) => (
+                        <div
+                            key={`${g.timeMs}-${g.posPx}`}
+                            className={`absolute top-0 bottom-0 ${
+                                g.emphasis === "measure"
+                                    ? "w-0.5 bg-border"
+                                    : g.emphasis === "beat"
+                                    ? "w-px bg-border/70"
+                                    : "w-px bg-border/40"
+                            }`}
+                            style={{ left: g.posPx }}
+                        />
+                  ))
+                : timeMarkers.map((marker) => (
+                        <div
+                            key={`time-${marker.time}`}
+                            className="absolute top-0"
+                            style={{ left: marker.position }}
+                        >
+                            <div className="w-px h-3 bg-foreground" />
+                            <span className="text-xs text-muted-foreground ml-1 font-mono">
+                                {marker.label}
+                            </span>
+                        </div>
+                  ))}
 
 			{/* Project markers track */}
 			<MarkerTrack pxPerMs={pxPerMs} width={timelineWidth} />
