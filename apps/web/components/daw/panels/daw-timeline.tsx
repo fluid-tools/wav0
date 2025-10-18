@@ -2,21 +2,23 @@
 
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { MarkerTrack } from "@/components/daw/panels/marker-track";
 import {
-    playbackAtom,
-    playheadViewportPxAtom,
-    projectEndOverrideAtom,
-    projectEndPositionAtom,
-    setCurrentTimeAtom,
-    timelineAtom,
-    timelinePxPerMsAtom,
-    timelineWidthAtom,
-    markersAtom,
-    updateMarkerAtom,
-    addMarkerAtom,
-    gridAtom,
-    musicalMetadataAtom,
+	addMarkerAtom,
+	gridAtom,
+	markersAtom,
+	musicalMetadataAtom,
+	playbackAtom,
+	playheadViewportPxAtom,
+	projectEndOverrideAtom,
+	projectEndPositionAtom,
+	setCurrentTimeAtom,
+	timelineAtom,
+	timelinePxPerMsAtom,
+	timelineWidthAtom,
+	updateMarkerAtom,
 } from "@/lib/daw-sdk";
+import { useTimebase } from "@/lib/daw-sdk/hooks/use-timebase";
 import { snapTimeMs } from "@/lib/daw-sdk/utils/time-utils";
 import { formatDuration } from "@/lib/storage/opfs";
 
@@ -29,22 +31,18 @@ export function DAWTimeline() {
 	const [_projectEndOverride, setProjectEndOverride] = useAtom(
 		projectEndOverrideAtom,
 	);
-    const containerRef = useRef<HTMLButtonElement>(null);
+	const containerRef = useRef<HTMLButtonElement>(null);
 	const [isDraggingEnd, setIsDraggingEnd] = useState(false);
 	const [playheadViewportPx] = useAtom(playheadViewportPxAtom);
 	const [pxPerMs] = useAtom(timelinePxPerMsAtom);
-    const [markers] = useAtom(markersAtom);
-    const [, updateMarker] = useAtom(updateMarkerAtom);
-    const [, addMarker] = useAtom(addMarkerAtom);
-    const [grid] = useAtom(gridAtom);
-    const [music] = useAtom(musicalMetadataAtom);
+	const [_markers] = useAtom(markersAtom);
+	const [_updateMarker] = useAtom(updateMarkerAtom);
+	const [, addMarker] = useAtom(addMarkerAtom);
+	const [grid] = useAtom(gridAtom);
+	const [music] = useAtom(musicalMetadataAtom);
+	const { grid: tGrid } = useTimebase();
 
-    const markerDrag = useRef<{
-        id: string;
-        pointerId: number;
-        startX: number;
-        startTimeMs: number;
-    } | null>(null);
+	// legacy marker drag removed in favor of dedicated MarkerTrack
 
 	const onMouseMove = useCallback(
 		(e: MouseEvent) => {
@@ -69,7 +67,7 @@ export function DAWTimeline() {
 	}, [isDraggingEnd, onMouseMove]);
 	const _timelinePlayheadViewport = playheadViewportPx;
 
-	// Calculate time markers based on zoom and BPM
+	// Calculate time markers (time mode)
 	const getTimeMarkers = () => {
 		if (pxPerMs <= 0) return [];
 		const markers = [];
@@ -93,11 +91,13 @@ export function DAWTimeline() {
 		return markers;
 	};
 
+	// Calculate beat markers (bars mode) using musical metadata
 	const getBeatMarkers = () => {
 		if (pxPerMs <= 0) return [];
 		const markers = [];
-		const beatsPerMinute = playback.bpm;
-		const secondsPerBeat = 60 / beatsPerMinute;
+		const beatsPerMinute = music.tempoBpm;
+		const secondsPerBeat =
+			(60 / beatsPerMinute) * (4 / music.timeSignature.den);
 		const pixelsPerBeat = secondsPerBeat * pxPerMs * 1000;
 
 		for (let beat = 0; beat * pixelsPerBeat < timelineWidth; beat++) {
@@ -106,7 +106,7 @@ export function DAWTimeline() {
 				beat,
 				time: time * 1000,
 				position: beat * pixelsPerBeat,
-				isMeasure: beat % 4 === 0,
+				isMeasure: beat % music.timeSignature.num === 0,
 			});
 		}
 
@@ -131,17 +131,28 @@ export function DAWTimeline() {
 		setCurrentTime(Math.max(0, time));
 	};
 
-    // Add marker at playhead on key "m"
-    useEffect(() => {
-        const onKey = (e: KeyboardEvent) => {
-            if (e.key.toLowerCase() !== "m") return;
-            const timeMs = Math.max(0, Math.round(playback.currentTime));
-            const snapped = snapTimeMs(timeMs, grid, music.tempoBpm, music.timeSignature);
-            addMarker({ timeMs: snapped, name: "", color: "#ffffff" });
-        };
-        window.addEventListener("keydown", onKey);
-        return () => window.removeEventListener("keydown", onKey);
-    }, [addMarker, grid, music.tempoBpm, music.timeSignature, playback.currentTime]);
+	// Add marker at playhead on key "m"
+	useEffect(() => {
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key.toLowerCase() !== "m") return;
+			const timeMs = Math.max(0, Math.round(playback.currentTime));
+			const snapped = snapTimeMs(
+				timeMs,
+				grid,
+				music.tempoBpm,
+				music.timeSignature,
+			);
+			addMarker({ timeMs: snapped, name: "", color: "#ffffff" });
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, [
+		addMarker,
+		grid,
+		music.tempoBpm,
+		music.timeSignature,
+		playback.currentTime,
+	]);
 
 	const onTimelinePointerDown = (
 		event: React.PointerEvent<HTMLButtonElement>,
@@ -169,79 +180,32 @@ export function DAWTimeline() {
 			style={{ width: timelineWidth }}
 			aria-label="Timeline - click to set playback position"
 		>
-			{/* Beat markers */}
-			{beatMarkers.map((marker) => (
-				<div
-					key={`beat-${marker.beat}`}
-					className={`absolute top-0 bottom-0 ${
-						marker.isMeasure ? "w-0.5 bg-border" : "w-px bg-border/50"
-					}`}
-					style={{ left: marker.position }}
-				/>
-			))}
+			{/* Grids */}
+			{tGrid.mode === "bars"
+				? beatMarkers.map((marker) => (
+						<div
+							key={`beat-${marker.beat}`}
+							className={`absolute top-0 bottom-0 ${
+								marker.isMeasure ? "w-0.5 bg-border" : "w-px bg-border/50"
+							}`}
+							style={{ left: marker.position }}
+						/>
+					))
+				: timeMarkers.map((marker) => (
+						<div
+							key={`time-${marker.time}`}
+							className="absolute top-0"
+							style={{ left: marker.position }}
+						>
+							<div className="w-px h-3 bg-foreground" />
+							<span className="text-xs text-muted-foreground ml-1 font-mono">
+								{marker.label}
+							</span>
+						</div>
+					))}
 
-			{/* Time markers */}
-			{timeMarkers.map((marker) => (
-				<div
-					key={`time-${marker.time}`}
-					className="absolute top-0"
-					style={{ left: marker.position }}
-				>
-					<div className="w-px h-3 bg-foreground" />
-					<span className="text-xs text-muted-foreground ml-1 font-mono">
-						{marker.label}
-					</span>
-				</div>
-			))}
-
-            {/* Project markers */}
-            {markers.map((m) => {
-                const left = m.timeMs * pxPerMs;
-                return (
-                    <div
-                        key={m.id}
-                        className="absolute top-0 bottom-0 flex items-start"
-                        style={{ left }}
-                        role="button"
-                        aria-label={`Marker ${m.name || m.id}`}
-                        onPointerDown={(e) => {
-                            e.preventDefault();
-                            (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-                            markerDrag.current = {
-                                id: m.id,
-                                pointerId: e.pointerId,
-                                startX: e.clientX,
-                                startTimeMs: m.timeMs,
-                            };
-                        }}
-                        onPointerMove={(e) => {
-                            const drag = markerDrag.current;
-                            if (!drag || e.pointerId !== drag.pointerId) return;
-                            const dx = e.clientX - drag.startX;
-                            const raw = Math.max(0, drag.startTimeMs + dx / pxPerMs);
-                            const snapped = snapTimeMs(raw, grid, music.tempoBpm, music.timeSignature);
-                            updateMarker(drag.id, { timeMs: snapped });
-                        }}
-                        onPointerUp={(e) => {
-                            const drag = markerDrag.current;
-                            if (drag && e.pointerId === drag.pointerId) {
-                                markerDrag.current = null;
-                            }
-                        }}
-                        title={m.name || "Marker"}
-                    >
-                        <div
-                            className="w-2 h-4 rounded-b-sm"
-                            style={{ backgroundColor: m.color }}
-                        />
-                        {m.name ? (
-                            <span className="ml-1 text-xs text-muted-foreground bg-background/70 px-1 rounded">
-                                {m.name}
-                            </span>
-                        ) : null}
-                    </div>
-                );
-            })}
+			{/* Project markers track */}
+			<MarkerTrack pxPerMs={pxPerMs} width={timelineWidth} />
 
 			{/* Project end marker and buffer zone */}
 			<div

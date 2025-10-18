@@ -1,6 +1,7 @@
 "use client";
 
 import { useAtom } from "jotai";
+// jotai imported elsewhere; remove duplicate import per linter
 import {
 	Activity,
 	Download,
@@ -32,11 +33,13 @@ import { DAW_HEIGHTS, DAW_ICONS, DAW_TEXT } from "@/lib/constants/daw-design";
 import {
 	automationViewEnabledAtom,
 	eventListOpenAtom,
+	gridAtom,
 	projectNameAtom,
 	tracksAtom,
 } from "@/lib/daw-sdk";
 
 export function DAWToolbar() {
+	const [grid, setGrid] = useAtom(gridAtom);
 	const [projectName, setProjectName] = useAtom(projectNameAtom);
 	const [tracks] = useAtom(tracksAtom);
 	const [, setEventListOpen] = useAtom(eventListOpenAtom);
@@ -107,6 +110,60 @@ export function DAWToolbar() {
 					style={{ height: DAW_HEIGHTS.BUTTON_MD }}
 					placeholder="Project name"
 				/>
+				{/* Timebase */}
+				<div className="flex items-center gap-1 ml-2">
+					<Button
+						variant={grid.mode === "time" ? "default" : "ghost"}
+						size="sm"
+						onClick={() => setGrid({ ...grid, mode: "time" })}
+					>
+						Time
+					</Button>
+					<Button
+						variant={grid.mode === "bars" ? "default" : "ghost"}
+						size="sm"
+						onClick={() => setGrid({ ...grid, mode: "bars" })}
+					>
+						Bars
+					</Button>
+					<select
+						className="text-xs border rounded px-1 py-1 ml-1"
+						value={grid.resolution}
+						onChange={(e) =>
+							setGrid({
+								...grid,
+								resolution: e.target.value as typeof grid.resolution,
+							})
+						}
+					>
+						{(["1/1", "1/2", "1/4", "1/8", "1/16"] as const).map((r) => (
+							<option key={r} value={r}>
+								{r}
+							</option>
+						))}
+					</select>
+					<label className="text-xs ml-2 flex items-center gap-1">
+						<input
+							type="checkbox"
+							checked={grid.triplet}
+							onChange={(e) => setGrid({ ...grid, triplet: e.target.checked })}
+						/>
+						Triplet
+					</label>
+					<label className="text-xs ml-2 flex items-center gap-1">
+						Swing
+						<input
+							type="range"
+							min={0}
+							max={0.6}
+							step={0.05}
+							value={grid.swing}
+							onChange={(e) =>
+								setGrid({ ...grid, swing: Number(e.target.value) })
+							}
+						/>
+					</label>
+				</div>
 			</div>
 
 			<div className="flex items-center gap-2">

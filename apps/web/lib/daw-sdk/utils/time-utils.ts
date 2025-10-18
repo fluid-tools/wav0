@@ -140,13 +140,19 @@ export function calculateTimeMarkers(
 }
 
 // === Musical timebase conversions ===
-export function msToBeats(ms: number, bpm: number): number {
+export function msToBeats(ms: number, bpm: number, signature?: { num: number; den: number }): number {
     const seconds = ms / 1000
-    return seconds * (bpm / 60)
+    const baseBeats = seconds * (bpm / 60)
+    if (!signature) return baseBeats
+    // Adjust for denominator: if den=8, one notated beat is an eighth note.
+    const denScale = 4 / signature.den
+    return baseBeats / denScale
 }
 
-export function beatsToMs(beats: number, bpm: number): number {
-    const seconds = beats * (60 / bpm)
+export function beatsToMs(beats: number, bpm: number, signature?: { num: number; den: number }): number {
+    const denScale = signature ? 4 / signature.den : 1
+    const notatedBeats = beats * denScale
+    const seconds = notatedBeats * (60 / bpm)
     return seconds * 1000
 }
 
@@ -155,7 +161,7 @@ export function msToBarsBeats(
     bpm: number,
     signature: { num: number; den: number },
 ): { bar: number; beat: number; tick: number } {
-    const beats = msToBeats(ms, bpm)
+    const beats = msToBeats(ms, bpm, signature)
     const beatsPerBar = signature.num
     const bar = Math.floor(beats / beatsPerBar)
     const beat = Math.floor(beats % beatsPerBar)
@@ -170,22 +176,43 @@ export function barsBeatsToMs(
 ): number {
     const beatsPerBar = signature.num
     const totalBeats = (pos.bar - 1) * beatsPerBar + (pos.beat - 1) + (pos.tick ?? 0) / 960
-    return beatsToMs(totalBeats, bpm)
+    return beatsToMs(totalBeats, bpm, signature)
 }
 
 export function snapTimeMs(
     timeMs: number,
-    grid: { mode: "time" | "bars"; resolution: string },
+    grid: { mode: "time" | "bars"; resolution: "1/1"|"1/2"|"1/4"|"1/8"|"1/16"; triplet?: boolean; swing?: number },
     bpm: number,
     signature: { num: number; den: number },
 ): number {
     if (grid.mode === "time") return timeMs
-    // bars mode: resolution as fraction of a bar (e.g. 1/4 = quarter note)
     const res = grid.resolution
-    const denom = res.includes("/") ? Number(res.split("/")[1]) : 4
+    const denom = Number(res.split("/")[1])
     const beatsPerBar = signature.num
-    const beatsPerDivision = beatsPerBar / denom
-    const beatPos = msToBeats(timeMs, bpm)
-    const snappedBeats = Math.round(beatPos / beatsPerDivision) * beatsPerDivision
-    return beatsToMs(snappedBeats, bpm)
+    const baseDivisionBeats = beatsPerBar / denom
+    const beatPos = msToBeats(timeMs, bpm, signature)
+
+    // Triplet: divide each division into 3 equal parts
+    let division = baseDivisionBeats
+    if (grid.triplet) division = baseDivisionBeats / 3
+
+    // Swing: bias every second subdivision toward later time by factor (0–0.6)
+    // Implement as post-snap micro-shift
+    const snapped = Math.round(beatPos / division) * division
+    const isEven = Math.round(beatPos / division) % 2 === 0
+    if (grid.swing && grid.swing > 0 && !grid.triplet) {
+        const bias = division * (isEven ? 0 : grid.swing * (2/3 - 1/2))
+        return beatsToMs(snapped + bias, bpm, signature)
+    }
+    return beatsToMs(snapped, bpm, signature)
+}
+
+export function formatBarsBeatsTicks(
+    ms: number,
+    bpm: number,
+    signature: { num: number; den: number },
+): string {
+    const { bar, beat, tick } = msToBarsBeats(ms, bpm, signature)
+    const tickStr = tick.toString().padStart(3, "0")
+    return `${bar}.${beat}.${tickStr}`
 }

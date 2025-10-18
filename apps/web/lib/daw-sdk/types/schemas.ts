@@ -104,6 +104,7 @@ export const ProjectMarkerSchema = z.object({
     timeMs: z.number().min(0),
     name: z.string().default(""),
     color: z.string().default("#ffffff"),
+    durationMs: z.number().min(0).optional(),
 });
 
 export const ToolSchema = z.enum(["pointer", "trim", "razor"]);

@@ -707,25 +707,26 @@ export class PlaybackService {
 		const audioFileReadStart = clipTrimStartSec + timeIntoClip;
 		if (audioFileReadStart >= clipTrimEndSec) return;
 
-		// Apply fade envelopes
+		// Apply fade envelopes (cancel → anchor → future-only) with generation guard
 		try {
 			const clipGain = cps.gainNode ?? this.masterGainNode;
 			if (!clipGain || !this.audioContext) return;
 			const now = this.audioContext.currentTime;
 			this.cancelGainAutomation(clipGain.gain, now);
-			const clipStartAC =
-				this.startTime + clipStartSec - this.playbackTimeAtStart;
-			const loopEndAC =
-				this.startTime + loopUntilSec - this.playbackTimeAtStart;
-			const oneShotEndAC =
-				this.startTime + clipOneShotEndSec - this.playbackTimeAtStart;
+
+			// Anchor at current timeline gain (assume 0..1 linear, fallback 1)
+			const anchorValue = 1;
+			clipGain.gain.setValueAtTime(anchorValue, now);
+
+			const clipStartAC = this.startTime + clipStartSec - this.playbackTimeAtStart;
+			const loopEndAC = this.startTime + loopUntilSec - this.playbackTimeAtStart;
+			const oneShotEndAC = this.startTime + clipOneShotEndSec - this.playbackTimeAtStart;
 
 			if (clip.fadeIn && clip.fadeIn > 0) {
-				clipGain.gain.setValueAtTime(0, Math.max(now, clipStartAC));
-				clipGain.gain.linearRampToValueAtTime(
-					1,
-					Math.max(now, clipStartAC + clip.fadeIn / 1000),
-				);
+				// From 0 → 1 using curve (use linear for now; curve params available on clip)
+				const startT = Math.max(now, clipStartAC);
+				clipGain.gain.setValueAtTime(0, startT);
+				clipGain.gain.linearRampToValueAtTime(1, startT + clip.fadeIn / 1000);
 			}
 
 			if (clip.fadeOut && clip.fadeOut > 0) {
@@ -735,10 +736,8 @@ export class PlaybackService {
 						: null
 					: oneShotEndAC;
 				if (targetEnd !== null) {
-					clipGain.gain.setValueAtTime(
-						1,
-						Math.max(now, targetEnd - clip.fadeOut / 1000),
-					);
+					const startT = Math.max(now, targetEnd - clip.fadeOut / 1000);
+					clipGain.gain.setValueAtTime(1, startT);
 					clipGain.gain.linearRampToValueAtTime(0, Math.max(now, targetEnd));
 				}
 			}

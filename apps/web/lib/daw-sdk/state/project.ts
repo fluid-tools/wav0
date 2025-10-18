@@ -7,12 +7,14 @@ export const markersAtom = atomWithStorage<ProjectMarker[]>("daw-project-markers
 export const sectionsAtom = atomWithStorage<TimelineSection[]>("daw-project-sections", [])
 
 export const gridAtom = atomWithStorage(
-	"daw-grid",
-	{
-		mode: "time" as "time" | "bars",
-		resolution: "1/4" as "1/1" | "1/2" | "1/4" | "1/8" | "1/16" | "triplet" | "swing",
-		projectLengthMs: 60000,
-	},
+    "daw-grid",
+    {
+        mode: "time" as "time" | "bars",
+        resolution: "1/4" as "1/1" | "1/2" | "1/4" | "1/8" | "1/16",
+        triplet: false,
+        swing: 0,
+        projectLengthMs: 60000,
+    },
 )
 
 export const musicalMetadataAtom = atomWithStorage(
