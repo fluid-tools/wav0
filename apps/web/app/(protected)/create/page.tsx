@@ -263,7 +263,7 @@ export default function ChatBotDemo() {
 								<span>Firecrawl</span>
 							</PromptInputButton>
 							<PromptInputModelSelect
-								onValueChange={(value) => {
+								onValueChange={(value: string) => {
 									setModel(value);
 								}}
 								value={model}

@@ -133,6 +133,105 @@ bun lint
 bun build
 ```
 
+### Testing GitHub Workflows Locally
+
+We use [act](https://github.com/nektos/act) to test GitHub Actions workflows locally before pushing. This saves time and prevents broken CI runs.
+
+#### Prerequisites
+
+1. **Install Docker** (required for act to run)
+   - [Docker Desktop](https://www.docker.com/products/docker-desktop) for macOS/Windows
+   - Docker Engine for Linux
+
+2. **Install act**
+   ```bash
+   # macOS (Homebrew)
+   brew install act
+
+   # Windows (Chocolatey)
+   choco install act-cli
+
+   # Linux
+   curl https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash
+   ```
+
+#### Running Workflows Locally
+
+**Test CI workflow (lint, typecheck, build):**
+```bash
+# Run the full CI workflow
+act -W .github/workflows/ci.yml
+
+# Run with specific GitHub image (more accurate)
+act -W .github/workflows/ci.yml -P ubuntu-latest=catthehacker/ubuntu:act-latest
+
+# Pass secrets for Turbo remote caching (optional)
+act -W .github/workflows/ci.yml \
+  -s TURBO_TOKEN=your_token \
+  -s TURBO_TEAM=your_team
+```
+
+**Test Convex deploy workflow (production):**
+```bash
+# ⚠️ WARNING: This will actually deploy to Convex if you provide real keys
+act push -W .github/workflows/deploy-convex.yml \
+  -P ubuntu-latest=catthehacker/ubuntu:act-latest \
+  -s CONVEX_DEPLOY_KEY=your_deploy_key \
+  -s CONVEX_DEPLOYMENT=your_deployment_id
+
+# Use --dryrun to test without executing
+act push -W .github/workflows/deploy-convex.yml --dryrun
+```
+
+**Test Convex preview deploy:**
+```bash
+# Test preview deploy (requires ENABLE_CONVEX_PREVIEWS=1)
+act pull_request -W .github/workflows/deploy-convex.yml \
+  -P ubuntu-latest=catthehacker/ubuntu:act-latest \
+  -s CONVEX_DEPLOY_KEY=your_preview_key \
+  -s CONVEX_DEPLOYMENT=your_preview_deployment \
+  --var ENABLE_CONVEX_PREVIEWS=1
+```
+
+#### Common act Options
+
+- `-W <workflow.yml>` - Specify which workflow to run
+- `-P ubuntu-latest=<image>` - Override runner image
+- `-s KEY=value` - Pass secrets
+- `--var KEY=value` - Pass repository variables
+- `-n` or `--dryrun` - Show what would run without executing
+- `-l` - List available workflows and jobs
+- `--job <job_name>` - Run a specific job only
+- `-v` - Verbose output for debugging
+
+#### Best Practices
+
+1. **Always use --dryrun first** for deploy workflows to avoid accidental deployments
+2. **Use catthehacker/ubuntu images** for better compatibility with GitHub Actions
+3. **Test with real secrets in a safe environment** (e.g., preview/staging)
+4. **Check Docker resources** - act can be resource-intensive; ensure Docker has enough RAM/CPU
+
+#### Troubleshooting
+
+**act fails to start:**
+- Ensure Docker is running (`docker ps`)
+- Try pulling the runner image manually: `docker pull catthehacker/ubuntu:act-latest`
+
+**Workflow differences from GitHub:**
+- Some GitHub Actions features aren't fully supported by act
+- Environment contexts may differ slightly
+- Use GitHub's runner images for maximum accuracy
+
+**Secrets not working:**
+- Use `-s` flag, not `--secret` (older syntax)
+- Check secret names match workflow exactly (case-sensitive)
+- Use `--secret-file .secrets` for multiple secrets:
+  ```bash
+  # .secrets file format:
+  CONVEX_DEPLOY_KEY=xxx
+  TURBO_TOKEN=yyy
+  ```
+
 ## 📝 Making Changes
 
 ### 1. Create a Branch

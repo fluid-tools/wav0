@@ -71,6 +71,7 @@ export function transferAutomationPoints(
 
 /**
  * Remove automation points within a given time range from a track
+ * @deprecated Use removeAutomationPointsInRangeTrack from daw-sdk instead
  */
 export function removeAutomationPointsInRange(
 	track: Track,

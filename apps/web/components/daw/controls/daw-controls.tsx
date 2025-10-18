@@ -39,6 +39,7 @@ import {
 	updateClipAtom,
 } from "@/lib/daw-sdk";
 import { formatDuration } from "@/lib/storage/opfs";
+import { MasterMeter } from "./master-meter";
 
 export function DAWControls() {
 	const [playback] = useAtom(playbackAtom);
@@ -313,6 +314,13 @@ export function DAWControls() {
 						defaultValue={75}
 						className="w-16 h-2 bg-muted rounded-lg appearance-none cursor-pointer"
 					/>
+				</div>
+
+				<div className="flex items-center gap-2 border-l border-border pl-4">
+					<span className="text-sm font-medium text-muted-foreground">
+						Output
+					</span>
+					<MasterMeter />
 				</div>
 			</div>
 		</div>

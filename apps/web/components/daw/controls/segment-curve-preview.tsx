@@ -41,7 +41,10 @@ export function SegmentCurvePreview({
 			height={height}
 			className={`${className}`}
 			style={{ display: "block" }}
+			role="img"
+			aria-label="Automation curve preview"
 		>
+			<title>Automation curve preview</title>
 			{/* Background grid */}
 			<line
 				x1="0"

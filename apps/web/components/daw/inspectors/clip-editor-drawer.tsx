@@ -328,7 +328,7 @@ export function ClipEditorDrawer() {
 										envelope={envelope}
 										onChange={handleEnvelopeChange}
 										clipStartTime={clip.startTime}
-										trackVolume={track.volume}
+										trackVolume={track.volume ?? 75}
 									/>
 								) : (
 									<InspectorCard>

@@ -35,10 +35,11 @@ function getQueryClient() {
 
 /**
  * DAW Initialization - Non-blocking background init
+ * useEffect guarantees client-only execution (no SSR/prerender)
  */
 function DAWInitializer({ children }: { children: ReactNode }) {
 	useEffect(() => {
-		// Initialize in background, don't block render
+		// Initialize audio services in browser
 		audioService.getAudioContext().catch((err) => {
 			console.error("[DAW] Init failed:", err);
 		});

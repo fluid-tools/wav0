@@ -45,13 +45,14 @@ export const updateClipAtom = atom(
 		}
 
 		// Detect clip movement for clip-bound automation (even without moveAutomation flag)
-	const clipMoved =
-		updates.startTime !== undefined &&
-		originalClip &&
-		originalClip.startTime !== updates.startTime;
-	const clipTimeDelta = clipMoved && updates.startTime !== undefined
-		? updates.startTime - originalClip.startTime
-		: 0;
+		const clipMoved =
+			updates.startTime !== undefined &&
+			originalClip &&
+			originalClip.startTime !== updates.startTime;
+		const clipTimeDelta =
+			clipMoved && updates.startTime !== undefined
+				? updates.startTime - originalClip.startTime
+				: 0;
 
 		const updatedTracks = tracks.map((track) => {
 			if (track.id !== trackId || !track.clips) return track;

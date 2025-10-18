@@ -1,49 +1,43 @@
 {
-    "$schema": "https://turbo.build/schema.json",
-    "ui": "tui",
-    "globalEnv": [
-      "AI_GATEWAY_API_KEY",
-      "AWS_ACCESS_KEY_ID",
-      "AWS_BUCKET_NAME",
-      "AWS_REGION",
-      "AWS_SECRET_ACCESS_KEY",
-      "BETTER_AUTH_SECRET",
-      "BETTER_AUTH_URL",
-      "BLOB_READ_WRITE_TOKEN",
-      "CONVEX_DEPLOYMENT",
-      "CONVEX_DEPLOY_KEY",
-      "CONVEX_URL",
-      "DATABASE_URL",
-      "ELEVENLABS_API_KEY",
-      "FIRECRAWL_API_KEY",
-      "GOOGLE_CLIENT_ID",
-      "GOOGLE_CLIENT_SECRET",
-      "REDIS_STREAM_URL",
-      "RESEND_API_KEY",
-      "RESEND_FROM_EMAIL",
-      "UPSTASH_REDIS_REST_TOKEN",
-      "UPSTASH_REDIS_REST_URL"
-    ],
-    "tasks": {
-      "build": {
-        "dependsOn": ["^build"],
-        "inputs": ["$TURBO_DEFAULT$", ".env*"],
-        "outputs": [".next/**", "!.next/cache/**"]
-      },
-      "lint": {
-        "dependsOn": ["^lint"]
-      },
-      "check-types": {
-        "dependsOn": ["^check-types"]
-      },
-      "dev": {
-        "cache": false,
-        "persistent": true
-      },
-      "dev:setup": {
-        "cache": false,
-        "persistent": true
-      }
-    }
-  }
-  
+	"$schema": "https://turbo.build/schema.json",
+	"ui": "tui",
+	"globalEnv": [
+		"AI_GATEWAY_API_KEY",
+		"AWS_*",
+		"BETTER_AUTH_*",
+		"BLOB_READ_WRITE_TOKEN",
+		"CONVEX_*",
+		"ELEVENLABS_API_KEY",
+		"FIRECRAWL_API_KEY",
+		"GOOGLE_*",
+		"REDIS_STREAM_URL",
+		"RESEND_*",
+		"UPSTASH_*"
+	],
+	"tasks": {
+		"build": {
+			"dependsOn": ["^build"],
+			"inputs": ["$TURBO_DEFAULT$", ".env*"],
+			"outputs": [".next/**", "!.next/cache/**"]
+		},
+		"deploy": {
+			"dependsOn": ["^deploy"],
+			"inputs": ["$TURBO_DEFAULT$", ".env*"],
+			"outputs": ["convex/_generated/**"]
+		},
+		"lint": {
+			"dependsOn": ["^lint"]
+		},
+		"check-types": {
+			"dependsOn": ["^check-types"]
+		},
+		"dev": {
+			"cache": false,
+			"persistent": true
+		},
+		"dev:setup": {
+			"cache": false,
+			"persistent": true
+		}
+	}
+}

@@ -4,12 +4,18 @@ import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ClipContextMenu } from "@/components/daw/context-menus/clip-context-menu";
 import { ClipFadeHandles } from "@/components/daw/controls/clip-fade-handles";
-import { AutomationTransferDialog } from "@/components/daw/dialogs/automation-transfer-dialog";
 import { AutomationLane } from "@/components/daw/panels/automation-lane";
 import { DAW_HEIGHTS } from "@/lib/constants/daw-design";
-import type { Clip } from "@/lib/daw-sdk";
+import type {
+	Clip,
+	TrackEnvelopePoint,
+	TrackEnvelopeSegment,
+} from "@/lib/daw-sdk";
 import {
 	activeToolAtom,
+	clipMoveHistoryAtom,
+	dragMachineAtom,
+	dragPreviewAtom,
 	loadAudioFileAtom,
 	playbackAtom,
 	playbackService,
@@ -24,13 +30,14 @@ import {
 	updateClipAtom,
 	updateTrackAtom,
 } from "@/lib/daw-sdk";
-import { formatDuration } from "@/lib/storage/opfs";
-import { cn } from "@/lib/utils";
 import {
 	countAutomationPointsInRange,
-	removeAutomationPointsInRange,
-	transferAutomationPoints,
-} from "@/lib/utils/automation-utils";
+	removeTrackAutomationPointsInRange,
+	shiftTrackAutomationInRange,
+	transferAutomationEnvelope,
+} from "@/lib/daw-sdk/utils/automation-utils";
+import { formatDuration } from "@/lib/storage/opfs";
+import { cn } from "@/lib/utils";
 
 export function DAWTrackContent() {
 	const [tracks, setTracks] = useAtom(tracksAtom);
@@ -46,6 +53,8 @@ export function DAWTrackContent() {
 	const [trackHeightZoom] = useAtom(trackHeightZoomAtom);
 	const [projectEndPosition] = useAtom(projectEndPositionAtom);
 	const [_totalDuration] = useAtom(totalDurationAtom);
+	const [_dragMachineSnapshot, sendDragEvent] = useAtom(dragMachineAtom);
+	const dragPreview = useAtom(dragPreviewAtom)[0];
 	const [resizingClip, setResizingClip] = useState<{
 		trackId: string;
 		clipId: string;
@@ -65,23 +74,13 @@ export function DAWTrackContent() {
 		originalTrackIndex: number;
 		sourceTrackId: string;
 	} | null>(null);
+	const [, setMoveHistory] = useAtom(clipMoveHistoryAtom);
 
 	const [loopDragging, setLoopDragging] = useState<{
 		trackId: string;
 		clipId: string;
 		startX: number;
 		startLoopEnd: number | undefined;
-	} | null>(null);
-
-	// Automation transfer dialog state
-	const [automationTransferDialog, setAutomationTransferDialog] = useState<{
-		open: boolean;
-		clipId: string;
-		clipName: string;
-		sourceTrack: { id: string; name: string };
-		targetTrack: { id: string; name: string };
-		automationPointCount: number;
-		newStartTime: number;
 	} | null>(null);
 
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -276,128 +275,42 @@ export function DAWTrackContent() {
 				}
 
 				if (draggingClip) {
-					// Horizontal movement (time)
+					// Compute preview-only position
 					const deltaX = lastX - draggingClip.startX;
 					const deltaTime = deltaX / pixelsPerMs;
-					const newStartTime = Math.max(0, draggingClip.startTime + deltaTime);
+					let previewStartTime = Math.max(
+						0,
+						draggingClip.startTime + deltaTime,
+					);
+					if (timeline.snapToGrid && timeline.gridSize > 0) {
+						previewStartTime =
+							Math.round(previewStartTime / timeline.gridSize) *
+							timeline.gridSize;
+					}
 
-					// Vertical movement (track switching)
-					const deltaY = lastY - draggingClip.startY;
 					const trackHeight = Math.round(
 						DAW_HEIGHTS.TRACK_ROW * trackHeightZoom,
 					);
-					const trackIndexOffset = Math.round(deltaY / trackHeight);
-					const newTrackIndex = Math.max(
-						0,
-						Math.min(
-							tracks.length - 1,
-							draggingClip.originalTrackIndex + trackIndexOffset,
-						),
-					);
-
-					// Check if we need to move to a different track
-					if (newTrackIndex !== draggingClip.originalTrackIndex) {
-						const newTrack = tracks[newTrackIndex];
-						const oldTrack = tracks.find((t) => t.id === draggingClip.trackId);
-
-						if (newTrack && oldTrack && newTrack.id !== oldTrack.id) {
-							// Find the clip
-							const clip = oldTrack.clips?.find(
-								(c) => c.id === draggingClip.clipId,
-							);
-							if (clip) {
-								// Check for automation in clip's time range
-								// Skip automation logic if envelope is disabled
-								const clipEndTime =
-									clip.startTime + (clip.trimEnd - clip.trimStart);
-								const hasEnabledAutomation =
-									oldTrack.volumeEnvelope?.enabled ?? false;
-								const automationCount = hasEnabledAutomation
-									? countAutomationPointsInRange(
-											oldTrack,
-											clip.startTime,
-											clipEndTime,
-										)
-									: 0;
-
-								// If automation exists AND is enabled, show dialog; otherwise move immediately
-								if (automationCount > 0) {
-									// Show dialog to confirm automation transfer
-									setAutomationTransferDialog({
-										open: true,
-										clipId: clip.id,
-										clipName: clip.name || "Untitled",
-										sourceTrack: { id: oldTrack.id, name: oldTrack.name },
-										targetTrack: { id: newTrack.id, name: newTrack.name },
-										automationPointCount: automationCount,
-										newStartTime,
-									});
-
-									// Pause further dragging until dialog is resolved
-									setDraggingClip(null);
-									return;
-								}
-
-								// No automation - proceed with immediate move
-								// Stop playback on old track if playing
-								if (playback.isPlaying) {
-									playbackService
-										.stopClip(oldTrack.id, clip.id)
-										.catch(console.error);
-								}
-
-								// Move clip atomically
-								const updatedClip = { ...clip, startTime: newStartTime };
-								setTracks((prev) =>
-									prev.map((t) => {
-										if (t.id === oldTrack.id) {
-											return {
-												...t,
-												clips: t.clips?.filter((c) => c.id !== clip.id) ?? [],
-											};
-										}
-										if (t.id === newTrack.id) {
-											return {
-												...t,
-												clips: [...(t.clips ?? []), updatedClip],
-											};
-										}
-										return t;
-									}),
-								);
-
-								// Update dragging state to track new location
-								setDraggingClip({
-									...draggingClip,
-									trackId: newTrack.id,
-									startTime: newStartTime,
-									sourceTrackId: newTrack.id,
-								});
-								setSelectedTrackId(newTrack.id);
-								return;
-							}
-						}
+					const container = containerRef.current;
+					let newTrackIndex = draggingClip.originalTrackIndex;
+					if (container) {
+						const rect = container.getBoundingClientRect();
+						const relativeY = lastY - rect.top + container.scrollTop;
+						const targetTrackIndex = Math.floor(relativeY / trackHeight);
+						newTrackIndex = Math.max(
+							0,
+							Math.min(tracks.length - 1, targetTrackIndex),
+						);
 					}
+					const previewTrackId =
+						tracks[newTrackIndex]?.id ?? draggingClip.trackId;
 
-					// Normal horizontal-only update within same track
-					// Automatically move automation if enabled and points exist in range
-					const track = tracks.find((t) => t.id === draggingClip.trackId);
-					const clip = track?.clips?.find((c) => c.id === draggingClip.clipId);
-					const shouldMoveAutomation =
-						track?.volumeEnvelope?.enabled &&
-						clip &&
-						countAutomationPointsInRange(
-							track,
-							clip.startTime,
-							clip.startTime + (clip.trimEnd - clip.trimStart),
-						) > 0;
-
-					updateClip(
-						draggingClip.trackId,
-						draggingClip.clipId,
-						{ startTime: newStartTime },
-						{ moveAutomation: shouldMoveAutomation },
-					);
+					// Send MOVE event to drag machine
+					sendDragEvent({
+						type: "MOVE",
+						previewTrackId,
+						previewStartTime,
+					});
 				}
 
 				if (loopDragging) {
@@ -426,18 +339,221 @@ export function DAWTrackContent() {
 		};
 
 		const onUp = () => {
-			lastPointer.current = null;
-			setResizingClip(null);
-			setDraggingClip(null);
-			setLoopDragging(null);
-			if (raf) cancelAnimationFrame(raf);
+			try {
+				// Commit drag if preview exists
+				if (dragPreview && draggingClip) {
+					const originalTrack = tracks.find(
+						(t) => t.id === dragPreview.originalTrackId,
+					);
+					const targetTrack = tracks.find(
+						(t) => t.id === dragPreview.previewTrackId,
+					);
+					const clip = originalTrack?.clips?.find(
+						(c) => c.id === dragPreview.clipId,
+					);
+
+					if (originalTrack && targetTrack && clip) {
+						const isSameTrack =
+							dragPreview.originalTrackId === dragPreview.previewTrackId;
+						const moved =
+							!isSameTrack ||
+							dragPreview.originalStartTime !== dragPreview.previewStartTime;
+
+						if (moved) {
+							const clipDurationMs = clip.trimEnd - clip.trimStart;
+							const clipEndTime = clip.startTime + clipDurationMs;
+							const deltaMs =
+								dragPreview.previewStartTime - dragPreview.originalStartTime;
+
+							if (isSameTrack) {
+								// Same track: in-place update with automation shift
+								if (playback.isPlaying) {
+									playbackService
+										.stopClip(originalTrack.id, clip.id)
+										.catch(console.error);
+								}
+
+								setTracks((prev) => {
+									const updated = prev.map((t) => {
+										if (t.id === originalTrack.id) {
+											const updatedClip = {
+												...clip,
+												startTime: dragPreview.previewStartTime,
+											};
+											const updatedTrack = {
+												...t,
+												clips: (t.clips ?? []).map((c) =>
+													c.id === clip.id ? updatedClip : c,
+												),
+											};
+											// Shift automation points by delta using track wrapper
+											return shiftTrackAutomationInRange(
+												updatedTrack,
+												clip.startTime,
+												clipEndTime,
+												deltaMs,
+											);
+										}
+										return t;
+									});
+									playbackService.synchronizeTracks(updated);
+									return updated;
+								});
+
+								setMoveHistory((prev) => {
+									const now = Date.now();
+									const recent = prev[0];
+									// Coalesce undo toasts within 100ms
+									if (recent && now - recent.timestamp < 100) {
+										return prev;
+									}
+									return [
+										{
+											clipId: clip.id,
+											fromTrackId: originalTrack.id,
+											toTrackId: targetTrack.id,
+											fromStartTime: dragPreview.originalStartTime,
+											toStartTime: dragPreview.previewStartTime,
+											automationData: null,
+											timestamp: now,
+										},
+										...prev.slice(0, 9),
+									];
+								});
+							} else {
+								// Cross-track: transfer automation
+								const hasAutomation =
+									originalTrack.volumeEnvelope?.enabled ?? false;
+								const automationCount = hasAutomation
+									? countAutomationPointsInRange(
+											originalTrack,
+											clip.startTime,
+											clipEndTime,
+										)
+									: 0;
+
+								let automationData: {
+									points: TrackEnvelopePoint[];
+									segments: TrackEnvelopeSegment[];
+								} | null = null;
+								if (automationCount > 0) {
+									const { pointsToTransfer, segmentsToTransfer } =
+										transferAutomationEnvelope(
+											originalTrack,
+											targetTrack,
+											clip.startTime,
+											clipEndTime,
+											dragPreview.previewStartTime,
+											clip.id,
+										);
+									automationData = {
+										points: pointsToTransfer,
+										segments: segmentsToTransfer,
+									};
+								}
+
+								if (playback.isPlaying) {
+									playbackService
+										.stopClip(originalTrack.id, clip.id)
+										.catch(console.error);
+								}
+
+								setTracks((prev) => {
+									const updated = prev.map((t) => {
+										if (t.id === originalTrack.id) {
+											const updatedTrack = {
+												...t,
+												clips: t.clips?.filter((c) => c.id !== clip.id) ?? [],
+											};
+											if (automationData) {
+												// Use track wrapper to remove automation
+												return removeTrackAutomationPointsInRange(
+													updatedTrack,
+													clip.startTime,
+													clipEndTime,
+												);
+											}
+											return updatedTrack;
+										}
+										if (t.id === targetTrack.id) {
+											const movedClip = {
+												...clip,
+												startTime: dragPreview.previewStartTime,
+											};
+											let updatedTrack: typeof t = {
+												...t,
+												clips: [...(t.clips ?? []), movedClip],
+											};
+											if (automationData) {
+												const currentEnv = updatedTrack.volumeEnvelope || {
+													enabled: true,
+													points: [],
+													segments: [],
+												};
+												updatedTrack = {
+													...updatedTrack,
+													volumeEnvelope: {
+														...currentEnv,
+														enabled: true,
+														points: [
+															...(currentEnv.points || []),
+															...automationData.points,
+														].sort((a, b) => a.time - b.time),
+														segments: [
+															...(currentEnv.segments || []),
+															...automationData.segments,
+														],
+													},
+												};
+											}
+											return updatedTrack;
+										}
+										return t;
+									});
+									playbackService.synchronizeTracks(updated);
+									return updated;
+								});
+
+								setMoveHistory((prev) => [
+									{
+										clipId: clip.id,
+										fromTrackId: originalTrack.id,
+										toTrackId: targetTrack.id,
+										fromStartTime: dragPreview.originalStartTime,
+										toStartTime: dragPreview.previewStartTime,
+										automationData,
+										timestamp: Date.now(),
+									},
+									...prev.slice(0, 9),
+								]);
+							}
+						}
+					}
+				}
+			} catch (error) {
+				console.error("Error committing drag:", error);
+			} finally {
+				// Always finalize drag state
+				sendDragEvent({ type: "DROP" });
+				lastPointer.current = null;
+				setResizingClip(null);
+				setDraggingClip(null);
+				setLoopDragging(null);
+				if (raf) cancelAnimationFrame(raf);
+			}
 		};
+
+		const onCancel = onUp; // Same finalization logic
 
 		window.addEventListener("mousemove", onMove);
 		window.addEventListener("mouseup", onUp);
+		window.addEventListener("pointercancel", onCancel);
+		window.addEventListener("blur", onCancel);
 		return () => {
 			window.removeEventListener("mousemove", onMove);
 			window.removeEventListener("mouseup", onUp);
+			window.removeEventListener("pointercancel", onCancel);
+			window.removeEventListener("blur", onCancel);
 			if (raf) cancelAnimationFrame(raf);
 		};
 	}, [
@@ -452,111 +568,20 @@ export function DAWTrackContent() {
 		timeline.gridSize,
 		trackHeightZoom,
 		playback.isPlaying,
-		setSelectedTrackId,
 		setTracks,
+		dragPreview,
+		sendDragEvent,
+		setMoveHistory,
 	]);
-
-	// Handle automation transfer dialog confirmation
-	const handleAutomationTransfer = useCallback(
-		async (transferAutomation: boolean) => {
-			if (!automationTransferDialog) return;
-
-			const { clipId, sourceTrack, targetTrack, newStartTime } =
-				automationTransferDialog;
-
-			// Find tracks and clip
-			const oldTrack = tracks.find((t) => t.id === sourceTrack.id);
-			const newTrack = tracks.find((t) => t.id === targetTrack.id);
-			const clip = oldTrack?.clips?.find((c) => c.id === clipId);
-
-			if (!oldTrack || !newTrack || !clip) {
-				setAutomationTransferDialog(null);
-				return;
-			}
-
-			// Stop playback on old track if playing
-			if (playback.isPlaying) {
-				await playbackService.stopClip(oldTrack.id, clipId);
-			}
-
-			const clipEndTime = clip.startTime + (clip.trimEnd - clip.trimStart);
-
-			// Prepare updated tracks
-			let updatedOldTrack = oldTrack;
-			let updatedNewTrack = newTrack;
-
-			if (transferAutomation) {
-				// Transfer automation points to new track
-				const pointsToTransfer = transferAutomationPoints(
-					oldTrack,
-					newTrack,
-					clip.startTime,
-					clipEndTime,
-					newStartTime,
-				);
-
-				// Remove automation from old track
-				updatedOldTrack = removeAutomationPointsInRange(
-					oldTrack,
-					clip.startTime,
-					clipEndTime,
-				);
-
-			// Add automation to new track
-			const newEnvelope = updatedNewTrack.volumeEnvelope || {
-				enabled: true,
-				points: [],
-				segments: [],
-			};
-			updatedNewTrack = {
-				...updatedNewTrack,
-				volumeEnvelope: {
-					...newEnvelope,
-					points: [...(newEnvelope.points || []), ...pointsToTransfer].sort(
-						(a, b) => a.time - b.time,
-					),
-				},
-			};
-			}
-
-			// Move clip with updated automation
-			const updatedClip = { ...clip, startTime: newStartTime };
-
-			setTracks((prev) =>
-				prev.map((t) => {
-					if (t.id === oldTrack.id) {
-						// Remove clip from source track and apply automation changes
-						return {
-							...updatedOldTrack,
-							clips: oldTrack.clips?.filter((c) => c.id !== clipId) ?? [],
-						};
-					}
-					if (t.id === newTrack.id) {
-						// Add clip to destination track and apply automation changes
-						return {
-							...updatedNewTrack,
-							clips: [...(newTrack.clips ?? []), updatedClip],
-						};
-					}
-					return t;
-				}),
-			);
-
-			setSelectedTrackId(newTrack.id);
-			setAutomationTransferDialog(null);
-		},
-		[
-			automationTransferDialog,
-			tracks,
-			playback.isPlaying,
-			setTracks,
-			setSelectedTrackId,
-		],
-	);
 
 	return (
 		<>
-			<div ref={containerRef} className="relative w-full h-full" data-daw-grid>
+			<div
+				ref={containerRef}
+				className="relative w-full h-full"
+				data-daw-grid
+				data-dragging={draggingClip ? "true" : undefined}
+			>
 				{tracks.map((track, index) => {
 					// Track row layout
 					const trackHeight = Math.round(
@@ -700,6 +725,14 @@ export function DAWTrackContent() {
 																originalTrackIndex: index,
 																sourceTrackId: track.id,
 															});
+															sendDragEvent({
+																type: "START_CLIP_DRAG",
+																clipId: clip.id,
+																trackId: track.id,
+																startTime: clip.startTime,
+																offsetX: e.clientX - rect.left,
+																offsetY: e.clientY - rect.top,
+															});
 														}
 													}}
 													onKeyDown={(e) => {
@@ -743,6 +776,18 @@ export function DAWTrackContent() {
 															originalTrackIndex: index,
 															sourceTrackId: track.id,
 														});
+														const rect =
+															e.currentTarget.parentElement?.getBoundingClientRect();
+														if (rect) {
+															sendDragEvent({
+																type: "START_CLIP_DRAG",
+																clipId: clip.id,
+																trackId: track.id,
+																startTime: clip.startTime,
+																offsetX: e.clientX - rect.left,
+																offsetY: e.clientY - rect.top,
+															});
+														}
 													}}
 													aria-label="Drag clip"
 												/>
@@ -936,6 +981,46 @@ export function DAWTrackContent() {
 					);
 				})}
 
+				{/* Drag Preview Overlay */}
+				{dragPreview &&
+					(() => {
+						const originalTrack = tracks.find(
+							(t) => t.id === dragPreview.originalTrackId,
+						);
+						const clip = originalTrack?.clips?.find(
+							(c) => c.id === dragPreview.clipId,
+						);
+						if (!clip) return null;
+						const trackHeight = Math.round(
+							DAW_HEIGHTS.TRACK_ROW * trackHeightZoom,
+						);
+						const targetIndex = tracks.findIndex(
+							(t) => t.id === dragPreview.previewTrackId,
+						);
+						const left = dragPreview.previewStartTime * pixelsPerMs;
+						const top = Math.max(0, targetIndex) * trackHeight;
+						const width = Math.max(
+							(clip.trimEnd - clip.trimStart) * pixelsPerMs,
+							8,
+						);
+						const color = clip.color ?? originalTrack?.color ?? "#3b82f6";
+						return (
+							<div
+								key="drag-preview"
+								className="absolute rounded-md pointer-events-none"
+								style={{
+									left,
+									top,
+									width,
+									height: trackHeight - 2,
+									backgroundColor: `${color}33`,
+									border: `2px dashed ${color}`,
+									zIndex: 1000,
+								}}
+							/>
+						);
+					})()}
+
 				{/* Project end marker */}
 				<div
 					className="absolute top-0 bottom-0 w-px bg-yellow-500/70 z-40"
@@ -967,20 +1052,7 @@ export function DAWTrackContent() {
 				</div>
 			</div>
 
-			{/* Automation Transfer Dialog */}
-			{automationTransferDialog && (
-				<AutomationTransferDialog
-					open={automationTransferDialog.open}
-					onOpenChange={(open) => {
-						if (!open) setAutomationTransferDialog(null);
-					}}
-					onConfirm={handleAutomationTransfer}
-					clipName={automationTransferDialog.clipName}
-					sourceTrackName={automationTransferDialog.sourceTrack.name}
-					targetTrackName={automationTransferDialog.targetTrack.name}
-					automationPointCount={automationTransferDialog.automationPointCount}
-				/>
-			)}
+			{/* Automation dialog removed in favor of default-move with Undo */}
 		</>
 	);
 }

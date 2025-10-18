@@ -39,24 +39,24 @@ export function AutomationTransferDialog({
 				<DialogHeader>
 					<DialogTitle>Move Automation Data?</DialogTitle>
 					<DialogDescription className="space-y-3 pt-2">
-						<p>
+						<span className="block">
 							You're moving <span className="font-semibold">{clipName}</span>{" "}
 							from <span className="font-semibold">{sourceTrackName}</span> to{" "}
 							<span className="font-semibold">{targetTrackName}</span>.
-						</p>
+						</span>
 						{automationPointCount > 0 ? (
-							<p>
+							<span className="block">
 								This track has{" "}
 								<span className="font-semibold">
 									{automationPointCount} automation point
 									{automationPointCount !== 1 ? "s" : ""}
 								</span>{" "}
 								in the clip's time range. What would you like to do?
-							</p>
+							</span>
 						) : (
-							<p className="text-muted-foreground text-sm">
+							<span className="block text-muted-foreground text-sm">
 								No automation data found in this clip's time range.
-							</p>
+							</span>
 						)}
 					</DialogDescription>
 				</DialogHeader>

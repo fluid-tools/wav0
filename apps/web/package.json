@@ -5,10 +5,11 @@
 	"type": "module",
 	"scripts": {
 		"dev": "next dev --turbopack",
-		"build": "tsc --noEmit && cd ../../packages/server && bunx convex deploy --cmd='cd ../../apps/web && next build --turbopack'",
+		"build": "tsc --noEmit && next build --turbopack",
 		"build:client": "tsc --noEmit && next build --turbopack",
+		"deploy:convex+build": "cd ../../packages/server && bunx convex deploy --cmd='cd ../../apps/web && next build --turbopack'",
 		"start": "next start",
-		"typecheck": "tsc --noEmit",
+		"check-types": "tsc --noEmit",
 		"lint": "biome check",
 		"format": "biome format --write"
 	},
@@ -55,7 +56,7 @@
 		"@wav0/server": "workspace:*",
 		"ai": "^5.0.60",
 		"better-auth": "1.3.8",
-		"botid": "^1.5.7",
+		"botid": "^1.5.9",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
 		"convex": "^1.27.3",
@@ -63,11 +64,12 @@
 		"embla-carousel-react": "^8.6.0",
 		"idb-keyval": "^6.2.2",
 		"jotai": "^2.15.0",
+		"jotai-xstate": "^0.6.1",
 		"lucide-react": "^0.544.0",
 		"mediabunny": "^1.23.0",
 		"motion": "^12.23.22",
 		"nanoid": "^5.1.6",
-		"next": "16.0.0-beta.0",
+		"next": "^15.5.6",
 		"next-safe-action": "^8.0.11",
 		"next-themes": "^0.4.6",
 		"nextjs-toploader": "^3.9.17",
@@ -77,6 +79,7 @@
 		"react-syntax-highlighter": "^15.6.6",
 		"react-virtuoso": "^4.14.1",
 		"server-only": "^0.0.1",
+		"shiki": "^3.13.0",
 		"sonner": "^2.0.7",
 		"streamdown": "^1.3.0",
 		"tailwind-merge": "^3.3.1",
@@ -84,6 +87,7 @@
 		"use-stick-to-bottom": "^1.1.1",
 		"vaul": "^1.1.2",
 		"wavesurfer.js": "^7.11.0",
+		"xstate": "^5.23.0",
 		"zod": "^4.1.11"
 	},
 	"devDependencies": {
@@ -92,7 +96,7 @@
 		"@tanstack/react-query-devtools": "^5.90.2",
 		"@types/node": "^22.18.8",
 		"@types/react": "19.2.2",
-		"@types/react-dom": "19.2.1",
+		"@types/react-dom": "19.2.2",
 		"@types/react-syntax-highlighter": "^15.5.13",
 		"dotenv-cli": "^10.0.0",
 		"tailwindcss": "^4.1.14",
@@ -101,6 +105,6 @@
 	},
 	"overrides": {
 		"@types/react": "19.2.2",
-		"@types/react-dom": "19.2.1"
+		"@types/react-dom": "19.2.2"
 	}
 }

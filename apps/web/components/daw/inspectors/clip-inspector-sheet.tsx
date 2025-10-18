@@ -147,7 +147,7 @@ export function ClipInspectorSheet() {
 										envelope={envelope}
 										onChange={handleEnvelopeChange}
 										clipStartTime={clip.startTime}
-										trackVolume={track.volume}
+										trackVolume={track.volume ?? 75}
 									/>
 								) : (
 									<p className="rounded-xl border border-dashed border-border/60 bg-background/40 p-4 text-xs text-muted-foreground">

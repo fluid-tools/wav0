@@ -6,6 +6,7 @@ import {
 	automationViewEnabledAtom,
 	playbackAtom,
 	projectEndOverrideAtom,
+	resetProjectAtom,
 	selectedClipIdAtom,
 	selectedTrackIdAtom,
 	setCurrentTimeAtom,
@@ -32,6 +33,7 @@ export function GlobalShortcuts() {
 	const [automationViewEnabled, setAutomationViewEnabled] = useAtom(
 		automationViewEnabledAtom,
 	);
+	const [, resetProject] = useAtom(resetProjectAtom);
 
 	useEffect(() => {
 		const ensureSelection = () => {
@@ -273,6 +275,19 @@ export function GlobalShortcuts() {
 				setCurrentTime(e.key === "ArrowLeft" ? 0 : totalDuration);
 				return;
 			}
+
+			// Cmd/Ctrl+Shift+Backspace: Reset project
+			if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "Backspace") {
+				e.preventDefault();
+				if (
+					confirm(
+						"Reset project to default state? This will clear all tracks and settings.",
+					)
+				) {
+					resetProject();
+				}
+				return;
+			}
 		};
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
@@ -293,6 +308,7 @@ export function GlobalShortcuts() {
 		setSelectedTrackId,
 		automationViewEnabled,
 		setAutomationViewEnabled,
+		resetProject,
 	]);
 
 	return null;

@@ -41,6 +41,7 @@ import { EventListSheet } from "./inspectors/event-list-sheet";
 import { DAWTimeline } from "./panels/daw-timeline";
 import { DAWTrackContent } from "./panels/daw-track-content";
 import { DAWTrackList } from "./panels/daw-track-list";
+import { ClipMoveToastManager } from "./toast/clip-move-toast";
 import { UnifiedOverlay } from "./unified-overlay";
 
 export function DAWContainer() {
@@ -374,6 +375,7 @@ export function DAWContainer() {
 			<DAWToolbar />
 			{/* Global keyboard shortcuts */}
 			<GlobalShortcuts />
+			<ClipMoveToastManager />
 			<ClipEditorDrawer />
 			<EventListSheet />
 
