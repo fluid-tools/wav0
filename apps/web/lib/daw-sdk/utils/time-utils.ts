@@ -281,3 +281,54 @@ export function generateBarsGrid(
 
     return out
 }
+
+export function enumerateGrid(
+    viewStartMs: number,
+    viewEndMs: number,
+    bpm: number,
+    signature: { num: number; den: number },
+    res: "1/1"|"1/2"|"1/4"|"1/8"|"1/16",
+    triplet: boolean,
+): { measures: number[]; beats: number[]; subs: number[] } {
+    const measures: number[] = []
+    const beats: number[] = []
+    const subs: number[] = []
+    const secondsPerBeat = (60 / bpm) * (4 / signature.den)
+    const beatsPerBar = signature.num
+    const msPerBeat = secondsPerBeat * 1000
+    const msPerBar = beatsPerBar * msPerBeat
+    const divisionBeats = getDivisionBeats(res, signature)
+    const subdivBeats = triplet ? divisionBeats / 3 : divisionBeats
+    const subdivMs = subdivBeats * msPerBeat
+
+    const startBar = Math.floor(viewStartMs / msPerBar)
+    const endBar = Math.ceil(viewEndMs / msPerBar) + 1
+
+    for (let bar = startBar; bar < endBar; bar++) {
+        const barMs = bar * msPerBar
+        if (barMs >= viewStartMs && barMs <= viewEndMs) measures.push(barMs)
+        for (let beat = 1; beat < beatsPerBar; beat++) {
+            const beatMs = barMs + beat * msPerBeat
+            if (beatMs >= viewStartMs && beatMs <= viewEndMs) beats.push(beatMs)
+        }
+        const divisionsPerBar = beatsPerBar / subdivBeats
+        for (let i = 1; i < divisionsPerBar; i++) {
+            const subMs = barMs + i * subdivMs
+            if (subMs >= viewStartMs && subMs <= viewEndMs) subs.push(subMs)
+        }
+    }
+
+    return { measures, beats, subs }
+}
+
+export function computeSubdivisionMs(
+    bpm: number,
+    signature: { num: number; den: number },
+    res: "1/1"|"1/2"|"1/4"|"1/8"|"1/16",
+    triplet: boolean,
+): number {
+    const secondsPerBeat = (60 / bpm) * (4 / signature.den)
+    const divisionBeats = getDivisionBeats(res, signature)
+    const subdivBeats = triplet ? divisionBeats / 3 : divisionBeats
+    return subdivBeats * secondsPerBeat * 1000
+}

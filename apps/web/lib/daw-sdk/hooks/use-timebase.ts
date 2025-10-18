@@ -19,7 +19,7 @@ export function useTimebase() {
 	}
 
 	function format(ms: number): string {
-		if (grid.mode === "time") return ms.toFixed(0) + " ms";
+		if (grid.mode === "time") return `${ms.toFixed(0)} ms`;
 		return formatBarsBeatsTicks(ms, music.tempoBpm, music.timeSignature);
 	}
 

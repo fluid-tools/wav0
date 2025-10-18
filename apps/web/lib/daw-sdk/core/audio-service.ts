@@ -174,6 +174,43 @@ export class AudioService {
 	}
 
 	/**
+	 * Get full AudioBuffer for a track (for export/offline rendering)
+	 */
+	async getAudioBuffer(opfsFileId: string): Promise<AudioBuffer | null> {
+		const sink = this.getAudioBufferSink(opfsFileId);
+		if (!sink) return null;
+		const duration = await sink.track.computeDuration();
+		const buffers: AudioBuffer[] = [];
+		for await (const { buffer } of sink.buffers(0, duration)) {
+			buffers.push(buffer);
+		}
+		if (buffers.length === 0) return null;
+		if (buffers.length === 1) return buffers[0];
+		return this.concatenateBuffers(buffers);
+	}
+
+	/**
+	 * Concatenate multiple AudioBuffers
+	 */
+	private concatenateBuffers(buffers: AudioBuffer[]): AudioBuffer {
+		if (buffers.length === 0) throw new Error("No buffers to concatenate");
+		if (buffers.length === 1) return buffers[0];
+		const totalLength = buffers.reduce((sum, b) => sum + b.length, 0);
+		const sampleRate = buffers[0].sampleRate;
+		const numberOfChannels = buffers[0].numberOfChannels;
+		const ac = new AudioContext({ sampleRate });
+		const result = ac.createBuffer(numberOfChannels, totalLength, sampleRate);
+		let offset = 0;
+		for (const buf of buffers) {
+			for (let ch = 0; ch < numberOfChannels; ch++) {
+				result.getChannelData(ch).set(buf.getChannelData(ch), offset);
+			}
+			offset += buf.length;
+		}
+		return result;
+	}
+
+	/**
 	 * Get track metadata
 	 */
 	getTrackInfo(trackId: string): AudioFileInfo | null {

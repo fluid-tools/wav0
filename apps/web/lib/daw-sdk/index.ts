@@ -18,6 +18,7 @@ export * from "./hooks/use-live-automation-gain";
 export * from "./hooks/use-playback-sync";
 // ===== State Management =====
 export * from "./state";
+export { loopRegionAtom } from "./state/timeline";
 // ===== Type Schemas & Validation =====
 export * from "./types/schemas";
 export * from "./utils/automation-utils";

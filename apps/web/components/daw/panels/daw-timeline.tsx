@@ -3,9 +3,11 @@
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MarkerTrack } from "@/components/daw/panels/marker-track";
+import { TimelineGridCanvas } from "@/components/daw/panels/timeline-grid-canvas";
 import {
 	addMarkerAtom,
 	gridAtom,
+	horizontalScrollAtom,
 	markersAtom,
 	musicalMetadataAtom,
 	playbackAtom,
@@ -40,7 +42,7 @@ export function DAWTimeline() {
 	const [, addMarker] = useAtom(addMarkerAtom);
 	const [grid] = useAtom(gridAtom);
 	const [music] = useAtom(musicalMetadataAtom);
-    const { grid: tGrid, getGridSubdivisions } = useTimebase();
+	const { grid: tGrid } = useTimebase();
 
 	// legacy marker drag removed in favor of dedicated MarkerTrack
 
@@ -91,27 +93,7 @@ export function DAWTimeline() {
 		return markers;
 	};
 
-	// Calculate beat markers (bars mode) using musical metadata
-	const getBeatMarkers = () => {
-		if (pxPerMs <= 0) return [];
-		const markers = [];
-		const beatsPerMinute = music.tempoBpm;
-		const secondsPerBeat =
-			(60 / beatsPerMinute) * (4 / music.timeSignature.den);
-		const pixelsPerBeat = secondsPerBeat * pxPerMs * 1000;
-
-		for (let beat = 0; beat * pixelsPerBeat < timelineWidth; beat++) {
-			const time = beat * secondsPerBeat;
-			markers.push({
-				beat,
-				time: time * 1000,
-				position: beat * pixelsPerBeat,
-				isMeasure: beat % music.timeSignature.num === 0,
-			});
-		}
-
-		return markers;
-	};
+	// Beat markers computation removed; canvas grid handles bars mode
 
 	const handleTimelineClick = (e: React.MouseEvent | React.PointerEvent) => {
 		const rect = e.currentTarget.getBoundingClientRect();
@@ -164,10 +146,8 @@ export function DAWTimeline() {
 
 	// Playhead position calculation (now handled by DAWPlayhead component)
 
-    const timeMarkers = getTimeMarkers();
-    const beatMarkers = getBeatMarkers();
-    const { stepMs } = useTimebase();
-    const subdivisionPx = tGrid.mode === "bars" ? Math.max(4, (stepMs || 0) * pxPerMs) : 0;
+	const timeMarkers = getTimeMarkers();
+	const [horizontalScroll] = useAtom(horizontalScrollAtom);
 
 	return (
 		<button
@@ -182,43 +162,33 @@ export function DAWTimeline() {
 			style={{ width: timelineWidth }}
 			aria-label="Timeline - click to set playback position"
 		>
-			{/* Subdivision gradient for bars mode (low-cost) */}
-			{tGrid.mode === "bars" && subdivisionPx > 6 && (
-				<div
-					className="absolute inset-0 pointer-events-none"
-					style={{
-						backgroundImage:
-							`repeating-linear-gradient(to right, rgba(var(--foreground),0.1) 0, rgba(var(--foreground),0.1) 1px, transparent 1px, transparent ${subdivisionPx}px)`,
-					}}
+			{/* Canvas grid for bars mode */}
+			{tGrid.mode === "bars" ? (
+				<TimelineGridCanvas
+					width={timelineWidth}
+					height={400}
+					pxPerMs={pxPerMs}
+					scrollLeft={horizontalScroll}
+					bpm={music.tempoBpm}
+					signature={music.timeSignature}
+					resolution={tGrid.resolution}
+					triplet={Boolean(tGrid.triplet)}
+					swing={Number(tGrid.swing) || 0}
 				/>
+			) : (
+				timeMarkers.map((marker) => (
+					<div
+						key={`time-${marker.time}`}
+						className="absolute top-0"
+						style={{ left: marker.position }}
+					>
+						<div className="w-px h-3 bg-foreground" />
+						<span className="text-xs text-muted-foreground ml-1 font-mono">
+							{marker.label}
+						</span>
+					</div>
+				))
 			)}
-            {/* Grids */}
-            {tGrid.mode === "bars"
-                ? getGridSubdivisions(timelineWidth, pxPerMs).map((g) => (
-                        <div
-                            key={`${g.timeMs}-${g.posPx}`}
-                            className={`absolute top-0 bottom-0 ${
-                                g.emphasis === "measure"
-                                    ? "w-0.5 bg-border"
-                                    : g.emphasis === "beat"
-                                    ? "w-px bg-border/70"
-                                    : "w-px bg-border/40"
-                            }`}
-                            style={{ left: g.posPx }}
-                        />
-                  ))
-                : timeMarkers.map((marker) => (
-                        <div
-                            key={`time-${marker.time}`}
-                            className="absolute top-0"
-                            style={{ left: marker.position }}
-                        >
-                            <div className="w-px h-3 bg-foreground" />
-                            <span className="text-xs text-muted-foreground ml-1 font-mono">
-                                {marker.label}
-                            </span>
-                        </div>
-                  ))}
 
 			{/* Project markers track */}
 			<MarkerTrack pxPerMs={pxPerMs} width={timelineWidth} />
