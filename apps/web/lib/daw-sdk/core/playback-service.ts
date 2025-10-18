@@ -1,7 +1,12 @@
 "use client";
 
 import { z } from "zod";
-import type { Clip, PlaybackOptions, Track } from "../types/schemas";
+import type {
+	Clip,
+	PlaybackOptions,
+	Track,
+	TrackEnvelope,
+} from "../types/schemas";
 import { dbToGain, volumeToDb } from "../utils/volume-utils";
 import { audioService } from "./audio-service";
 
@@ -21,6 +26,7 @@ type TrackPlaybackState = {
 	muteSoloGainNode: GainNode | null;
 	isPlaying: boolean;
 	automationGeneration: number;
+	lastEnvelopeDesc?: string;
 };
 
 /**
@@ -55,7 +61,12 @@ export class PlaybackService {
 	// Global clip registry: enforces one-track-per-clip ownership
 	private activeClips = new Map<
 		string,
-		{ trackId: string; clipState: ClipPlaybackState; desc: string; generation: number }
+		{
+			trackId: string;
+			clipState: ClipPlaybackState;
+			desc: string;
+			generation: number;
+		}
 	>();
 	// Serialization mutex for all sync operations
 	private syncLock: Promise<void> = Promise.resolve();
@@ -67,12 +78,24 @@ export class PlaybackService {
 			() => fn(),
 			() => fn(),
 		);
-		this.syncLock = queued.then(() => {}, () => {});
+		this.syncLock = queued.then(
+			() => {},
+			() => {},
+		);
 		return queued;
 	}
 
 	private describeClip(clip: Clip): string {
 		return `${clip.startTime}|${clip.trimStart}|${clip.trimEnd}|${clip.loop ? "1" : "0"}|${clip.loopEnd ?? -1}`;
+	}
+
+	private describeEnvelope(env?: TrackEnvelope): string {
+		if (!env || !env.points?.length) return "";
+		const pts = env.points.map((p) => `${p.time}:${p.value}`).join(",");
+		const segs = (env.segments ?? [])
+			.map((s) => `${s.fromPointId}->${s.toPointId}:${s.curve ?? "0"}`)
+			.join(",");
+		return `${pts}#${segs}`;
 	}
 
 	static getInstance(): PlaybackService {
@@ -196,7 +219,12 @@ export class PlaybackService {
 
 		// Register globally BEFORE scheduling audio
 		const desc = this.describeClip(clip);
-		this.activeClips.set(clip.id, { trackId: track.id, clipState, desc, generation });
+		this.activeClips.set(clip.id, {
+			trackId: track.id,
+			clipState,
+			desc,
+			generation,
+		});
 
 		// Schedule audio using existing logic
 		await this.scheduleClipWithState(track, clip, trackState, clipState);
@@ -357,13 +385,6 @@ export class PlaybackService {
 		}
 	}
 
-	/**
-	 * Schedule track volume envelope automation
-	 * @deprecated Use rescheduleTrackAutomation instead
-	 */
-	private scheduleTrackEnvelope(track: Track): void {
-		this.rescheduleTrackAutomation(track);
-	}
 
 	/**
 	 * Update track volume during playback without disrupting automation
@@ -455,10 +476,17 @@ export class PlaybackService {
 				state.muteSoloGainNode.connect(this.masterGainNode);
 			}
 
+			// Detect envelope changes and bump automation generation
+			const desc = this.describeEnvelope(track.volumeEnvelope);
+			if (state.lastEnvelopeDesc !== desc) {
+				state.automationGeneration++;
+				state.lastEnvelopeDesc = desc;
+			}
+
 			const muted = Boolean(track.muted) || (soloEngaged && !track.soloed);
 			this.trackMuteState.set(track.id, muted);
 			state.muteSoloGainNode.gain.value = muted ? 0 : 1;
-			this.scheduleTrackEnvelope(track);
+			this.rescheduleTrackAutomation(track, state.automationGeneration);
 			state.isPlaying = !muted;
 		}
 		this.currentTracks = new Map(tracks.map((track) => [track.id, track]));
@@ -489,7 +517,10 @@ export class PlaybackService {
 		if (!this.audioContext) return;
 
 		// Build desired state: which clips should be on which tracks
-		const desiredState = new Map<string, { clip: Clip; trackId: string; desc: string }>();
+		const desiredState = new Map<
+			string,
+			{ clip: Clip; trackId: string; desc: string }
+		>();
 		for (const track of tracks) {
 			const clips =
 				track.clips && track.clips.length > 0
