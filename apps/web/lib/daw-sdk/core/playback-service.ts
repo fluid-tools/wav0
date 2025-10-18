@@ -668,8 +668,8 @@ export class PlaybackService {
 		}
 		if (!sink) return;
 
-    // Use current timeline (seconds)
-    const timelineSec = this.getPlaybackTime();
+		// Use current timeline (seconds)
+		const timelineSec = this.getPlaybackTime();
 
 		const clipStartSec = clip.startTime / 1000;
 		const clipTrimStartSec = clip.trimStart / 1000;
@@ -781,28 +781,28 @@ export class PlaybackService {
 					clipGain ?? this.masterGainNode ?? this.audioContext.destination,
 				);
 
-			const timeInTrimmed = timestamp - clipTrimStartSec;
-			const timelinePos = clipStartSec + cycleOffsetSec + timeInTrimmed;
-			if (timelinePos > loopUntilSec) break;
+				const timeInTrimmed = timestamp - clipTrimStartSec;
+				const timelinePos = clipStartSec + cycleOffsetSec + timeInTrimmed;
+				if (timelinePos > loopUntilSec) break;
 
-			// Anchor to current timeline
-			const now = this.audioContext.currentTime;
-			const currentTl = this.getPlaybackTime();
-			const startAt = now + (timelinePos - currentTl);
+				// Anchor to current timeline
+				const now = this.audioContext.currentTime;
+				const currentTl = this.getPlaybackTime();
+				const startAt = now + (timelinePos - currentTl);
 
-			if (startAt >= now) {
-				node.start(startAt);
-				this.nodeStartTimes.set(node, startAt);
-			} else {
-				const offset = now - startAt;
-				if (offset < buffer.duration) {
-					const actualStart = now;
-					node.start(actualStart, offset);
-					this.nodeStartTimes.set(node, actualStart);
+				if (startAt >= now) {
+					node.start(startAt);
+					this.nodeStartTimes.set(node, startAt);
 				} else {
-					continue;
+					const offset = now - startAt;
+					if (offset < buffer.duration) {
+						const actualStart = now;
+						node.start(actualStart, offset);
+						this.nodeStartTimes.set(node, actualStart);
+					} else {
+						continue;
+					}
 				}
-			}
 
 				cps.audioSources.push(node);
 				this.queuedAudioNodes.add(node);
