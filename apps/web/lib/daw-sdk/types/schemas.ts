@@ -98,6 +98,14 @@ export const TimelineSectionSchema = z.object({
 	color: z.string(),
 });
 
+// Project marker (named cue on the timeline)
+export const ProjectMarkerSchema = z.object({
+    id: z.string(),
+    timeMs: z.number().min(0),
+    name: z.string().default(""),
+    color: z.string().default("#ffffff"),
+});
+
 export const ToolSchema = z.enum(["pointer", "trim", "razor"]);
 
 export const AutomationTypeSchema = z.enum(["volume", "pan"]);
@@ -137,6 +145,7 @@ export type Track = z.infer<typeof TrackSchema>;
 export type PlaybackState = z.infer<typeof PlaybackStateSchema>;
 export type TimelineState = z.infer<typeof TimelineStateSchema>;
 export type TimelineSection = z.infer<typeof TimelineSectionSchema>;
+export type ProjectMarker = z.infer<typeof ProjectMarkerSchema>;
 export type Tool = z.infer<typeof ToolSchema>;
 export type AutomationType = z.infer<typeof AutomationTypeSchema>;
 export type ClipInspectorTarget = z.infer<typeof ClipInspectorTargetSchema>;

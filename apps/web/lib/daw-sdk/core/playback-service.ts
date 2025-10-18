@@ -7,6 +7,7 @@ import type {
 	Track,
 	TrackEnvelope,
 } from "../types/schemas";
+import { evaluateEnvelopeGainAt } from "../utils/automation-utils";
 import { dbToGain, volumeToDb } from "../utils/volume-utils";
 import { audioService } from "./audio-service";
 
@@ -261,12 +262,15 @@ export class PlaybackService {
 		// Step 1: Cancel all existing scheduled values
 		envelopeGain.gain.cancelScheduledValues(now);
 
-		// Step 2: Anchor current value at now
-		envelopeGain.gain.setValueAtTime(envelopeGain.gain.value, now);
-
-		// Convert volume to linear gain using pure dB math
+		// Step 2: Anchor to instantaneous effective gain at current transport time
+		const currentTimeMs = this.getPlaybackTime() * 1000;
 		const baseVolumeDb = track.volumeDb ?? volumeToDb(track.volume ?? 75);
 		const baseVolume = dbToGain(baseVolumeDb);
+		const multiplier = evaluateEnvelopeGainAt(envelope, currentTimeMs);
+		const anchorGain = baseVolume * multiplier;
+		envelopeGain.gain.setValueAtTime(anchorGain, now);
+
+		// baseVolume already computed above
 
 		if (!envelope || !envelope.enabled || envelope.points.length === 0) {
 			envelopeGain.gain.setValueAtTime(baseVolume, now);
@@ -274,7 +278,6 @@ export class PlaybackService {
 		}
 
 		const sorted = [...envelope.points].sort((a, b) => a.time - b.time);
-		const currentTimeMs = this.getPlaybackTime() * 1000;
 
 		// Find current multiplier at playback position with proper interpolation
 		let currentMultiplier = 1.0;
@@ -498,14 +501,18 @@ export class PlaybackService {
 	}
 
 	synchronizeTracks(tracks: Track[]): void {
-		this.applySnapshot(tracks);
-
-		// Fire async sync via mutex (use global registry)
 		if (this.isPlaying && this.audioContext) {
-			this.queueSync(() => this.synchronizeClipsGlobal(tracks)).catch((err) => {
-				console.error("Failed to synchronize clips during playback:", err);
+			// Atomic: snapshot + clip sync under mutex to avoid gaps
+			this.queueSync(async () => {
+				this.applySnapshot(tracks);
+				await this.synchronizeClipsGlobal(tracks);
+			}).catch((err) => {
+				console.error("Failed to synchronize tracks during playback:", err);
 			});
+			return;
 		}
+		// Not playing: just apply snapshot
+		this.applySnapshot(tracks);
 	}
 
 	/**

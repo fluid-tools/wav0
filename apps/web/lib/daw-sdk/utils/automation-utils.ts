@@ -244,6 +244,18 @@ export function getEnvelopeMultiplierAtTime(
 }
 
 /**
+ * Evaluate envelope gain multiplier at a given absolute timeline time
+ * Safe for undefined/disabled envelopes. Returns 1.0 when not applicable.
+ */
+export function evaluateEnvelopeGainAt(
+    envelope: TrackEnvelope | undefined,
+    timeMs: number,
+): number {
+    if (!envelope || !envelope.enabled || !envelope.points?.length) return 1.0
+    return getEnvelopeMultiplierAtTime(envelope, timeMs)
+}
+
+/**
  * Interpolate between two values based on curve value (-99 to +99)
  * @deprecated Use evaluateSegmentCurve with -99 to +99 curve parameter instead
  */

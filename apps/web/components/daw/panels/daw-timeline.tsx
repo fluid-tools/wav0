@@ -3,15 +3,21 @@
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-	playbackAtom,
-	playheadViewportPxAtom,
-	projectEndOverrideAtom,
-	projectEndPositionAtom,
-	setCurrentTimeAtom,
-	timelineAtom,
-	timelinePxPerMsAtom,
-	timelineWidthAtom,
+    playbackAtom,
+    playheadViewportPxAtom,
+    projectEndOverrideAtom,
+    projectEndPositionAtom,
+    setCurrentTimeAtom,
+    timelineAtom,
+    timelinePxPerMsAtom,
+    timelineWidthAtom,
+    markersAtom,
+    updateMarkerAtom,
+    addMarkerAtom,
+    gridAtom,
+    musicalMetadataAtom,
 } from "@/lib/daw-sdk";
+import { snapTimeMs } from "@/lib/daw-sdk/utils/time-utils";
 import { formatDuration } from "@/lib/storage/opfs";
 
 export function DAWTimeline() {
@@ -23,10 +29,22 @@ export function DAWTimeline() {
 	const [_projectEndOverride, setProjectEndOverride] = useAtom(
 		projectEndOverrideAtom,
 	);
-	const containerRef = useRef<HTMLButtonElement>(null);
+    const containerRef = useRef<HTMLButtonElement>(null);
 	const [isDraggingEnd, setIsDraggingEnd] = useState(false);
 	const [playheadViewportPx] = useAtom(playheadViewportPxAtom);
 	const [pxPerMs] = useAtom(timelinePxPerMsAtom);
+    const [markers] = useAtom(markersAtom);
+    const [, updateMarker] = useAtom(updateMarkerAtom);
+    const [, addMarker] = useAtom(addMarkerAtom);
+    const [grid] = useAtom(gridAtom);
+    const [music] = useAtom(musicalMetadataAtom);
+
+    const markerDrag = useRef<{
+        id: string;
+        pointerId: number;
+        startX: number;
+        startTimeMs: number;
+    } | null>(null);
 
 	const onMouseMove = useCallback(
 		(e: MouseEvent) => {
@@ -113,6 +131,18 @@ export function DAWTimeline() {
 		setCurrentTime(Math.max(0, time));
 	};
 
+    // Add marker at playhead on key "m"
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key.toLowerCase() !== "m") return;
+            const timeMs = Math.max(0, Math.round(playback.currentTime));
+            const snapped = snapTimeMs(timeMs, grid, music.tempoBpm, music.timeSignature);
+            addMarker({ timeMs: snapped, name: "", color: "#ffffff" });
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [addMarker, grid, music.tempoBpm, music.timeSignature, playback.currentTime]);
+
 	const onTimelinePointerDown = (
 		event: React.PointerEvent<HTMLButtonElement>,
 	) => {
@@ -163,6 +193,55 @@ export function DAWTimeline() {
 					</span>
 				</div>
 			))}
+
+            {/* Project markers */}
+            {markers.map((m) => {
+                const left = m.timeMs * pxPerMs;
+                return (
+                    <div
+                        key={m.id}
+                        className="absolute top-0 bottom-0 flex items-start"
+                        style={{ left }}
+                        role="button"
+                        aria-label={`Marker ${m.name || m.id}`}
+                        onPointerDown={(e) => {
+                            e.preventDefault();
+                            (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+                            markerDrag.current = {
+                                id: m.id,
+                                pointerId: e.pointerId,
+                                startX: e.clientX,
+                                startTimeMs: m.timeMs,
+                            };
+                        }}
+                        onPointerMove={(e) => {
+                            const drag = markerDrag.current;
+                            if (!drag || e.pointerId !== drag.pointerId) return;
+                            const dx = e.clientX - drag.startX;
+                            const raw = Math.max(0, drag.startTimeMs + dx / pxPerMs);
+                            const snapped = snapTimeMs(raw, grid, music.tempoBpm, music.timeSignature);
+                            updateMarker(drag.id, { timeMs: snapped });
+                        }}
+                        onPointerUp={(e) => {
+                            const drag = markerDrag.current;
+                            if (drag && e.pointerId === drag.pointerId) {
+                                markerDrag.current = null;
+                            }
+                        }}
+                        title={m.name || "Marker"}
+                    >
+                        <div
+                            className="w-2 h-4 rounded-b-sm"
+                            style={{ backgroundColor: m.color }}
+                        />
+                        {m.name ? (
+                            <span className="ml-1 text-xs text-muted-foreground bg-background/70 px-1 rounded">
+                                {m.name}
+                            </span>
+                        ) : null}
+                    </div>
+                );
+            })}
 
 			{/* Project end marker and buffer zone */}
 			<div

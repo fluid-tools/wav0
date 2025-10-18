@@ -138,3 +138,54 @@ export function calculateTimeMarkers(
 
 	return markers;
 }
+
+// === Musical timebase conversions ===
+export function msToBeats(ms: number, bpm: number): number {
+    const seconds = ms / 1000
+    return seconds * (bpm / 60)
+}
+
+export function beatsToMs(beats: number, bpm: number): number {
+    const seconds = beats * (60 / bpm)
+    return seconds * 1000
+}
+
+export function msToBarsBeats(
+    ms: number,
+    bpm: number,
+    signature: { num: number; den: number },
+): { bar: number; beat: number; tick: number } {
+    const beats = msToBeats(ms, bpm)
+    const beatsPerBar = signature.num
+    const bar = Math.floor(beats / beatsPerBar)
+    const beat = Math.floor(beats % beatsPerBar)
+    const tick = Math.floor((beats - Math.floor(beats)) * 960) // PPQ=960
+    return { bar: bar + 1, beat: beat + 1, tick }
+}
+
+export function barsBeatsToMs(
+    pos: { bar: number; beat: number; tick?: number },
+    bpm: number,
+    signature: { num: number; den: number },
+): number {
+    const beatsPerBar = signature.num
+    const totalBeats = (pos.bar - 1) * beatsPerBar + (pos.beat - 1) + (pos.tick ?? 0) / 960
+    return beatsToMs(totalBeats, bpm)
+}
+
+export function snapTimeMs(
+    timeMs: number,
+    grid: { mode: "time" | "bars"; resolution: string },
+    bpm: number,
+    signature: { num: number; den: number },
+): number {
+    if (grid.mode === "time") return timeMs
+    // bars mode: resolution as fraction of a bar (e.g. 1/4 = quarter note)
+    const res = grid.resolution
+    const denom = res.includes("/") ? Number(res.split("/")[1]) : 4
+    const beatsPerBar = signature.num
+    const beatsPerDivision = beatsPerBar / denom
+    const beatPos = msToBeats(timeMs, bpm)
+    const snappedBeats = Math.round(beatPos / beatsPerDivision) * beatsPerDivision
+    return beatsToMs(snappedBeats, bpm)
+}
