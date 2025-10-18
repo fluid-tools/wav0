@@ -265,7 +265,7 @@ export class PlaybackService {
 		envelopeGain.gain.setValueAtTime(envelopeGain.gain.value, now);
 
 		// Convert volume to linear gain using pure dB math
-		const baseVolumeDb = track.volumeDb ?? volumeToDb(track.volume ?? 100);
+		const baseVolumeDb = track.volumeDb ?? volumeToDb(track.volume ?? 75);
 		const baseVolume = dbToGain(baseVolumeDb);
 
 		if (!envelope || !envelope.enabled || envelope.points.length === 0) {
