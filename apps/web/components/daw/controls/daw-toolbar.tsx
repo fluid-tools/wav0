@@ -13,6 +13,8 @@ import {
 	Settings,
 	Upload,
 } from "lucide-react";
+import { useState } from "react";
+import { ExportDialog } from "@/components/daw/dialogs/export-dialog";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -36,14 +38,12 @@ import {
 	gridAtom,
 	musicalMetadataAtom,
 	projectNameAtom,
-	tracksAtom,
 } from "@/lib/daw-sdk";
 
 export function DAWToolbar() {
 	const [grid, setGrid] = useAtom(gridAtom);
 	const [music, setMusic] = useAtom(musicalMetadataAtom);
 	const [projectName, setProjectName] = useAtom(projectNameAtom);
-	const [tracks] = useAtom(tracksAtom);
 	const [, setEventListOpen] = useAtom(eventListOpenAtom);
 	const [automationViewEnabled, setAutomationViewEnabled] = useAtom(
 		automationViewEnabledAtom,
@@ -64,287 +64,292 @@ export function DAWToolbar() {
 		input.click();
 	};
 
-	const handleExportProject = async () => {
-		// Basic project export
-		const projectData = {
-			name: projectName,
-			tracks: tracks,
-			timestamp: new Date().toISOString(),
-		};
-
-		const blob = new Blob([JSON.stringify(projectData, null, 2)], {
-			type: "application/json",
-		});
-
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement("a");
-		a.href = url;
-		a.download = `${projectName}.wav0`;
-		a.click();
-		URL.revokeObjectURL(url);
-	};
+	const [exportOpen, setExportOpen] = useState(false);
 
 	return (
-		<div
-			className="bg-background border-b flex items-center justify-between px-4"
-			style={{ height: DAW_HEIGHTS.TOOLBAR }}
-		>
-			<div className="flex items-center gap-4">
-				<h1 className={DAW_TEXT.BRAND}>
-					wav<span className="text-muted-foreground">0</span>
-				</h1>
+		<>
+			<div
+				className="bg-background border-b flex items-center justify-between px-4"
+				style={{ height: DAW_HEIGHTS.TOOLBAR }}
+			>
+				<div className="flex items-center gap-4">
+					<h1 className={DAW_TEXT.BRAND}>
+						wav<span className="text-muted-foreground">0</span>
+					</h1>
+
+					<div className="flex items-center gap-2">
+						<Button variant="ghost" size="sm" onClick={() => {}}>
+							<FolderOpen className={DAW_ICONS.MD} />
+						</Button>
+						<Button variant="ghost" size="sm" onClick={() => {}}>
+							<Save className={DAW_ICONS.MD} />
+						</Button>
+					</div>
+				</div>
 
 				<div className="flex items-center gap-2">
-					<Button variant="ghost" size="sm" onClick={() => {}}>
-						<FolderOpen className={DAW_ICONS.MD} />
-					</Button>
-					<Button variant="ghost" size="sm" onClick={() => {}}>
-						<Save className={DAW_ICONS.MD} />
-					</Button>
+					<Input
+						value={projectName}
+						onChange={(e) => setProjectName(e.target.value)}
+						className="w-48 text-sm"
+						style={{ height: DAW_HEIGHTS.BUTTON_MD }}
+						placeholder="Project name"
+					/>
+					{/* Tempo & Signature */}
+					<div className="flex items-center gap-2 ml-2">
+						<label className="text-xs flex items-center gap-1">
+							BPM
+							<input
+								type="number"
+								min={30}
+								max={300}
+								defaultValue={music.tempoBpm}
+								onChange={(e) => {
+									const target = e.target as HTMLInputElement & { _t?: number };
+									const v = Number(target.value) || 120;
+									window.clearTimeout(target._t);
+									target._t = window.setTimeout(
+										() => setMusic({ ...music, tempoBpm: v }),
+										150,
+									);
+								}}
+								className="w-16 h-7 border rounded px-1 text-xs"
+							/>
+						</label>
+						<label className="text-xs flex items-center gap-1">
+							TS
+							<select
+								className="h-7 border rounded px-1 text-xs"
+								defaultValue={music.timeSignature.num}
+								onChange={(e) => {
+									const target = e.target as HTMLSelectElement & {
+										_t?: number;
+									};
+									const num = Number(target.value) as 2 | 3 | 4 | 5 | 7;
+									window.clearTimeout(target._t);
+									target._t = window.setTimeout(
+										() =>
+											setMusic({
+												...music,
+												timeSignature: { num, den: music.timeSignature.den },
+											}),
+										150,
+									);
+								}}
+							>
+								{[2, 3, 4, 5, 7].map((n) => (
+									<option key={n} value={n}>
+										{n}
+									</option>
+								))}
+							</select>
+							<span>/</span>
+							<select
+								className="h-7 border rounded px-1 text-xs"
+								defaultValue={music.timeSignature.den}
+								onChange={(e) => {
+									const target = e.target as HTMLSelectElement & {
+										_t?: number;
+									};
+									const den = Number(target.value) as 2 | 4 | 8;
+									window.clearTimeout(target._t);
+									target._t = window.setTimeout(
+										() =>
+											setMusic({
+												...music,
+												timeSignature: { num: music.timeSignature.num, den },
+											}),
+										150,
+									);
+								}}
+							>
+								{[2, 4, 8].map((d) => (
+									<option key={d} value={d}>
+										{d}
+									</option>
+								))}
+							</select>
+						</label>
+					</div>
+					{/* Timebase */}
+					<div className="flex items-center gap-1 ml-2">
+						<Button
+							variant={grid.mode === "time" ? "default" : "ghost"}
+							size="sm"
+							onClick={() => setGrid({ ...grid, mode: "time" })}
+						>
+							Time
+						</Button>
+						<Button
+							variant={grid.mode === "bars" ? "default" : "ghost"}
+							size="sm"
+							onClick={() => setGrid({ ...grid, mode: "bars" })}
+						>
+							Bars
+						</Button>
+						<select
+							className="text-xs border rounded px-1 py-1 ml-1"
+							value={grid.resolution}
+							onChange={(e) =>
+								setGrid({
+									...grid,
+									resolution: e.target.value as typeof grid.resolution,
+								})
+							}
+						>
+							{(["1/1", "1/2", "1/4", "1/8", "1/16"] as const).map((r) => (
+								<option key={r} value={r}>
+									{r}
+								</option>
+							))}
+						</select>
+						<label className="text-xs ml-2 flex items-center gap-1">
+							<input
+								type="checkbox"
+								checked={grid.triplet}
+								onChange={(e) =>
+									setGrid({ ...grid, triplet: e.target.checked })
+								}
+							/>
+							Triplet
+						</label>
+						<label className="text-xs ml-2 flex items-center gap-1">
+							Swing
+							<input
+								type="range"
+								min={0}
+								max={0.6}
+								step={0.05}
+								value={grid.swing}
+								onChange={(e) =>
+									setGrid({ ...grid, swing: Number(e.target.value) })
+								}
+							/>
+						</label>
+					</div>
 				</div>
-			</div>
 
-			<div className="flex items-center gap-2">
-				<Input
-					value={projectName}
-					onChange={(e) => setProjectName(e.target.value)}
-					className="w-48 text-sm"
-					style={{ height: DAW_HEIGHTS.BUTTON_MD }}
-					placeholder="Project name"
-				/>
-				{/* Tempo & Signature */}
-				<div className="flex items-center gap-2 ml-2">
-					<label className="text-xs flex items-center gap-1">
-						BPM
-						<input
-							type="number"
-							min={30}
-							max={300}
-							value={music.tempoBpm}
-							onChange={(e) =>
-								setMusic({ ...music, tempoBpm: Number(e.target.value) || 120 })
-							}
-							className="w-16 h-7 border rounded px-1 text-xs"
-						/>
-					</label>
-					<label className="text-xs flex items-center gap-1">
-						TS
-						<select
-							className="h-7 border rounded px-1 text-xs"
-							value={music.timeSignature.num}
-							onChange={(e) =>
-								setMusic({
-									...music,
-									timeSignature: {
-										num: Number(e.target.value) as any,
-										den: music.timeSignature.den,
-									},
-								})
-							}
-						>
-							{[2, 3, 4, 5, 7].map((n) => (
-								<option key={n} value={n}>
-									{n}
-								</option>
-							))}
-						</select>
-						<span>/</span>
-						<select
-							className="h-7 border rounded px-1 text-xs"
-							value={music.timeSignature.den}
-							onChange={(e) =>
-								setMusic({
-									...music,
-									timeSignature: {
-										num: music.timeSignature.num,
-										den: Number(e.target.value) as any,
-									},
-								})
-							}
-						>
-							{[2, 4, 8].map((d) => (
-								<option key={d} value={d}>
-									{d}
-								</option>
-							))}
-						</select>
-					</label>
-				</div>
-				{/* Timebase */}
-				<div className="flex items-center gap-1 ml-2">
+				<div className="flex items-center gap-2">
 					<Button
-						variant={grid.mode === "time" ? "default" : "ghost"}
+						variant="ghost"
 						size="sm"
-						onClick={() => setGrid({ ...grid, mode: "time" })}
+						onClick={() => setEventListOpen(true)}
+						title="Event List (E)"
 					>
-						Time
+						<List className={DAW_ICONS.MD} />
+						<span className="ml-1 text-xs">Events</span>
 					</Button>
+
 					<Button
-						variant={grid.mode === "bars" ? "default" : "ghost"}
+						variant={automationViewEnabled ? "default" : "ghost"}
 						size="sm"
-						onClick={() => setGrid({ ...grid, mode: "bars" })}
-					>
-						Bars
-					</Button>
-					<select
-						className="text-xs border rounded px-1 py-1 ml-1"
-						value={grid.resolution}
-						onChange={(e) =>
-							setGrid({
-								...grid,
-								resolution: e.target.value as typeof grid.resolution,
-							})
+						onClick={() => setAutomationViewEnabled(!automationViewEnabled)}
+						title="Toggle Automation View (A)"
+						aria-label={
+							automationViewEnabled
+								? "Hide automation curves"
+								: "Show automation curves"
 						}
 					>
-						{(["1/1", "1/2", "1/4", "1/8", "1/16"] as const).map((r) => (
-							<option key={r} value={r}>
-								{r}
-							</option>
-						))}
-					</select>
-					<label className="text-xs ml-2 flex items-center gap-1">
-						<input
-							type="checkbox"
-							checked={grid.triplet}
-							onChange={(e) => setGrid({ ...grid, triplet: e.target.checked })}
-						/>
-						Triplet
-					</label>
-					<label className="text-xs ml-2 flex items-center gap-1">
-						Swing
-						<input
-							type="range"
-							min={0}
-							max={0.6}
-							step={0.05}
-							value={grid.swing}
-							onChange={(e) =>
-								setGrid({ ...grid, swing: Number(e.target.value) })
-							}
-						/>
-					</label>
+						<Activity className={DAW_ICONS.MD} />
+						<span className="ml-1 text-xs">Auto</span>
+					</Button>
+
+					<Button variant="ghost" size="sm" onClick={handleImportAudio}>
+						<Upload className={DAW_ICONS.MD} />
+						<span className="ml-1 text-xs">Import</span>
+					</Button>
+
+					<Button variant="ghost" size="sm" onClick={() => setExportOpen(true)}>
+						<Download className={DAW_ICONS.MD} />
+						<span className="ml-1 text-xs">Export</span>
+					</Button>
+
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={() => {
+							// Use global shortcut path already wired; duplicate here for discoverability
+							const event = new KeyboardEvent("keydown", {
+								key: "S",
+								shiftKey: true,
+							});
+							window.dispatchEvent(event);
+						}}
+						title="Split at playhead (Shift+S)"
+					>
+						<span className="ml-1 text-xs">Split</span>
+					</Button>
+
+					<Dialog>
+						<DialogTrigger asChild>
+							<Button
+								variant="ghost"
+								size="sm"
+								aria-label="Keyboard shortcuts"
+								onClick={(e) => e.stopPropagation()}
+							>
+								<HelpCircle className={DAW_ICONS.MD} />
+							</Button>
+						</DialogTrigger>
+						<DialogContent className="sm:max-w-xl">
+							<DialogHeader>
+								<DialogTitle>Keyboard shortcuts</DialogTitle>
+								<DialogDescription>
+									Quick controls to keep you in flow
+								</DialogDescription>
+							</DialogHeader>
+							<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm leading-6">
+								<div>
+									<b>Space</b>: Play/Pause
+								</div>
+								<div>
+									<b>S</b>: Restart from 0
+								</div>
+								<div>
+									<b>Shift+S</b>: Split at playhead
+								</div>
+								<div>
+									<b>L</b>: Loop toggle; [ / ] prev/next clip; Alt+L set loop
+									end; Shift+L clear
+								</div>
+								<div>
+									<b>M</b>/<b>Shift+M</b>: Mute/Solo track; <b>1–9</b>: Select
+									track
+								</div>
+								<div>
+									<b>←/→</b>: Seek by grid
+								</div>
+								<div>
+									<b>Shift+←/→</b>: Project end by grid
+								</div>
+								<div>
+									<b>Cmd+←/→</b>: Seek to start/end (Mac)
+								</div>
+								<div>
+									<b>/</b> or <b>?</b>: Open this dialog
+								</div>
+							</div>
+						</DialogContent>
+					</Dialog>
+
+					<DropdownMenu>
+						<DropdownMenuTrigger asChild>
+							<Button variant="ghost" size="sm">
+								<MoreHorizontal className={DAW_ICONS.MD} />
+							</Button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="end">
+							<DropdownMenuItem>
+								<Settings className={`${DAW_ICONS.MD} mr-2`} />
+								Settings
+							</DropdownMenuItem>
+							<DropdownMenuItem>Clear Project</DropdownMenuItem>
+						</DropdownMenuContent>
+					</DropdownMenu>
 				</div>
 			</div>
-
-			<div className="flex items-center gap-2">
-				<Button
-					variant="ghost"
-					size="sm"
-					onClick={() => setEventListOpen(true)}
-					title="Event List (E)"
-				>
-					<List className={DAW_ICONS.MD} />
-					<span className="ml-1 text-xs">Events</span>
-				</Button>
-
-				<Button
-					variant={automationViewEnabled ? "default" : "ghost"}
-					size="sm"
-					onClick={() => setAutomationViewEnabled(!automationViewEnabled)}
-					title="Toggle Automation View (A)"
-					aria-label={
-						automationViewEnabled
-							? "Hide automation curves"
-							: "Show automation curves"
-					}
-				>
-					<Activity className={DAW_ICONS.MD} />
-					<span className="ml-1 text-xs">Auto</span>
-				</Button>
-
-				<Button variant="ghost" size="sm" onClick={handleImportAudio}>
-					<Upload className={DAW_ICONS.MD} />
-					<span className="ml-1 text-xs">Import</span>
-				</Button>
-
-				<Button variant="ghost" size="sm" onClick={handleExportProject}>
-					<Download className={DAW_ICONS.MD} />
-					<span className="ml-1 text-xs">Export</span>
-				</Button>
-
-				<Button
-					variant="ghost"
-					size="sm"
-					onClick={() => {
-						// Use global shortcut path already wired; duplicate here for discoverability
-						const event = new KeyboardEvent("keydown", {
-							key: "S",
-							shiftKey: true,
-						});
-						window.dispatchEvent(event);
-					}}
-					title="Split at playhead (Shift+S)"
-				>
-					<span className="ml-1 text-xs">Split</span>
-				</Button>
-
-				<Dialog>
-					<DialogTrigger asChild>
-						<Button
-							variant="ghost"
-							size="sm"
-							aria-label="Keyboard shortcuts"
-							onClick={(e) => e.stopPropagation()}
-						>
-							<HelpCircle className={DAW_ICONS.MD} />
-						</Button>
-					</DialogTrigger>
-					<DialogContent className="sm:max-w-xl">
-						<DialogHeader>
-							<DialogTitle>Keyboard shortcuts</DialogTitle>
-							<DialogDescription>
-								Quick controls to keep you in flow
-							</DialogDescription>
-						</DialogHeader>
-						<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm leading-6">
-							<div>
-								<b>Space</b>: Play/Pause
-							</div>
-							<div>
-								<b>S</b>: Restart from 0
-							</div>
-							<div>
-								<b>Shift+S</b>: Split at playhead
-							</div>
-							<div>
-								<b>L</b>: Loop toggle; [ / ] prev/next clip; Alt+L set loop end;
-								Shift+L clear
-							</div>
-							<div>
-								<b>M</b>/<b>Shift+M</b>: Mute/Solo track; <b>1–9</b>: Select
-								track
-							</div>
-							<div>
-								<b>←/→</b>: Seek by grid
-							</div>
-							<div>
-								<b>Shift+←/→</b>: Project end by grid
-							</div>
-							<div>
-								<b>Cmd+←/→</b>: Seek to start/end (Mac)
-							</div>
-							<div>
-								<b>/</b> or <b>?</b>: Open this dialog
-							</div>
-						</div>
-					</DialogContent>
-				</Dialog>
-
-				<DropdownMenu>
-					<DropdownMenuTrigger asChild>
-						<Button variant="ghost" size="sm">
-							<MoreHorizontal className={DAW_ICONS.MD} />
-						</Button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align="end">
-						<DropdownMenuItem>
-							<Settings className={`${DAW_ICONS.MD} mr-2`} />
-							Settings
-						</DropdownMenuItem>
-						<DropdownMenuItem>Clear Project</DropdownMenuItem>
-					</DropdownMenuContent>
-				</DropdownMenu>
-			</div>
-		</div>
+			<ExportDialog open={exportOpen} onOpenChange={setExportOpen} />
+		</>
 	);
 }

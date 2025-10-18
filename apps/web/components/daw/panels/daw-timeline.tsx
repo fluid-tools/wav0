@@ -164,8 +164,10 @@ export function DAWTimeline() {
 
 	// Playhead position calculation (now handled by DAWPlayhead component)
 
-	const timeMarkers = getTimeMarkers();
-	const beatMarkers = getBeatMarkers();
+    const timeMarkers = getTimeMarkers();
+    const beatMarkers = getBeatMarkers();
+    const { stepMs } = useTimebase();
+    const subdivisionPx = tGrid.mode === "bars" ? Math.max(4, (stepMs || 0) * pxPerMs) : 0;
 
 	return (
 		<button
@@ -180,6 +182,16 @@ export function DAWTimeline() {
 			style={{ width: timelineWidth }}
 			aria-label="Timeline - click to set playback position"
 		>
+			{/* Subdivision gradient for bars mode (low-cost) */}
+			{tGrid.mode === "bars" && subdivisionPx > 6 && (
+				<div
+					className="absolute inset-0 pointer-events-none"
+					style={{
+						backgroundImage:
+							`repeating-linear-gradient(to right, rgba(var(--foreground),0.1) 0, rgba(var(--foreground),0.1) 1px, transparent 1px, transparent ${subdivisionPx}px)`,
+					}}
+				/>
+			)}
             {/* Grids */}
             {tGrid.mode === "bars"
                 ? getGridSubdivisions(timelineWidth, pxPerMs).map((g) => (
