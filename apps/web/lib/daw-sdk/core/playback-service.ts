@@ -581,19 +581,15 @@ export class PlaybackService {
 		await this.getAudioContext();
 		this.tracks.clear();
 
-		for (const track of tracks) {
-			const hasClipRef = (track.clips ?? []).some((c) => !!c.opfsFileId);
-			const hasLegacyRef = !!track.opfsFileId;
-			if (hasClipRef || hasLegacyRef) {
-				this.tracks.set(track.id, {
-					clipStates: new Map(),
-					envelopeGainNode: null,
-					muteSoloGainNode: null,
-					isPlaying: false,
-					automationGeneration: 0,
-				});
-			}
-		}
+    for (const track of tracks) {
+        this.tracks.set(track.id, {
+            clipStates: new Map(),
+            envelopeGainNode: null,
+            muteSoloGainNode: null,
+            isPlaying: false,
+            automationGeneration: 0,
+        });
+    }
 	}
 
 	async play(tracks: Track[], options: PlaybackOptions = {}): Promise<void> {
