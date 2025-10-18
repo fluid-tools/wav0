@@ -515,36 +515,17 @@ export class PlaybackService {
 	private async synchronizeClipsGlobal(tracks: Track[]): Promise<void> {
 		if (!this.audioContext) return;
 
-		// Build desired state: which clips should be on which tracks
+		// Build desired state from REAL clips only (no synthetic opfs fallbacks)
 		const desiredState = new Map<
 			string,
 			{ clip: Clip; trackId: string; desc: string }
 		>();
 		for (const track of tracks) {
-			const clips =
-				track.clips && track.clips.length > 0
-					? track.clips
-					: track.opfsFileId
-						? [
-								{
-									id: track.id,
-									name: track.name,
-									opfsFileId: track.opfsFileId,
-									startTime: track.startTime,
-									trimStart: track.trimStart,
-									trimEnd: track.trimEnd,
-									color: track.color,
-									sourceDurationMs: track.duration,
-								} as Clip,
-							]
-						: [];
-
+			const clips = track.clips ?? [];
 			for (const clip of clips) {
-				if (clip.opfsFileId) {
-					const desc = this.describeClip(clip);
-					// Handle duplicates: last entry wins (defensive)
-					desiredState.set(clip.id, { clip, trackId: track.id, desc });
-				}
+				if (!clip.opfsFileId) continue;
+				const desc = this.describeClip(clip);
+				desiredState.set(clip.id, { clip, trackId: track.id, desc });
 			}
 		}
 
@@ -687,8 +668,8 @@ export class PlaybackService {
 		}
 		if (!sink) return;
 
-		// Use current timeline instead of playbackTimeAtStart
-		const timelineSec = this.getPlaybackTime() / 1000;
+    // Use current timeline (seconds)
+    const timelineSec = this.getPlaybackTime();
 
 		const clipStartSec = clip.startTime / 1000;
 		const clipTrimStartSec = clip.trimStart / 1000;
@@ -800,25 +781,28 @@ export class PlaybackService {
 					clipGain ?? this.masterGainNode ?? this.audioContext.destination,
 				);
 
-				const timeInTrimmed = timestamp - clipTrimStartSec;
-				const timelinePos = clipStartSec + cycleOffsetSec + timeInTrimmed;
-				if (timelinePos > loopUntilSec) break;
+			const timeInTrimmed = timestamp - clipTrimStartSec;
+			const timelinePos = clipStartSec + cycleOffsetSec + timeInTrimmed;
+			if (timelinePos > loopUntilSec) break;
 
-				const startAt = this.startTime + timelinePos - this.playbackTimeAtStart;
+			// Anchor to current timeline
+			const now = this.audioContext.currentTime;
+			const currentTl = this.getPlaybackTime();
+			const startAt = now + (timelinePos - currentTl);
 
-				if (startAt >= this.audioContext.currentTime) {
-					node.start(startAt);
-					this.nodeStartTimes.set(node, startAt);
+			if (startAt >= now) {
+				node.start(startAt);
+				this.nodeStartTimes.set(node, startAt);
+			} else {
+				const offset = now - startAt;
+				if (offset < buffer.duration) {
+					const actualStart = now;
+					node.start(actualStart, offset);
+					this.nodeStartTimes.set(node, actualStart);
 				} else {
-					const offset = this.audioContext.currentTime - startAt;
-					if (offset < buffer.duration) {
-						const actualStart = this.audioContext.currentTime;
-						node.start(actualStart, offset);
-						this.nodeStartTimes.set(node, actualStart);
-					} else {
-						continue;
-					}
+					continue;
 				}
+			}
 
 				cps.audioSources.push(node);
 				this.queuedAudioNodes.add(node);
