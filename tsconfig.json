@@ -1,5 +1,5 @@
 {
 	"compilerOptions": {
-		"strictNullChecks": true
+		"strict": true
 	}
 }
