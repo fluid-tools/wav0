@@ -8,7 +8,6 @@ import {
 	addMarkerAtom,
 	gridAtom,
 	horizontalScrollAtom,
-	markersAtom,
 	musicalMetadataAtom,
 	playbackAtom,
 	playheadViewportPxAtom,
@@ -18,7 +17,6 @@ import {
 	timelineAtom,
 	timelinePxPerMsAtom,
 	timelineWidthAtom,
-	updateMarkerAtom,
 } from "@/lib/daw-sdk";
 import { useTimebase } from "@/lib/daw-sdk/hooks/use-timebase";
 import { snapTimeMs } from "@/lib/daw-sdk/utils/time-utils";
@@ -37,8 +35,6 @@ export function DAWTimeline() {
 	const [isDraggingEnd, setIsDraggingEnd] = useState(false);
 	const [playheadViewportPx] = useAtom(playheadViewportPxAtom);
 	const [pxPerMs] = useAtom(timelinePxPerMsAtom);
-	const [_markers] = useAtom(markersAtom);
-	const [_updateMarker] = useAtom(updateMarkerAtom);
 	const [, addMarker] = useAtom(addMarkerAtom);
 	const [grid] = useAtom(gridAtom);
 	const [music] = useAtom(musicalMetadataAtom);
@@ -116,6 +112,20 @@ export function DAWTimeline() {
 	// Add marker at playhead on key "m"
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
+			// Ignore if typing in an input or if modifier keys are pressed
+			const target = e.target as HTMLElement;
+			if (
+				target.tagName === "INPUT" ||
+				target.tagName === "TEXTAREA" ||
+				target.tagName === "SELECT" ||
+				target.isContentEditable ||
+				e.metaKey ||
+				e.ctrlKey ||
+				e.altKey ||
+				e.shiftKey
+			) {
+				return;
+			}
 			if (e.key.toLowerCase() !== "m") return;
 			const timeMs = Math.max(0, Math.round(playback.currentTime));
 			const snapped = snapTimeMs(
