@@ -294,7 +294,10 @@ export function generateBarsGrid(
 			if (swing > 0 && !triplet) {
 				// Visual bias only on even subdivisions
 				const isEven = i % 2 === 0;
-				const bias = isEven ? 0 : swing * (2 / 3 - 1 / 2) * subdivMs * pxPerMs;
+				const swing01 = swing / 100; // Normalize from 0-100 to 0-1
+				const bias = isEven
+					? 0
+					: swing01 * (2 / 3 - 1 / 2) * subdivMs * pxPerMs;
 				subPx += bias;
 			}
 			if (subPx > widthPx) break;

@@ -167,7 +167,12 @@ export function DAWControls() {
 							<Play className={DAW_ICONS.LG} />
 						)}
 					</Button>
-					<Button variant="ghost" size="sm" onClick={handleStop} aria-label="Stop">
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={handleStop}
+						aria-label="Stop"
+					>
 						<Square className={DAW_ICONS.MD} />
 					</Button>
 					<Button variant="ghost" size="sm" aria-label="Skip to end">

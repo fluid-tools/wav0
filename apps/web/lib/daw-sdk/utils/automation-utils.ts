@@ -362,7 +362,6 @@ export function migrateAutomationToSegments(
 		});
 	}
 
-
 	return {
 		enabled: envelope.enabled,
 		points,

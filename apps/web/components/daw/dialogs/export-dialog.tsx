@@ -1,7 +1,6 @@
 "use client";
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useEffectEvent } from "@/lib/react/use-effect-event";
 import { ExportPreviewLanes } from "@/components/daw/export/export-preview-lanes";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +18,7 @@ import { projectNameAtom, tracksAtom } from "@/lib/daw-sdk";
 import { createPreviewPlayer } from "@/lib/daw-sdk/core/preview-player";
 import { renderProjectToAudioBuffer } from "@/lib/daw-sdk/core/render-service";
 import { loopRegionAtom } from "@/lib/daw-sdk/state/timeline";
+import { useEffectEvent } from "@/lib/react/use-effect-event";
 
 type Props = { open: boolean; onOpenChange: (v: boolean) => void };
 

@@ -80,10 +80,22 @@ export function DAWToolbar() {
 					</h1>
 
 					<div className="flex items-center gap-2">
-						<Button variant="ghost" size="sm" disabled title="Coming soon" aria-label="Open project">
+						<Button
+							variant="ghost"
+							size="sm"
+							disabled
+							title="Coming soon"
+							aria-label="Open project"
+						>
 							<FolderOpen className={DAW_ICONS.MD} />
 						</Button>
-						<Button variant="ghost" size="sm" disabled title="Coming soon" aria-label="Save project">
+						<Button
+							variant="ghost"
+							size="sm"
+							disabled
+							title="Coming soon"
+							aria-label="Save project"
+						>
 							<Save className={DAW_ICONS.MD} />
 						</Button>
 					</div>
@@ -299,8 +311,12 @@ export function DAWToolbar() {
 								defaultValue={music.tempoBpm}
 								onChange={(e) => {
 									const v = Number(e.target.value);
-									const clamped = Math.max(30, Math.min(300, Number.isFinite(v) ? v : 120));
-									if (bpmDebounceRef.current) clearTimeout(bpmDebounceRef.current);
+									const clamped = Math.max(
+										30,
+										Math.min(300, Number.isFinite(v) ? v : 120),
+									);
+									if (bpmDebounceRef.current)
+										clearTimeout(bpmDebounceRef.current);
 									bpmDebounceRef.current = setTimeout(
 										() => setMusic({ ...music, tempoBpm: clamped }),
 										150,

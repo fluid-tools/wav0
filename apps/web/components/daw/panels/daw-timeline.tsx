@@ -33,7 +33,7 @@ export function DAWTimeline() {
 	const [_projectEndOverride, setProjectEndOverride] = useAtom(
 		projectEndOverrideAtom,
 	);
-	const containerRef = useRef<HTMLButtonElement>(null);
+	const containerRef = useRef<HTMLDivElement>(null);
 	const [isDraggingEnd, setIsDraggingEnd] = useState(false);
 	const [playheadViewportPx] = useAtom(playheadViewportPxAtom);
 	const [pxPerMs] = useAtom(timelinePxPerMsAtom);
@@ -136,9 +136,7 @@ export function DAWTimeline() {
 		playback.currentTime,
 	]);
 
-	const onTimelinePointerDown = (
-		event: React.PointerEvent<HTMLButtonElement>,
-	) => {
+	const onTimelinePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
 		if (event.button !== 0) return;
 		event.preventDefault();
 		handleTimelineClick(event);
@@ -150,18 +148,40 @@ export function DAWTimeline() {
 	const [horizontalScroll] = useAtom(horizontalScrollAtom);
 
 	return (
-		<div
+		<section
 			ref={containerRef}
 			className="h-full w-full relative bg-muted/10 cursor-pointer select-none"
 			onClick={(e) => {
 				if (isDraggingEnd) return;
 				handleTimelineClick(e);
 			}}
+			onKeyDown={(e) => {
+				if (isDraggingEnd) return;
+				if (e.key === "Enter" || e.key === " ") {
+					e.preventDefault();
+					// Create a synthetic mouse event for keyboard interaction
+					const syntheticEvent = {
+						...e,
+						clientX: 0,
+						clientY: 0,
+						currentTarget: e.currentTarget,
+						button: 0,
+						buttons: 0,
+						movementX: 0,
+						movementY: 0,
+						relatedTarget: null,
+						screenX: 0,
+						screenY: 0,
+						pageX: 0,
+						pageY: 0,
+						getModifierState: e.getModifierState,
+					} as unknown as React.MouseEvent<HTMLElement>;
+					handleTimelineClick(syntheticEvent);
+				}
+			}}
 			onPointerDown={onTimelinePointerDown}
 			style={{ width: timelineWidth }}
-			role="region"
 			aria-label="Timeline - click to set playback position"
-			tabIndex={0}
 		>
 			{/* Canvas grid for bars mode */}
 			{tGrid.mode === "bars" ? (
@@ -231,6 +251,6 @@ export function DAWTimeline() {
 					))}
 				</div>
 			)}
-		</div>
+		</section>
 	);
 }
