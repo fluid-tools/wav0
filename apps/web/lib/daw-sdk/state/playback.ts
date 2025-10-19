@@ -1,10 +1,46 @@
 "use client";
 
-import { atom } from "jotai";
+import { atom, type Getter, type Setter } from "jotai";
 import { playbackService } from "../index";
 import { playbackAtom, tracksAtom } from "./atoms";
 import { totalDurationAtom } from "./tracks";
 import type { Track } from "./types";
+
+// Guarded onTimeUpdate callback to prevent recursion
+let lastUpdateTime = 0;
+let lastUpdateMs = 0;
+
+function createGuardedTimeUpdateCallback(
+	get: Getter,
+	set: Setter,
+) {
+	return (timeSeconds: number) => {
+		const currentMs = Math.max(0, Math.round(timeSeconds * 1000));
+		const now = performance.now();
+		
+		// Prevent updates if time hasn't changed
+		if (currentMs === lastUpdateMs) return;
+		
+		// Limit update frequency to ~60Hz (16ms intervals)
+		if (now - lastUpdateTime < 16) return;
+		
+		lastUpdateTime = now;
+		lastUpdateMs = currentMs;
+		
+		const newPlayback = get(playbackAtom) as any;
+		const total = get(totalDurationAtom) as number;
+		
+		if (currentMs >= total) {
+			set(playbackAtom, { ...newPlayback, currentTime: 0, isPlaying: false });
+			return;
+		}
+		
+		// Only update if the value actually changed
+		if (newPlayback.currentTime !== currentMs) {
+			set(playbackAtom, { ...newPlayback, currentTime: currentMs });
+		}
+	};
+}
 
 export const togglePlaybackAtom = atom(null, async (get, set) => {
 	const tracks = get(tracksAtom) as Track[];
@@ -22,16 +58,7 @@ export const togglePlaybackAtom = atom(null, async (get, set) => {
 
 	await playbackService.play(tracks, {
 		startTime: currentTimeSeconds,
-		onTimeUpdate: (timeSeconds: number) => {
-			const newPlayback = get(playbackAtom);
-			const total = get(totalDurationAtom);
-			const currentMs = timeSeconds * 1000;
-			if (currentMs >= total) {
-				set(playbackAtom, { ...newPlayback, currentTime: 0, isPlaying: false });
-				return;
-			}
-			set(playbackAtom, { ...newPlayback, currentTime: currentMs });
-		},
+		onTimeUpdate: createGuardedTimeUpdateCallback(get, set),
 		onPlaybackEnd: () => {
 			const endState = get(playbackAtom);
 			set(playbackAtom, { ...endState, isPlaying: false });
@@ -61,16 +88,7 @@ export const setCurrentTimeAtom = atom(
 
 		await playbackService.play(tracks, {
 			startTime: timeMs / 1000,
-			onTimeUpdate: (currentTimeSeconds: number) => {
-				const newState = get(playbackAtom);
-				const total = get(totalDurationAtom);
-				const ms = currentTimeSeconds * 1000;
-				if (ms >= total) {
-					set(playbackAtom, { ...newState, currentTime: 0, isPlaying: false });
-					return;
-				}
-				set(playbackAtom, { ...newState, currentTime: ms });
-			},
+			onTimeUpdate: createGuardedTimeUpdateCallback(get, set),
 			onPlaybackEnd: () => {
 				const endState = get(playbackAtom);
 				set(playbackAtom, { ...endState, isPlaying: false });

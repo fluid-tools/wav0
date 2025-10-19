@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef } from "react";
-import { enumerateGrid, msToBarsBeats } from "@/lib/daw-sdk/utils/time-utils";
+import { useTimebase } from "@/lib/daw-sdk/hooks/use-timebase";
 
 type Props = {
 	width: number;
@@ -19,12 +19,9 @@ export function TimelineGridCanvas({
 	height,
 	pxPerMs,
 	scrollLeft,
-	bpm,
-	signature,
-	resolution,
-	triplet,
 }: Props) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
+	const timebase = useTimebase();
 
 	useEffect(() => {
 		const canvas = canvasRef.current;
@@ -43,14 +40,7 @@ export function TimelineGridCanvas({
 
 		const viewStartMs = scrollLeft / pxPerMs;
 		const viewEndMs = (scrollLeft + width) / pxPerMs;
-		const grid = enumerateGrid(
-			viewStartMs,
-			viewEndMs,
-			bpm,
-			signature,
-			resolution,
-			triplet,
-		);
+		const grid = timebase.getGridSubdivisionsInView(viewStartMs, viewEndMs, pxPerMs);
 
 		// Resolve theme colors from CSS variables to avoid black-on-black
 		const styles = getComputedStyle(canvas);
@@ -59,7 +49,7 @@ export function TimelineGridCanvas({
 		const colMeas = styles.getPropertyValue("--timeline-grid-measure").trim() || "rgba(255,255,255,0.5)";
 		const colLabel = styles.getPropertyValue("--timeline-grid-label").trim() || "rgba(255,255,255,0.7)";
 
-		// Draw subdivisions
+		// Draw subdivisions (thin lines)
 		ctx.strokeStyle = colSub;
 		ctx.lineWidth = 0.5;
 		for (const ms of grid.subs) {
@@ -70,42 +60,37 @@ export function TimelineGridCanvas({
 			ctx.stroke();
 		}
 
-		// Draw beats
+		// Draw beats (1px; heavier stroke if primary)
 		ctx.strokeStyle = colBeat;
 		ctx.lineWidth = 1;
-		for (const ms of grid.beats) {
-			const x = ms * pxPerMs - scrollLeft;
+		for (const beat of grid.beats) {
+			const x = beat.ms * pxPerMs - scrollLeft;
+			ctx.lineWidth = beat.primary ? 1.5 : 1;
 			ctx.beginPath();
 			ctx.moveTo(x, 0);
 			ctx.lineTo(x, height);
 			ctx.stroke();
 		}
 
-		// Draw measures + labels
+		// Draw measures + labels (2px)
 		ctx.strokeStyle = colMeas;
 		ctx.lineWidth = 2;
 		ctx.fillStyle = colLabel;
 		ctx.font = "10px monospace";
 		let lastLabelX = -1e9;
-		const minLabelSpacing = 24; // px
-		const seen = new Set<number>();
-		for (const ms of grid.measures) {
-			// de-dupe very close measure times due to float rounding
-			const key = Math.round(ms * 1000);
-			if (seen.has(key)) continue;
-			seen.add(key);
-			const x = ms * pxPerMs - scrollLeft;
+		const minLabelSpacing = 28; // px
+		for (const measure of grid.measures) {
+			const x = measure.ms * pxPerMs - scrollLeft;
 			ctx.beginPath();
 			ctx.moveTo(x, 0);
 			ctx.lineTo(x, height);
 			ctx.stroke();
 			if (x - lastLabelX >= minLabelSpacing && x >= 0 && x <= width) {
-				const { bar } = msToBarsBeats(ms, bpm, signature);
-				ctx.fillText(`${bar}`, x + 4, 12);
+				ctx.fillText(`${measure.bar}`, x + 4, 12);
 				lastLabelX = x;
 			}
 		}
-	}, [width, height, pxPerMs, scrollLeft, bpm, signature, resolution, triplet]);
+	}, [width, height, pxPerMs, scrollLeft, timebase]);
 
 	return (
 		<canvas

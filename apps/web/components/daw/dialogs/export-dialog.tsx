@@ -1,7 +1,12 @@
 "use client";
 import { useAtom } from "jotai";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
 	Dialog,
 	DialogContent,
@@ -26,7 +31,9 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 	const [busy, setBusy] = useState(false);
 	const [previewBuffer, setPreviewBuffer] = useState<AudioBuffer | null>(null);
 	const [previewVol, setPreviewVol] = useState(1);
+	const [showPreviewLanes, setShowPreviewLanes] = useState(false);
 	const playerRef = useRef<ReturnType<typeof createPreviewPlayer> | null>(null);
+	const previewCanvasRef = useRef<HTMLCanvasElement>(null);
 	const [tracks] = useAtom(tracksAtom);
 	const [projectName] = useAtom(projectNameAtom);
 	const [loopRegion] = useAtom(loopRegionAtom);
@@ -75,7 +82,7 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 		};
 	}, [open]);
 
-	function getRangeMs() {
+	const getRangeMs = useCallback(() => {
 		if (range === "loop" && loopRegion.enabled) {
 			return { startMs: loopRegion.startMs, endMs: loopRegion.endMs };
 		}
@@ -86,7 +93,126 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 			startMs: 0,
 			endMs: Math.max(...tracks.map((t) => t.duration), 60000),
 		};
-	}
+	}, [range, loopRegion, customStart, customEnd, tracks]);
+
+	const renderPreviewLanes = useCallback(() => {
+		const canvas = previewCanvasRef.current;
+		if (!canvas) return;
+
+		const ctx = canvas.getContext("2d");
+		if (!ctx) return;
+
+		const { startMs, endMs } = getRangeMs();
+		const canvasWidth = 400;
+		const canvasHeight = Math.min(tracks.length * 20 + 40, 200);
+
+		canvas.width = canvasWidth;
+		canvas.height = canvasHeight;
+		canvas.style.width = `${canvasWidth}px`;
+		canvas.style.height = `${canvasHeight}px`;
+
+		ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+		if (endMs <= startMs) return;
+
+		const pxPerMs = canvasWidth / (endMs - startMs);
+		const rowHeight = 16;
+		const padding = 4;
+
+		// Draw tracks
+		tracks.forEach((track, trackIndex) => {
+			const y = trackIndex * rowHeight + padding;
+
+			// Draw track background
+			ctx.fillStyle = trackIndex % 2 === 0 ? "#f8f9fa" : "#e9ecef";
+			ctx.fillRect(0, y, canvasWidth, rowHeight - 2);
+
+			// Draw track clips
+			track.clips?.forEach((clip) => {
+				// Calculate audible windows
+				const trimStart = clip.trimStart || 0;
+				const trimEnd = clip.trimEnd || clip.sourceDurationMs || 0;
+				const clipDuration = trimEnd - trimStart;
+
+				if (clipDuration <= 0) return;
+
+				const audibleStart = Math.max(clip.startTime, startMs);
+				const audibleEnd = Math.min(clip.startTime + clipDuration, endMs);
+
+				// Handle looped clips
+				if (clip.loop) {
+					const cycleLen = clipDuration;
+					const loopEnd = clip.loopEnd || Infinity;
+
+					// Find first cycle start within range
+					let firstCycleStart = clip.startTime;
+					if (startMs > clip.startTime) {
+						const cyclesOffset = Math.ceil(
+							(startMs - clip.startTime) / cycleLen,
+						);
+						firstCycleStart = clip.startTime + cyclesOffset * cycleLen;
+					}
+
+					// Tile cycles across the range
+					let currentStart = firstCycleStart;
+					while (currentStart < endMs && currentStart < loopEnd) {
+						const currentEnd = Math.min(
+							currentStart + cycleLen,
+							endMs,
+							loopEnd,
+						);
+						if (currentEnd > startMs) {
+							const x = (currentStart - startMs) * pxPerMs;
+							const w = (currentEnd - currentStart) * pxPerMs;
+
+							ctx.fillStyle = "#3b82f6";
+							ctx.fillRect(x, y + 2, w, rowHeight - 6);
+						}
+						currentStart += cycleLen;
+					}
+				} else {
+					// One-shot clip
+					if (audibleEnd > audibleStart) {
+						const x = (audibleStart - startMs) * pxPerMs;
+						const w = (audibleEnd - audibleStart) * pxPerMs;
+
+						ctx.fillStyle = "#3b82f6";
+						ctx.fillRect(x, y + 2, w, rowHeight - 6);
+					}
+				}
+			});
+
+			// Draw track label
+			ctx.fillStyle = "#374151";
+			ctx.font = "10px sans-serif";
+			ctx.fillText(`Track ${trackIndex + 1}`, 4, y + 12);
+		});
+
+		// Draw time markers
+		ctx.strokeStyle = "#6b7280";
+		ctx.lineWidth = 1;
+		const timeStep = (endMs - startMs) / 8; // 8 time markers
+		for (let i = 0; i <= 8; i++) {
+			const timeMs = startMs + i * timeStep;
+			const x = (timeMs - startMs) * pxPerMs;
+			ctx.beginPath();
+			ctx.moveTo(x, 0);
+			ctx.lineTo(x, canvasHeight);
+			ctx.stroke();
+
+			// Time label
+			ctx.fillStyle = "#6b7280";
+			ctx.font = "8px sans-serif";
+			ctx.fillText(`${(timeMs / 1000).toFixed(1)}s`, x + 2, 12);
+		}
+	}, [tracks, getRangeMs]);
+
+	// Render preview lanes when tracks/range changes
+	useEffect(() => {
+		if (showPreviewLanes) {
+			renderPreviewLanes();
+		}
+	}, [showPreviewLanes, renderPreviewLanes]);
 
 	async function onExport() {
 		try {
@@ -108,7 +234,7 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 				bytes = await encode(wavBytes, fmt, (p) => setProgress(p));
 				ext = fmt === "m4a" ? "m4a" : fmt;
 			}
-			const blob = new Blob([bytes], {
+			const blob = new Blob([bytes as BlobPart], {
 				type: fmt === "m4a" ? "audio/mp4" : `audio/${ext}`,
 			});
 			const a = document.createElement("a");
@@ -301,6 +427,25 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 						)}
 					</div>
 				)}
+				<Collapsible open={showPreviewLanes} onOpenChange={setShowPreviewLanes}>
+					<CollapsibleTrigger asChild>
+						<Button variant="ghost" size="sm" className="w-full">
+							{showPreviewLanes ? "Hide" : "Show"} Preview Lanes
+						</Button>
+					</CollapsibleTrigger>
+					<CollapsibleContent>
+						<div className="mt-2 border rounded p-2 bg-muted/10">
+							<div className="text-xs text-muted-foreground mb-2">
+								Visual preview of audible content in export range
+							</div>
+							<canvas
+								ref={previewCanvasRef}
+								className="border rounded bg-white"
+								style={{ maxWidth: "100%", height: "auto" }}
+							/>
+						</div>
+					</CollapsibleContent>
+				</Collapsible>
 				<div className="flex justify-end gap-2">
 					<Button
 						variant="ghost"
