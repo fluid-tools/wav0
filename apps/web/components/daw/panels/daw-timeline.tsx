@@ -2,7 +2,13 @@
 
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { MarkerTrack } from "@/components/daw/panels/marker-track";
+import { TimelineGridCanvas } from "@/components/daw/panels/timeline-grid-canvas";
 import {
+	addMarkerAtom,
+	gridAtom,
+	horizontalScrollAtom,
+	musicalMetadataAtom,
 	playbackAtom,
 	playheadViewportPxAtom,
 	projectEndOverrideAtom,
@@ -12,6 +18,8 @@ import {
 	timelinePxPerMsAtom,
 	timelineWidthAtom,
 } from "@/lib/daw-sdk";
+import { useTimebase } from "@/lib/daw-sdk/hooks/use-timebase";
+import { snapTimeMs } from "@/lib/daw-sdk/utils/time-utils";
 import { formatDuration } from "@/lib/storage/opfs";
 
 export function DAWTimeline() {
@@ -27,6 +35,12 @@ export function DAWTimeline() {
 	const [isDraggingEnd, setIsDraggingEnd] = useState(false);
 	const [playheadViewportPx] = useAtom(playheadViewportPxAtom);
 	const [pxPerMs] = useAtom(timelinePxPerMsAtom);
+	const [, addMarker] = useAtom(addMarkerAtom);
+	const [grid] = useAtom(gridAtom);
+	const [music] = useAtom(musicalMetadataAtom);
+	const { grid: tGrid } = useTimebase();
+
+	// legacy marker drag removed in favor of dedicated MarkerTrack
 
 	const onMouseMove = useCallback(
 		(e: MouseEvent) => {
@@ -51,7 +65,7 @@ export function DAWTimeline() {
 	}, [isDraggingEnd, onMouseMove]);
 	const _timelinePlayheadViewport = playheadViewportPx;
 
-	// Calculate time markers based on zoom and BPM
+	// Calculate time markers (time mode)
 	const getTimeMarkers = () => {
 		if (pxPerMs <= 0) return [];
 		const markers = [];
@@ -75,25 +89,7 @@ export function DAWTimeline() {
 		return markers;
 	};
 
-	const getBeatMarkers = () => {
-		if (pxPerMs <= 0) return [];
-		const markers = [];
-		const beatsPerMinute = playback.bpm;
-		const secondsPerBeat = 60 / beatsPerMinute;
-		const pixelsPerBeat = secondsPerBeat * pxPerMs * 1000;
-
-		for (let beat = 0; beat * pixelsPerBeat < timelineWidth; beat++) {
-			const time = beat * secondsPerBeat;
-			markers.push({
-				beat,
-				time: time * 1000,
-				position: beat * pixelsPerBeat,
-				isMeasure: beat % 4 === 0,
-			});
-		}
-
-		return markers;
-	};
+	// Beat markers computation removed; canvas grid handles bars mode
 
 	const handleTimelineClick = (e: React.MouseEvent | React.PointerEvent) => {
 		const rect = e.currentTarget.getBoundingClientRect();
@@ -113,6 +109,43 @@ export function DAWTimeline() {
 		setCurrentTime(Math.max(0, time));
 	};
 
+	// Add marker at playhead on key "m"
+	useEffect(() => {
+		const onKey = (e: KeyboardEvent) => {
+			// Ignore if typing in an input or if modifier keys are pressed
+			const target = e.target as HTMLElement;
+			if (
+				target.tagName === "INPUT" ||
+				target.tagName === "TEXTAREA" ||
+				target.tagName === "SELECT" ||
+				target.isContentEditable ||
+				e.metaKey ||
+				e.ctrlKey ||
+				e.altKey ||
+				e.shiftKey
+			) {
+				return;
+			}
+			if (e.key.toLowerCase() !== "m") return;
+			const timeMs = Math.max(0, Math.round(playback.currentTime));
+			const snapped = snapTimeMs(
+				timeMs,
+				grid,
+				music.tempoBpm,
+				music.timeSignature,
+			);
+			addMarker({ timeMs: snapped, name: "", color: "#ffffff" });
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, [
+		addMarker,
+		grid,
+		music.tempoBpm,
+		music.timeSignature,
+		playback.currentTime,
+	]);
+
 	const onTimelinePointerDown = (
 		event: React.PointerEvent<HTMLButtonElement>,
 	) => {
@@ -124,7 +157,7 @@ export function DAWTimeline() {
 	// Playhead position calculation (now handled by DAWPlayhead component)
 
 	const timeMarkers = getTimeMarkers();
-	const beatMarkers = getBeatMarkers();
+	const [horizontalScroll] = useAtom(horizontalScrollAtom);
 
 	return (
 		<button
@@ -135,34 +168,46 @@ export function DAWTimeline() {
 				if (isDraggingEnd) return;
 				handleTimelineClick(e);
 			}}
+			onKeyDown={(e) => {
+				if (isDraggingEnd) return;
+				if (e.key === "Enter" || e.key === " ") {
+					e.preventDefault();
+					const at = Math.max(0, Math.round(playback.currentTime));
+					const snapped = timeline.snapToGrid
+						? snapTimeMs(at, grid, music.tempoBpm, music.timeSignature)
+						: at;
+					setCurrentTime(snapped);
+				}
+			}}
 			onPointerDown={onTimelinePointerDown}
 			style={{ width: timelineWidth }}
 			aria-label="Timeline - click to set playback position"
 		>
-			{/* Beat markers */}
-			{beatMarkers.map((marker) => (
-				<div
-					key={`beat-${marker.beat}`}
-					className={`absolute top-0 bottom-0 ${
-						marker.isMeasure ? "w-0.5 bg-border" : "w-px bg-border/50"
-					}`}
-					style={{ left: marker.position }}
+			{/* Canvas grid for bars mode */}
+			{tGrid.mode === "bars" ? (
+				<TimelineGridCanvas
+					width={timelineWidth}
+					height={400}
+					pxPerMs={pxPerMs}
+					scrollLeft={horizontalScroll}
 				/>
-			))}
+			) : (
+				timeMarkers.map((marker) => (
+					<div
+						key={`time-${marker.time}`}
+						className="absolute top-0"
+						style={{ left: marker.position }}
+					>
+						<div className="w-px h-3 bg-foreground" />
+						<span className="text-xs text-muted-foreground ml-1 font-mono">
+							{marker.label}
+						</span>
+					</div>
+				))
+			)}
 
-			{/* Time markers */}
-			{timeMarkers.map((marker) => (
-				<div
-					key={`time-${marker.time}`}
-					className="absolute top-0"
-					style={{ left: marker.position }}
-				>
-					<div className="w-px h-3 bg-foreground" />
-					<span className="text-xs text-muted-foreground ml-1 font-mono">
-						{marker.label}
-					</span>
-				</div>
-			))}
+			{/* Project markers track */}
+			<MarkerTrack pxPerMs={pxPerMs} width={timelineWidth} />
 
 			{/* Project end marker and buffer zone */}
 			<div

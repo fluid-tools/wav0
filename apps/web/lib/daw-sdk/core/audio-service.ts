@@ -33,6 +33,7 @@ export class AudioService {
 	private static instance: AudioService;
 	private audioContext: AudioContext | null = null;
 	private loadedTracks = new Map<string, LoadedAudioTrack>();
+	private audioBufferCache = new Map<string, AudioBuffer>();
 
 	private constructor() {}
 
@@ -174,6 +175,68 @@ export class AudioService {
 	}
 
 	/**
+	 * Get full AudioBuffer for a track (for export/offline rendering)
+	 */
+	async getAudioBuffer(
+		opfsFileId: string,
+		fileName = "",
+	): Promise<AudioBuffer | null> {
+		// Check cache first
+		if (this.audioBufferCache.has(opfsFileId)) {
+			const cached = this.audioBufferCache.get(opfsFileId);
+			if (!cached) throw new Error(`Audio buffer not found for ${opfsFileId}`);
+			return cached;
+		}
+
+		let loadedTrack = this.loadedTracks.get(opfsFileId);
+		if (!loadedTrack) {
+			// Load from OPFS if not already loaded
+			try {
+				await this.loadTrackFromOPFS(opfsFileId, fileName);
+				loadedTrack = this.loadedTracks.get(opfsFileId);
+			} catch (e) {
+				console.error(`Failed to load audio for ${opfsFileId}:`, e);
+				return null;
+			}
+		}
+		if (!loadedTrack) return null;
+		const duration = await loadedTrack.audioTrack.computeDuration();
+		const buffers: AudioBuffer[] = [];
+		for await (const { buffer } of loadedTrack.sink.buffers(0, duration)) {
+			buffers.push(buffer);
+		}
+		if (buffers.length === 0) return null;
+
+		const result =
+			buffers.length === 1 ? buffers[0] : this.concatenateBuffers(buffers);
+
+		// Cache the result
+		this.audioBufferCache.set(opfsFileId, result);
+		return result;
+	}
+
+	/**
+	 * Concatenate multiple AudioBuffers
+	 */
+	private concatenateBuffers(buffers: AudioBuffer[]): AudioBuffer {
+		if (buffers.length === 0) throw new Error("No buffers to concatenate");
+		if (buffers.length === 1) return buffers[0];
+		const totalLength = buffers.reduce((sum, b) => sum + b.length, 0);
+		const sampleRate = buffers[0].sampleRate;
+		const numberOfChannels = buffers[0].numberOfChannels;
+		const ac = new AudioContext({ sampleRate });
+		const result = ac.createBuffer(numberOfChannels, totalLength, sampleRate);
+		let offset = 0;
+		for (const buf of buffers) {
+			for (let ch = 0; ch < numberOfChannels; ch++) {
+				result.getChannelData(ch).set(buf.getChannelData(ch), offset);
+			}
+			offset += buf.length;
+		}
+		return result;
+	}
+
+	/**
 	 * Get track metadata
 	 */
 	getTrackInfo(trackId: string): AudioFileInfo | null {
@@ -193,6 +256,7 @@ export class AudioService {
 	 */
 	unloadTrack(trackId: string): void {
 		this.loadedTracks.delete(trackId);
+		this.audioBufferCache.delete(trackId);
 	}
 
 	/**
@@ -200,6 +264,7 @@ export class AudioService {
 	 */
 	async cleanup(): Promise<void> {
 		this.loadedTracks.clear();
+		this.audioBufferCache.clear();
 		if (this.audioContext) {
 			await this.audioContext.close();
 			this.audioContext = null;

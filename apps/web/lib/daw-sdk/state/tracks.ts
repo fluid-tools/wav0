@@ -49,7 +49,6 @@ export const updateTrackAtom = atom(
 	null,
 	async (get, set, trackId: string, updates: Partial<Track>) => {
 		const tracks = get(tracksAtom);
-		const playback = get(playbackAtom);
 		const updatedTracks = tracks.map((track) => {
 			if (track.id !== trackId) return track;
 			if (updates.volumeEnvelope) {
@@ -89,23 +88,6 @@ export const updateTrackAtom = atom(
 		}
 		if (typeof updates.soloed === "boolean") {
 			playbackService.updateSoloStates(updatedTracks);
-		}
-
-		if (
-			playback.isPlaying &&
-			(updates.startTime !== undefined ||
-				updates.trimStart !== undefined ||
-				updates.trimEnd !== undefined)
-		) {
-			try {
-				await playbackService.rescheduleTrack(updatedTrack);
-			} catch (error) {
-				console.error(
-					"Failed to reschedule track after update",
-					trackId,
-					error,
-				);
-			}
 		}
 	},
 );

@@ -2,6 +2,7 @@
 
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { Clip } from "@/lib/daw-sdk";
+import { evaluateSegmentCurve } from "@/lib/daw-sdk/utils/curve-functions";
 import { formatDuration } from "@/lib/storage/opfs";
 import { cn } from "@/lib/utils";
 
@@ -210,13 +211,31 @@ export const ClipFadeHandles = memo(function ClipFadeHandles({
 							aria-hidden="true"
 						>
 							<title>{`${fade === "fadeIn" ? "Fade in" : "Fade out"} curve visualization`}</title>
-							<path
-								d={isLeft ? "M 0,100 Q 30,60 100,0" : "M 0,0 Q 70,40 100,100"}
-								fill="none"
-								stroke="rgba(255,255,255,0.6)"
-								strokeWidth="2"
-								vectorEffect="non-scaling-stroke"
-							/>
+							{(() => {
+								// Draw with evaluateSegmentCurve to mirror automation
+								const samples = 40;
+								const coords: Array<[number, number]> = [];
+								for (let i = 0; i <= samples; i++) {
+									const t = i / samples;
+									const y = isLeft
+										? 1 - evaluateSegmentCurve(0, 1, t, clip.fadeInCurve ?? 0)
+										: evaluateSegmentCurve(1, 0, t, clip.fadeOutCurve ?? 0);
+									const x = t;
+									coords.push([x * 100, y * 100]);
+								}
+								const d = coords
+									.map((c, i) => `${i === 0 ? "M" : "L"} ${c[0]},${c[1]}`)
+									.join(" ");
+								return (
+									<path
+										d={d}
+										fill="none"
+										stroke="rgba(255,255,255,0.7)"
+										strokeWidth="2"
+										vectorEffect="non-scaling-stroke"
+									/>
+								);
+							})()}
 						</svg>
 					</div>
 				)}

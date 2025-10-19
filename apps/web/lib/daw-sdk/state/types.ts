@@ -8,6 +8,7 @@ export type {
 	Clip,
 	ClipInspectorTarget,
 	PlaybackState,
+	ProjectMarker,
 	TimelineSection,
 	TimelineState,
 	Tool,
