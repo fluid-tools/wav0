@@ -10,31 +10,28 @@ import type { Track } from "./types";
 let lastUpdateTime = 0;
 let lastUpdateMs = 0;
 
-function createGuardedTimeUpdateCallback(
-	get: Getter,
-	set: Setter,
-) {
+function createGuardedTimeUpdateCallback(get: Getter, set: Setter) {
 	return (timeSeconds: number) => {
 		const currentMs = Math.max(0, Math.round(timeSeconds * 1000));
 		const now = performance.now();
-		
+
 		// Prevent updates if time hasn't changed
 		if (currentMs === lastUpdateMs) return;
-		
+
 		// Limit update frequency to ~60Hz (16ms intervals)
 		if (now - lastUpdateTime < 16) return;
-		
+
 		lastUpdateTime = now;
 		lastUpdateMs = currentMs;
-		
+
 		const newPlayback = get(playbackAtom) as any;
 		const total = get(totalDurationAtom) as number;
-		
+
 		if (currentMs >= total) {
 			set(playbackAtom, { ...newPlayback, currentTime: 0, isPlaying: false });
 			return;
 		}
-		
+
 		// Only update if the value actually changed
 		if (newPlayback.currentTime !== currentMs) {
 			set(playbackAtom, { ...newPlayback, currentTime: currentMs });

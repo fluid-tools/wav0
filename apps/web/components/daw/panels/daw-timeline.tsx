@@ -169,11 +169,6 @@ export function DAWTimeline() {
 					height={400}
 					pxPerMs={pxPerMs}
 					scrollLeft={horizontalScroll}
-					bpm={music.tempoBpm}
-					signature={music.timeSignature}
-					resolution={tGrid.resolution}
-					triplet={Boolean(tGrid.triplet)}
-					swing={Number(tGrid.swing) || 0}
 				/>
 			) : (
 				timeMarkers.map((marker) => (

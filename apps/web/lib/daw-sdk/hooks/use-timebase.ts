@@ -46,7 +46,11 @@ export function useTimebase() {
 		viewStartMs: number,
 		viewEndMs: number,
 		pxPerMs: number,
-	): { measures: Array<{ ms: number; bar: number }>; beats: Array<{ ms: number; primary: boolean }>; subs: number[] } {
+	): {
+		measures: Array<{ ms: number; bar: number }>;
+		beats: Array<{ ms: number; primary: boolean }>;
+		subs: number[];
+	} {
 		if (grid.mode === "time") {
 			return { measures: [], beats: [], subs: [] };
 		}
@@ -56,16 +60,21 @@ export function useTimebase() {
 		const subs: number[] = [];
 
 		// Calculate musical timing
-		const secondsPerBeat = (60 / music.tempoBpm) * (4 / music.timeSignature.den);
+		const secondsPerBeat =
+			(60 / music.tempoBpm) * (4 / music.timeSignature.den);
 		const msPerBeat = secondsPerBeat * 1000;
 		const msPerBar = music.timeSignature.num * msPerBeat;
 
 		// Compound grouping: if den===8 and num % 3 === 0, group beats by 3
-		const isCompound = music.timeSignature.den === 8 && music.timeSignature.num % 3 === 0;
+		const isCompound =
+			music.timeSignature.den === 8 && music.timeSignature.num % 3 === 0;
 		const groupBeats = isCompound ? 3 : 1;
 
 		// Get subdivision info
-		const divisionBeats = getDivisionBeats(grid.resolution, music.timeSignature);
+		const divisionBeats = getDivisionBeats(
+			grid.resolution,
+			music.timeSignature,
+		);
 		const subdivBeats = grid.triplet ? divisionBeats / 3 : divisionBeats;
 
 		// Iterate bars from view start to view end
@@ -74,7 +83,7 @@ export function useTimebase() {
 
 		for (let barIndex = startBar; barIndex <= endBar; barIndex++) {
 			const barMs = barIndex * msPerBar;
-			
+
 			// Add measure if in range
 			if (barMs >= viewStartMs && barMs <= viewEndMs) {
 				measures.push({ ms: barMs, bar: barIndex + 1 });
@@ -98,7 +107,9 @@ export function useTimebase() {
 					let finalSubMs = subMs;
 					if (grid.swing && grid.swing > 0 && !grid.triplet) {
 						const isEven = i % 2 === 0;
-						const bias = isEven ? 0 : grid.swing * (2 / 3 - 1 / 2) * subdivBeats * msPerBeat;
+						const bias = isEven
+							? 0
+							: grid.swing * (2 / 3 - 1 / 2) * subdivBeats * msPerBeat;
 						finalSubMs += bias;
 					}
 					subs.push(finalSubMs);
@@ -111,7 +122,12 @@ export function useTimebase() {
 		const pxPerSub = pxPerMs * subdivBeats * msPerBeat;
 
 		// Filter based on pixel density
-		const filteredBeats = pxPerBeat >= 8 ? beats : pxPerBeat >= 14 ? beats.filter(b => b.primary) : [];
+		const filteredBeats =
+			pxPerBeat >= 8
+				? beats
+				: pxPerBeat >= 14
+					? beats.filter((b) => b.primary)
+					: [];
 		const filteredSubs = pxPerSub >= 12 ? subs : [];
 
 		return {

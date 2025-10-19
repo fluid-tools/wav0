@@ -22,13 +22,13 @@ export function TimelineGridHeader({
 	const svgElements = useMemo(() => {
 		if (!grid.measures.length) return null;
 
-		const elements: JSX.Element[] = [];
+		const elements: React.ReactElement[] = [];
 		let lastLabelX = -1e9;
 		const minLabelSpacing = 28; // px
 
 		for (const measure of grid.measures) {
 			const x = measure.ms * pxPerMs - scrollLeft;
-			
+
 			// Only render labels that are visible and have enough spacing
 			if (x - lastLabelX >= minLabelSpacing && x >= 0 && x <= width) {
 				elements.push(
@@ -42,7 +42,7 @@ export function TimelineGridHeader({
 						className="select-none"
 					>
 						{measure.bar}
-					</text>
+					</text>,
 				);
 				lastLabelX = x;
 			}

@@ -34,10 +34,9 @@ export function MarkerTrack({ pxPerMs, width }: MarkerTrackProps) {
 					const left = start * pxPerMs;
 					const markerWidth = Math.max(10, duration * pxPerMs);
 					const yOffset = (idx % 2) * 2; // slight vertical offset for overlaps
-					const onDown = (
-						e: React.PointerEvent<HTMLDivElement>,
-						edge: "left" | "right" | "center",
-					) => {
+					type Align = "left" | "right" | "center";
+
+					const onDown = (e: React.PointerEvent, edge: Align) => {
 						e.preventDefault();
 						(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 						dragRef.current = {
@@ -49,7 +48,7 @@ export function MarkerTrack({ pxPerMs, width }: MarkerTrackProps) {
 							edge,
 						};
 					};
-					const onMove = (e: React.PointerEvent<HTMLDivElement>) => {
+					const onMove: React.PointerEventHandler = (e) => {
 						const d = dragRef.current;
 						if (!d || e.pointerId !== d.pointerId) return;
 						const dx = (e.clientX - d.startX) / pxPerMs;
@@ -69,7 +68,7 @@ export function MarkerTrack({ pxPerMs, width }: MarkerTrackProps) {
 							updateMarker(d.id, { durationMs: newDur });
 						}
 					};
-					const onUp = (e: React.PointerEvent<HTMLDivElement>) => {
+					const onUp: React.PointerEventHandler = (e) => {
 						const d = dragRef.current;
 						if (d && e.pointerId === d.pointerId) dragRef.current = null;
 					};

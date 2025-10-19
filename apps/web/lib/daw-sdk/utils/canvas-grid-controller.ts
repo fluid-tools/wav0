@@ -34,10 +34,10 @@ export class CanvasGridController {
 	private subsPath: Path2D | null = null;
 	private beatsPath: Path2D | null = null;
 	private measuresPath: Path2D | null = null;
-	
+
 	// Store measure data for labels
 	private measuresData: Array<{ ms: number; bar: number }> = [];
-	
+
 	// Current drawing state for primary beats
 	private grid: GridSubdivisions | null = null;
 	private pxPerMs = 0;
@@ -60,7 +60,7 @@ export class CanvasGridController {
 	 */
 	draw(options: CanvasGridControllerOptions): void {
 		this.pendingOptions = options;
-		
+
 		if (this.isDrawing) {
 			// Already scheduled, just update pending options
 			return;
@@ -131,7 +131,7 @@ export class CanvasGridController {
 		pxPerMs: number,
 		scrollLeft: number,
 		width: number,
-		height: number
+		height: number,
 	): void {
 		// Build subdivisions path
 		this.subsPath = new Path2D();
@@ -188,7 +188,7 @@ export class CanvasGridController {
 		// Draw primary beats with thicker lines and slightly different color
 		this.ctx.strokeStyle = color;
 		this.ctx.lineWidth = 1.5;
-		
+
 		// Create a new path for primary beats only
 		const primaryBeatsPath = new Path2D();
 		for (const beat of this.grid?.beats || []) {
@@ -200,7 +200,7 @@ export class CanvasGridController {
 				}
 			}
 		}
-		
+
 		this.ctx.stroke(primaryBeatsPath);
 	}
 
@@ -211,7 +211,6 @@ export class CanvasGridController {
 		this.ctx.lineWidth = 2;
 		this.ctx.stroke(this.measuresPath);
 	}
-
 
 	/**
 	 * Clean up resources

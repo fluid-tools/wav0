@@ -156,7 +156,10 @@ export class PlaybackService {
 			if (this.audioContext && clipState.gainNode) {
 				const now = this.audioContext.currentTime;
 				clipState.gainNode.gain.cancelScheduledValues(now);
-				clipState.gainNode.gain.setValueAtTime(clipState.gainNode.gain.value, now);
+				clipState.gainNode.gain.setValueAtTime(
+					clipState.gainNode.gain.value,
+					now,
+				);
 				clipState.gainNode.gain.linearRampToValueAtTime(0, now + 0.005);
 			}
 		} catch {}
@@ -175,7 +178,9 @@ export class PlaybackService {
 		// Stop all audio sources (after short fade window)
 		for (const node of clipState.audioSources) {
 			try {
-				node.stop(this.audioContext ? this.audioContext.currentTime + 0.006 : undefined);
+				node.stop(
+					this.audioContext ? this.audioContext.currentTime + 0.006 : undefined,
+				);
 				node.disconnect();
 			} catch (error) {
 				console.warn("Failed to stop audio source", clipId, error);

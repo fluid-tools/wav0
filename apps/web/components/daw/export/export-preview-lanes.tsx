@@ -25,7 +25,7 @@ export function ExportPreviewLanes({
 	const svgElements = useMemo(() => {
 		if (range.endMs <= range.startMs) return null;
 
-		const elements: JSX.Element[] = [];
+		const elements: React.ReactElement[] = [];
 		let totalTiles = 0;
 
 		// Draw tracks
@@ -40,10 +40,12 @@ export function ExportPreviewLanes({
 					y={y}
 					width={width}
 					height={rowHeight - 2}
-					fill={trackIndex % 2 === 0 ? "var(--muted)" : "var(--muted-foreground)"}
+					fill={
+						trackIndex % 2 === 0 ? "var(--muted)" : "var(--muted-foreground)"
+					}
 					rx={2}
 					ry={2}
-				/>
+				/>,
 			);
 
 			// Draw track clips
@@ -98,7 +100,7 @@ export function ExportPreviewLanes({
 									ry={2}
 									stroke="var(--primary)"
 									strokeWidth={0.5}
-								/>
+								/>,
 							);
 
 							// Draw loop dividers (dotted lines inside the rectangle)
@@ -114,7 +116,7 @@ export function ExportPreviewLanes({
 										strokeWidth={1}
 										strokeDasharray="2,2"
 										opacity={0.3}
-									/>
+									/>,
 								);
 							}
 
@@ -142,7 +144,7 @@ export function ExportPreviewLanes({
 								ry={2}
 								stroke="var(--primary)"
 								strokeWidth={0.5}
-							/>
+							/>,
 						);
 
 						totalTiles++;
@@ -162,7 +164,7 @@ export function ExportPreviewLanes({
 					className="select-none"
 				>
 					Track {trackIndex + 1}
-				</text>
+				</text>,
 			);
 		});
 
@@ -181,7 +183,7 @@ export function ExportPreviewLanes({
 					y2={height}
 					stroke="var(--border)"
 					strokeWidth={1}
-				/>
+				/>,
 			);
 
 			// Time label
@@ -196,7 +198,7 @@ export function ExportPreviewLanes({
 					className="select-none"
 				>
 					{(timeMs / 1000).toFixed(1)}s
-				</text>
+				</text>,
 			);
 		}
 

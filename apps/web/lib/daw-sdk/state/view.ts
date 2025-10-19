@@ -231,7 +231,9 @@ export const cachedGridSubdivisionsAtom = atom((get) => {
 	// Limit cache size to prevent memory leaks
 	if (gridSubdivisionsCache.size > 50) {
 		const firstKey = gridSubdivisionsCache.keys().next().value;
-		gridSubdivisionsCache.delete(firstKey);
+		if (firstKey) {
+			gridSubdivisionsCache.delete(firstKey);
+		}
 	}
 
 	return result;

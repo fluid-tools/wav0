@@ -19,7 +19,9 @@ export async function encode(
 	if (fmt === "wav") return wavBytes;
 	const input = new Input({
 		formats: ALL_FORMATS,
-		source: new BlobSource(new Blob([wavBytes], { type: "audio/wav" })),
+		source: new BlobSource(
+			new Blob([wavBytes as BlobPart], { type: "audio/wav" }),
+		),
 	});
 	const output = new Output({
 		format: pickFormat(fmt),
@@ -29,7 +31,9 @@ export async function encode(
 	if (!conversion.isValid) throw new Error("Conversion not valid");
 	conversion.onProgress = (p) => onProgress?.(p);
 	await conversion.execute();
-	return output.target.buffer;
+	const buffer = output.target.buffer;
+	if (!buffer) throw new Error("Conversion failed");
+	return new Uint8Array(buffer);
 }
 
 function pickFormat(fmt: "wav" | "flac" | "m4a" | "ogg") {
