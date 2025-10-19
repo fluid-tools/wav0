@@ -14,7 +14,6 @@ import {
 	ZoomOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 // import { DAW_PIXELS_PER_SECOND_AT_ZOOM_1 } from "@/lib/constants";
 import {
 	DAW_BUTTONS,
@@ -48,7 +47,7 @@ export function DAWControls() {
 	const [, togglePlayback] = useAtom(togglePlaybackAtom);
 	const [, stopPlayback] = useAtom(stopPlaybackAtom);
 	const [, setCurrentTime] = useAtom(setCurrentTimeAtom);
-	const [, setBpm] = useAtom(setBpmAtom);
+	const [, _setBpm] = useAtom(setBpmAtom);
 	const [, setTimelineZoom] = useAtom(setTimelineZoomAtom);
 	const [, setTrackHeightZoom] = useAtom(setTrackHeightZoomAtom);
 	const [totalDuration] = useAtom(totalDurationAtom);
@@ -72,11 +71,6 @@ export function DAWControls() {
 		// Clamp to project duration (don't allow past yellow marker)
 		const clampedTime = Math.min(Math.max(0, time), totalDuration);
 		setCurrentTime(clampedTime);
-	};
-
-	const handleBpmChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		const bpm = parseInt(e.target.value, 10);
-		setBpm(bpm);
 	};
 
 	const handleZoomIn = () => {
@@ -280,19 +274,6 @@ export function DAWControls() {
 					>
 						<ChevronsUpDown className={DAW_ICONS.SM} />
 					</Button>
-				</div>
-
-				<div className="flex items-center gap-2">
-					<span className="text-xs text-muted-foreground">BPM</span>
-					<Input
-						type="number"
-						value={playback.bpm}
-						onChange={handleBpmChange}
-						className="w-16 text-sm"
-						style={{ height: DAW_HEIGHTS.BUTTON_MD }}
-						min={60}
-						max={200}
-					/>
 				</div>
 
 				<Button

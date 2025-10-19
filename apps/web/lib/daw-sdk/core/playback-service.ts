@@ -7,6 +7,7 @@ import type {
 	Track,
 	TrackEnvelope,
 } from "../types/schemas";
+import { evaluateEnvelopeGainAt } from "../utils/automation-utils";
 import { dbToGain, volumeToDb } from "../utils/volume-utils";
 import { audioService } from "./audio-service";
 
@@ -150,6 +151,18 @@ export class PlaybackService {
 		if (!active) return;
 
 		const clipState = active.clipState;
+		// Micro-fade out to avoid clicks when stopping during playback
+		try {
+			if (this.audioContext && clipState.gainNode) {
+				const now = this.audioContext.currentTime;
+				clipState.gainNode.gain.cancelScheduledValues(now);
+				clipState.gainNode.gain.setValueAtTime(
+					clipState.gainNode.gain.value,
+					now,
+				);
+				clipState.gainNode.gain.linearRampToValueAtTime(0, now + 0.005);
+			}
+		} catch {}
 
 		// Stop iterator
 		try {
@@ -162,10 +175,12 @@ export class PlaybackService {
 		clipState.iterator = null;
 		clipState.generation = (clipState.generation ?? 0) + 1;
 
-		// Stop all audio sources
+		// Stop all audio sources (after short fade window)
 		for (const node of clipState.audioSources) {
 			try {
-				node.stop();
+				node.stop(
+					this.audioContext ? this.audioContext.currentTime + 0.006 : undefined,
+				);
 				node.disconnect();
 			} catch (error) {
 				console.warn("Failed to stop audio source", clipId, error);
@@ -217,6 +232,17 @@ export class PlaybackService {
 			generation,
 		};
 
+		// Micro-fade in when starting during playback to avoid edge clicks
+		try {
+			const now = this.audioContext.currentTime;
+			gainNode.gain.cancelScheduledValues(now);
+			const initial = this.isPlaying ? 0 : gainNode.gain.value;
+			gainNode.gain.setValueAtTime(initial, now);
+			if (this.isPlaying) {
+				gainNode.gain.linearRampToValueAtTime(1, now + 0.005);
+			}
+		} catch {}
+
 		// Register globally BEFORE scheduling audio
 		const desc = this.describeClip(clip);
 		this.activeClips.set(clip.id, {
@@ -261,12 +287,15 @@ export class PlaybackService {
 		// Step 1: Cancel all existing scheduled values
 		envelopeGain.gain.cancelScheduledValues(now);
 
-		// Step 2: Anchor current value at now
-		envelopeGain.gain.setValueAtTime(envelopeGain.gain.value, now);
-
-		// Convert volume to linear gain using pure dB math
+		// Step 2: Anchor to instantaneous effective gain at current transport time
+		const currentTimeMs = this.getPlaybackTime() * 1000;
 		const baseVolumeDb = track.volumeDb ?? volumeToDb(track.volume ?? 75);
 		const baseVolume = dbToGain(baseVolumeDb);
+		const multiplier = evaluateEnvelopeGainAt(envelope, currentTimeMs);
+		const anchorGain = baseVolume * multiplier;
+		envelopeGain.gain.setValueAtTime(anchorGain, now);
+
+		// baseVolume already computed above
 
 		if (!envelope || !envelope.enabled || envelope.points.length === 0) {
 			envelopeGain.gain.setValueAtTime(baseVolume, now);
@@ -274,7 +303,6 @@ export class PlaybackService {
 		}
 
 		const sorted = [...envelope.points].sort((a, b) => a.time - b.time);
-		const currentTimeMs = this.getPlaybackTime() * 1000;
 
 		// Find current multiplier at playback position with proper interpolation
 		let currentMultiplier = 1.0;
@@ -498,14 +526,18 @@ export class PlaybackService {
 	}
 
 	synchronizeTracks(tracks: Track[]): void {
-		this.applySnapshot(tracks);
-
-		// Fire async sync via mutex (use global registry)
 		if (this.isPlaying && this.audioContext) {
-			this.queueSync(() => this.synchronizeClipsGlobal(tracks)).catch((err) => {
-				console.error("Failed to synchronize clips during playback:", err);
+			// Atomic: snapshot + clip sync under mutex to avoid gaps
+			this.queueSync(async () => {
+				this.applySnapshot(tracks);
+				await this.synchronizeClipsGlobal(tracks);
+			}).catch((err) => {
+				console.error("Failed to synchronize tracks during playback:", err);
 			});
+			return;
 		}
+		// Not playing: just apply snapshot
+		this.applySnapshot(tracks);
 	}
 
 	/**
@@ -575,17 +607,13 @@ export class PlaybackService {
 		this.tracks.clear();
 
 		for (const track of tracks) {
-			const hasClipRef = (track.clips ?? []).some((c) => !!c.opfsFileId);
-			const hasLegacyRef = !!track.opfsFileId;
-			if (hasClipRef || hasLegacyRef) {
-				this.tracks.set(track.id, {
-					clipStates: new Map(),
-					envelopeGainNode: null,
-					muteSoloGainNode: null,
-					isPlaying: false,
-					automationGeneration: 0,
-				});
-			}
+			this.tracks.set(track.id, {
+				clipStates: new Map(),
+				envelopeGainNode: null,
+				muteSoloGainNode: null,
+				isPlaying: false,
+				automationGeneration: 0,
+			});
 		}
 	}
 
@@ -696,6 +724,11 @@ export class PlaybackService {
 					clipDurationSec > 0 ? Math.floor(elapsed / clipDurationSec) : 0;
 				cycleOffsetSec = cycleIndex * clipDurationSec;
 				timeIntoClip = clipDurationSec > 0 ? elapsed - cycleOffsetSec : 0;
+				// Guard boundary: if we're exactly at cycle end, roll to next cycle start
+				if (clipDurationSec > 0 && timeIntoClip >= clipDurationSec - 1e-6) {
+					cycleOffsetSec += clipDurationSec;
+					timeIntoClip = 0;
+				}
 			}
 		} else {
 			timeIntoClip = Math.max(0, timelineSec - clipStartSec);
@@ -704,12 +737,17 @@ export class PlaybackService {
 		const audioFileReadStart = clipTrimStartSec + timeIntoClip;
 		if (audioFileReadStart >= clipTrimEndSec) return;
 
-		// Apply fade envelopes
+		// Apply fade envelopes (cancel → anchor → future-only) with generation guard
 		try {
 			const clipGain = cps.gainNode ?? this.masterGainNode;
 			if (!clipGain || !this.audioContext) return;
 			const now = this.audioContext.currentTime;
 			this.cancelGainAutomation(clipGain.gain, now);
+
+			// Anchor at current timeline gain (assume 0..1 linear, fallback 1)
+			const anchorValue = 1;
+			clipGain.gain.setValueAtTime(anchorValue, now);
+
 			const clipStartAC =
 				this.startTime + clipStartSec - this.playbackTimeAtStart;
 			const loopEndAC =
@@ -718,11 +756,10 @@ export class PlaybackService {
 				this.startTime + clipOneShotEndSec - this.playbackTimeAtStart;
 
 			if (clip.fadeIn && clip.fadeIn > 0) {
-				clipGain.gain.setValueAtTime(0, Math.max(now, clipStartAC));
-				clipGain.gain.linearRampToValueAtTime(
-					1,
-					Math.max(now, clipStartAC + clip.fadeIn / 1000),
-				);
+				// From 0 → 1 using curve (use linear for now; curve params available on clip)
+				const startT = Math.max(now, clipStartAC);
+				clipGain.gain.setValueAtTime(0, startT);
+				clipGain.gain.linearRampToValueAtTime(1, startT + clip.fadeIn / 1000);
 			}
 
 			if (clip.fadeOut && clip.fadeOut > 0) {
@@ -732,10 +769,8 @@ export class PlaybackService {
 						: null
 					: oneShotEndAC;
 				if (targetEnd !== null) {
-					clipGain.gain.setValueAtTime(
-						1,
-						Math.max(now, targetEnd - clip.fadeOut / 1000),
-					);
+					const startT = Math.max(now, targetEnd - clip.fadeOut / 1000);
+					clipGain.gain.setValueAtTime(1, startT);
 					clipGain.gain.linearRampToValueAtTime(0, Math.max(now, targetEnd));
 				}
 			}
