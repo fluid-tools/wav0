@@ -3,9 +3,9 @@ import { useAtom } from "jotai";
 import {
 	useCallback,
 	useEffect,
+	useEffectEvent,
 	useRef,
 	useState,
-	useEffectEvent,
 } from "react";
 import { ExportPreviewLanes } from "@/components/daw/export/export-preview-lanes";
 import { Button } from "@/components/ui/button";

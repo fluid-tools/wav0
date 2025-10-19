@@ -4,7 +4,7 @@ import { atom, type Getter, type Setter } from "jotai";
 import { playbackService } from "../index";
 import { playbackAtom, tracksAtom } from "./atoms";
 import { totalDurationAtom } from "./tracks";
-import type { Track } from "./types";
+import type { PlaybackState, Track } from "./types";
 
 // Guarded onTimeUpdate callback to prevent recursion
 let lastUpdateTime = 0;
@@ -24,7 +24,7 @@ function createGuardedTimeUpdateCallback(get: Getter, set: Setter) {
 		lastUpdateTime = now;
 		lastUpdateMs = currentMs;
 
-		const newPlayback = get(playbackAtom) as any;
+		const newPlayback = get(playbackAtom) as PlaybackState;
 		const total = get(totalDurationAtom) as number;
 
 		if (currentMs >= total) {

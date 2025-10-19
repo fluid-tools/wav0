@@ -45,7 +45,7 @@ export function scheduleTrackEnvelopeInRange(
 	rangeStartMs: number,
 	rangeEndMs: number,
 ): void {
-	const now = (ac as AudioContext).currentTime ?? 0;
+	const _now = (ac as AudioContext).currentTime ?? 0;
 	param.cancelScheduledValues(0);
 	if (!envelope || !envelope.enabled) return;
 	// Anchor at range start
@@ -101,7 +101,7 @@ export async function scheduleClipNodes(
 	src.connect(gainNode);
 
 	// Fades (basic linear; curve integration later)
-	const now = (ac as AudioContext).currentTime ?? 0;
+	const _now = (ac as AudioContext).currentTime ?? 0;
 	// For OfflineAudioContext, absStartSec is timeline 0-based; schedule from absStartSec
 	const startT = Math.max(0, absStartSec);
 	if (clip.fadeIn && clip.fadeIn > 0) {

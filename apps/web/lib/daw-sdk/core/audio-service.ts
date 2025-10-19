@@ -183,7 +183,9 @@ export class AudioService {
 	): Promise<AudioBuffer | null> {
 		// Check cache first
 		if (this.audioBufferCache.has(opfsFileId)) {
-			return this.audioBufferCache.get(opfsFileId)!;
+			const cached = this.audioBufferCache.get(opfsFileId);
+			if (!cached) throw new Error(`Audio buffer not found for ${opfsFileId}`);
+			return cached;
 		}
 
 		let loadedTrack = this.loadedTracks.get(opfsFileId);
