@@ -33,11 +33,11 @@ export function TimelineGridCanvas({
 		if (!ctx) return;
 
 		const dpr = window.devicePixelRatio || 1;
-		canvas.width = width * dpr;
-		canvas.height = height * dpr;
+		canvas.width = Math.max(1, Math.floor(width * dpr));
+		canvas.height = Math.max(1, Math.floor(height * dpr));
 		canvas.style.width = `${width}px`;
 		canvas.style.height = `${height}px`;
-		ctx.scale(dpr, dpr);
+		ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
 		ctx.clearRect(0, 0, width, height);
 
@@ -52,8 +52,15 @@ export function TimelineGridCanvas({
 			triplet,
 		);
 
+		// Resolve theme colors from CSS variables to avoid black-on-black
+		const styles = getComputedStyle(canvas);
+		const colSub = styles.getPropertyValue("--timeline-grid-sub").trim() || "rgba(255,255,255,0.15)";
+		const colBeat = styles.getPropertyValue("--timeline-grid-beat").trim() || "rgba(255,255,255,0.3)";
+		const colMeas = styles.getPropertyValue("--timeline-grid-measure").trim() || "rgba(255,255,255,0.5)";
+		const colLabel = styles.getPropertyValue("--timeline-grid-label").trim() || "rgba(255,255,255,0.7)";
+
 		// Draw subdivisions
-		ctx.strokeStyle = "var(--timeline-grid-sub)";
+		ctx.strokeStyle = colSub;
 		ctx.lineWidth = 0.5;
 		for (const ms of grid.subs) {
 			const x = ms * pxPerMs - scrollLeft;
@@ -64,7 +71,7 @@ export function TimelineGridCanvas({
 		}
 
 		// Draw beats
-		ctx.strokeStyle = "var(--timeline-grid-beat)";
+		ctx.strokeStyle = colBeat;
 		ctx.lineWidth = 1;
 		for (const ms of grid.beats) {
 			const x = ms * pxPerMs - scrollLeft;
@@ -75,18 +82,28 @@ export function TimelineGridCanvas({
 		}
 
 		// Draw measures + labels
-		ctx.strokeStyle = "var(--timeline-grid-measure)";
+		ctx.strokeStyle = colMeas;
 		ctx.lineWidth = 2;
-		ctx.fillStyle = "var(--timeline-grid-label)";
+		ctx.fillStyle = colLabel;
 		ctx.font = "10px monospace";
+		let lastLabelX = -1e9;
+		const minLabelSpacing = 24; // px
+		const seen = new Set<number>();
 		for (const ms of grid.measures) {
+			// de-dupe very close measure times due to float rounding
+			const key = Math.round(ms * 1000);
+			if (seen.has(key)) continue;
+			seen.add(key);
 			const x = ms * pxPerMs - scrollLeft;
 			ctx.beginPath();
 			ctx.moveTo(x, 0);
 			ctx.lineTo(x, height);
 			ctx.stroke();
-			const { bar } = msToBarsBeats(ms, bpm, signature);
-			ctx.fillText(`${bar}`, x + 4, 12);
+			if (x - lastLabelX >= minLabelSpacing && x >= 0 && x <= width) {
+				const { bar } = msToBarsBeats(ms, bpm, signature);
+				ctx.fillText(`${bar}`, x + 4, 12);
+				lastLabelX = x;
+			}
 		}
 	}, [width, height, pxPerMs, scrollLeft, bpm, signature, resolution, triplet]);
 

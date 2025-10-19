@@ -151,6 +151,15 @@ export class PlaybackService {
 		if (!active) return;
 
 		const clipState = active.clipState;
+		// Micro-fade out to avoid clicks when stopping during playback
+		try {
+			if (this.audioContext && clipState.gainNode) {
+				const now = this.audioContext.currentTime;
+				clipState.gainNode.gain.cancelScheduledValues(now);
+				clipState.gainNode.gain.setValueAtTime(clipState.gainNode.gain.value, now);
+				clipState.gainNode.gain.linearRampToValueAtTime(0, now + 0.005);
+			}
+		} catch {}
 
 		// Stop iterator
 		try {
@@ -163,10 +172,10 @@ export class PlaybackService {
 		clipState.iterator = null;
 		clipState.generation = (clipState.generation ?? 0) + 1;
 
-		// Stop all audio sources
+		// Stop all audio sources (after short fade window)
 		for (const node of clipState.audioSources) {
 			try {
-				node.stop();
+				node.stop(this.audioContext ? this.audioContext.currentTime + 0.006 : undefined);
 				node.disconnect();
 			} catch (error) {
 				console.warn("Failed to stop audio source", clipId, error);
@@ -217,6 +226,17 @@ export class PlaybackService {
 			audioSources: [],
 			generation,
 		};
+
+		// Micro-fade in when starting during playback to avoid edge clicks
+		try {
+			const now = this.audioContext.currentTime;
+			gainNode.gain.cancelScheduledValues(now);
+			const initial = this.isPlaying ? 0 : gainNode.gain.value;
+			gainNode.gain.setValueAtTime(initial, now);
+			if (this.isPlaying) {
+				gainNode.gain.linearRampToValueAtTime(1, now + 0.005);
+			}
+		} catch {}
 
 		// Register globally BEFORE scheduling audio
 		const desc = this.describeClip(clip);
@@ -699,6 +719,11 @@ export class PlaybackService {
 					clipDurationSec > 0 ? Math.floor(elapsed / clipDurationSec) : 0;
 				cycleOffsetSec = cycleIndex * clipDurationSec;
 				timeIntoClip = clipDurationSec > 0 ? elapsed - cycleOffsetSec : 0;
+				// Guard boundary: if we're exactly at cycle end, roll to next cycle start
+				if (clipDurationSec > 0 && timeIntoClip >= clipDurationSec - 1e-6) {
+					cycleOffsetSec += clipDurationSec;
+					timeIntoClip = 0;
+				}
 			}
 		} else {
 			timeIntoClip = Math.max(0, timelineSec - clipStartSec);

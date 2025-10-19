@@ -1,6 +1,6 @@
 "use client";
 import { useAtom } from "jotai";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -9,6 +9,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { projectNameAtom, tracksAtom } from "@/lib/daw-sdk";
+import { createPreviewPlayer } from "@/lib/daw-sdk/core/preview-player";
 import { renderProjectToAudioBuffer } from "@/lib/daw-sdk/core/render-service";
 import { loopRegionAtom } from "@/lib/daw-sdk/state/timeline";
 
@@ -24,6 +25,8 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 	const [progress, setProgress] = useState<number | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [previewBuffer, setPreviewBuffer] = useState<AudioBuffer | null>(null);
+	const [previewVol, setPreviewVol] = useState(1);
+	const playerRef = useRef<ReturnType<typeof createPreviewPlayer> | null>(null);
 	const [tracks] = useAtom(tracksAtom);
 	const [projectName] = useAtom(projectNameAtom);
 	const [loopRegion] = useAtom(loopRegionAtom);
@@ -38,6 +41,9 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 				{ startMs, endMs, sampleRate: sr, channels: ch },
 			);
 			setPreviewBuffer(buffer);
+			if (!playerRef.current) playerRef.current = createPreviewPlayer();
+			playerRef.current.load(buffer);
+			playerRef.current.setGain(previewVol);
 		} finally {
 			setBusy(false);
 		}
@@ -45,12 +51,29 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 
 	function playPreview() {
 		if (!previewBuffer) return;
-		const ac = new AudioContext();
-		const src = ac.createBufferSource();
-		src.buffer = previewBuffer;
-		src.connect(ac.destination);
-		src.start();
+		if (!playerRef.current) playerRef.current = createPreviewPlayer();
+		playerRef.current.load(previewBuffer);
+		playerRef.current.setGain(previewVol);
+		playerRef.current.play();
 	}
+
+	function pausePreview() {
+		playerRef.current?.pause();
+	}
+
+	function stopPreview() {
+		playerRef.current?.stop();
+	}
+
+	useEffect(() => {
+		if (!open) {
+			playerRef.current?.stop();
+		}
+		return () => {
+			playerRef.current?.dispose();
+			playerRef.current = null;
+		};
+	}, [open]);
 
 	function getRangeMs() {
 		if (range === "loop" && loopRegion.enabled) {
@@ -247,6 +270,35 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 								return `${mb} MB (${fmt.toUpperCase()})`;
 							})()}
 						</div>
+						{previewBuffer && (
+							<div className="mt-2 flex items-center gap-2">
+								<Button size="xs" variant="outline" onClick={playPreview}>
+									Play
+								</Button>
+								<Button size="xs" variant="outline" onClick={pausePreview}>
+									Pause
+								</Button>
+								<Button size="xs" variant="outline" onClick={stopPreview}>
+									Stop
+								</Button>
+								<label className="flex items-center gap-1">
+									<span>Vol</span>
+									<input
+										type="range"
+										min={0}
+										max={1}
+										step={0.01}
+										value={previewVol}
+										onChange={(e) => {
+											const v = Number(e.target.value);
+											setPreviewVol(v);
+											playerRef.current?.setGain(v);
+										}}
+										className="w-24"
+									/>
+								</label>
+							</div>
+						)}
 					</div>
 				)}
 				<div className="flex justify-end gap-2">
@@ -260,11 +312,6 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 					<Button variant="outline" onClick={onPreview} disabled={busy}>
 						Preview
 					</Button>
-					{previewBuffer && (
-						<Button variant="outline" onClick={playPreview}>
-							Play
-						</Button>
-					)}
 					<Button onClick={onExport} disabled={busy}>
 						Export
 					</Button>
