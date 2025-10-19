@@ -33,7 +33,7 @@ export function DAWTimeline() {
 	const [_projectEndOverride, setProjectEndOverride] = useAtom(
 		projectEndOverrideAtom,
 	);
-	const containerRef = useRef<HTMLDivElement>(null);
+	const containerRef = useRef<HTMLButtonElement>(null);
 	const [isDraggingEnd, setIsDraggingEnd] = useState(false);
 	const [playheadViewportPx] = useAtom(playheadViewportPxAtom);
 	const [pxPerMs] = useAtom(timelinePxPerMsAtom);
@@ -136,7 +136,9 @@ export function DAWTimeline() {
 		playback.currentTime,
 	]);
 
-	const onTimelinePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+	const onTimelinePointerDown = (
+		event: React.PointerEvent<HTMLButtonElement>,
+	) => {
 		if (event.button !== 0) return;
 		event.preventDefault();
 		handleTimelineClick(event);
@@ -148,9 +150,10 @@ export function DAWTimeline() {
 	const [horizontalScroll] = useAtom(horizontalScrollAtom);
 
 	return (
-		<section
+		<button
 			ref={containerRef}
-			className="h-full w-full relative bg-muted/10 cursor-pointer select-none"
+			type="button"
+			className="h-full w-full relative bg-muted/10 cursor-pointer select-none border-none p-0"
 			onClick={(e) => {
 				if (isDraggingEnd) return;
 				handleTimelineClick(e);
@@ -159,24 +162,11 @@ export function DAWTimeline() {
 				if (isDraggingEnd) return;
 				if (e.key === "Enter" || e.key === " ") {
 					e.preventDefault();
-					// Create a synthetic mouse event for keyboard interaction
-					const syntheticEvent = {
-						...e,
-						clientX: 0,
-						clientY: 0,
-						currentTarget: e.currentTarget,
-						button: 0,
-						buttons: 0,
-						movementX: 0,
-						movementY: 0,
-						relatedTarget: null,
-						screenX: 0,
-						screenY: 0,
-						pageX: 0,
-						pageY: 0,
-						getModifierState: e.getModifierState,
-					} as unknown as React.MouseEvent<HTMLElement>;
-					handleTimelineClick(syntheticEvent);
+					const at = Math.max(0, Math.round(playback.currentTime));
+					const snapped = timeline.snapToGrid
+						? snapTimeMs(at, grid, music.tempoBpm, music.timeSignature)
+						: at;
+					setCurrentTime(snapped);
 				}
 			}}
 			onPointerDown={onTimelinePointerDown}
@@ -251,6 +241,6 @@ export function DAWTimeline() {
 					))}
 				</div>
 			)}
-		</section>
+		</button>
 	);
 }
