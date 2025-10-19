@@ -8,6 +8,7 @@ export type PreviewPlayer = {
   seek: (seconds: number) => void
   setGain: (linear: number) => void
   dispose: () => void
+  onended?: () => void
 }
 
 export function createPreviewPlayer(): PreviewPlayer {
@@ -18,6 +19,7 @@ export function createPreviewPlayer(): PreviewPlayer {
   let startedAt = 0 // ac.currentTime at which playback of the buffer started at offset 0
   let pausedAt = 0 // seconds offset into buffer when paused/stopped
   let playing = false
+  let externalOnEnded: (() => void) | undefined
 
   function ensureContext(): AudioContext {
     if (!ac) {
@@ -49,6 +51,10 @@ export function createPreviewPlayer(): PreviewPlayer {
       if (src) {
         playing = false
       }
+      // notify external handler
+      try {
+        externalOnEnded?.()
+      } catch {}
     }
   }
 
@@ -131,6 +137,12 @@ export function createPreviewPlayer(): PreviewPlayer {
         ac = null
         gain = null
       }
+    },
+    get onended() {
+      return externalOnEnded
+    },
+    set onended(fn: (() => void) | undefined) {
+      externalOnEnded = fn
     },
   }
 }

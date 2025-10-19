@@ -37,6 +37,13 @@ export class CanvasGridController {
 	
 	// Store measure data for labels
 	private measuresData: Array<{ ms: number; bar: number }> = [];
+	
+	// Current drawing state for primary beats
+	private grid: GridSubdivisions | null = null;
+	private pxPerMs = 0;
+	private scrollLeft = 0;
+	private width = 0;
+	private height = 0;
 
 	constructor(canvas: HTMLCanvasElement) {
 		this.canvas = canvas;
@@ -90,6 +97,13 @@ export class CanvasGridController {
 	private drawGrid(options: CanvasGridControllerOptions): void {
 		const { width, height, pxPerMs, scrollLeft, grid, themeColors } = options;
 
+		// Store state for primary beats drawing
+		this.grid = grid;
+		this.pxPerMs = pxPerMs;
+		this.scrollLeft = scrollLeft;
+		this.width = width;
+		this.height = height;
+
 		// Setup HiDPI scaling
 		const dpr = window.devicePixelRatio || 1;
 		this.canvas.width = Math.max(1, Math.floor(width * dpr));
@@ -104,11 +118,12 @@ export class CanvasGridController {
 		// Build Path2D objects for batching
 		this.buildPaths(grid, pxPerMs, scrollLeft, width, height);
 
-		// Draw all paths in batches
+		// Draw all paths in batches (order matters for visual hierarchy)
 		this.drawSubdivisions(themeColors.sub);
 		this.drawBeats(themeColors.beat);
+		this.drawPrimaryBeats(themeColors.beat); // Draw primary beats on top
 		this.drawMeasures(themeColors.measure);
-		this.drawMeasureLabels(this.measuresData, pxPerMs, scrollLeft, width, themeColors.label);
+		// Labels are now handled by SVG overlay
 	}
 
 	private buildPaths(
@@ -167,6 +182,28 @@ export class CanvasGridController {
 		this.ctx.stroke(this.beatsPath);
 	}
 
+	private drawPrimaryBeats(color: string): void {
+		if (!this.beatsPath) return;
+
+		// Draw primary beats with thicker lines and slightly different color
+		this.ctx.strokeStyle = color;
+		this.ctx.lineWidth = 1.5;
+		
+		// Create a new path for primary beats only
+		const primaryBeatsPath = new Path2D();
+		for (const beat of this.grid?.beats || []) {
+			if (beat.primary) {
+				const x = beat.ms * this.pxPerMs - this.scrollLeft;
+				if (x >= 0 && x <= this.width) {
+					primaryBeatsPath.moveTo(x, 0);
+					primaryBeatsPath.lineTo(x, this.height);
+				}
+			}
+		}
+		
+		this.ctx.stroke(primaryBeatsPath);
+	}
+
 	private drawMeasures(color: string): void {
 		if (!this.measuresPath) return;
 
@@ -175,29 +212,6 @@ export class CanvasGridController {
 		this.ctx.stroke(this.measuresPath);
 	}
 
-	/**
-	 * Draw measure labels separately since Path2D doesn't store metadata
-	 */
-	private drawMeasureLabels(
-		measures: Array<{ ms: number; bar: number }>,
-		pxPerMs: number,
-		scrollLeft: number,
-		width: number,
-		labelColor: string
-	): void {
-		this.ctx.fillStyle = labelColor;
-		this.ctx.font = "10px monospace";
-		let lastLabelX = -1e9;
-		const minLabelSpacing = 28; // px
-
-		for (const measure of measures) {
-			const x = measure.ms * pxPerMs - scrollLeft;
-			if (x - lastLabelX >= minLabelSpacing && x >= 0 && x <= width) {
-				this.ctx.fillText(`${measure.bar}`, x + 4, 12);
-				lastLabelX = x;
-			}
-		}
-	}
 
 	/**
 	 * Clean up resources

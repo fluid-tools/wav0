@@ -3,6 +3,7 @@ import { useAtom } from "jotai";
 import { useDeferredValue, useEffect, useMemo, useRef } from "react";
 import { cachedGridSubdivisionsAtom } from "@/lib/daw-sdk/state/view";
 import { CanvasGridController } from "@/lib/daw-sdk/utils/canvas-grid-controller";
+import { TimelineGridHeader } from "./timeline-grid-header";
 
 type Props = {
 	width: number;
@@ -79,10 +80,18 @@ export function TimelineGridCanvas({
 	}, [width, height, deferredPxPerMs, deferredScrollLeft, grid, themeColors]);
 
 	return (
-		<canvas
-			ref={canvasRef}
-			className="absolute inset-0 pointer-events-none"
-			style={{ width, height }}
-		/>
+		<div className="relative" style={{ width, height }}>
+			<canvas
+				ref={canvasRef}
+				className="absolute inset-0 pointer-events-none"
+				style={{ width, height }}
+			/>
+			<TimelineGridHeader
+				width={width}
+				height={height}
+				pxPerMs={deferredPxPerMs}
+				scrollLeft={deferredScrollLeft}
+			/>
+		</div>
 	);
 }

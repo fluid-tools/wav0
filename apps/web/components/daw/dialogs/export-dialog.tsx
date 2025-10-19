@@ -1,6 +1,7 @@
 "use client";
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ExportPreviewLanes } from "@/components/daw/export/export-preview-lanes";
 import { Button } from "@/components/ui/button";
 import {
 	Collapsible,
@@ -17,6 +18,7 @@ import { projectNameAtom, tracksAtom } from "@/lib/daw-sdk";
 import { createPreviewPlayer } from "@/lib/daw-sdk/core/preview-player";
 import { renderProjectToAudioBuffer } from "@/lib/daw-sdk/core/render-service";
 import { loopRegionAtom } from "@/lib/daw-sdk/state/timeline";
+import { useEffectEvent } from "@/lib/react/use-effect-event";
 
 type Props = { open: boolean; onOpenChange: (v: boolean) => void };
 
@@ -33,7 +35,6 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 	const [previewVol, setPreviewVol] = useState(1);
 	const [showPreviewLanes, setShowPreviewLanes] = useState(false);
 	const playerRef = useRef<ReturnType<typeof createPreviewPlayer> | null>(null);
-	const previewCanvasRef = useRef<HTMLCanvasElement>(null);
 	const [tracks] = useAtom(tracksAtom);
 	const [projectName] = useAtom(projectNameAtom);
 	const [loopRegion] = useAtom(loopRegionAtom);
@@ -72,6 +73,12 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 		playerRef.current?.stop();
 	}
 
+	// Use useEffectEvent for non-reactive event handlers
+	const onPlayerEnded = useEffectEvent(() => {
+		// This can read latest state without re-subscribing the effect
+		stopPreview();
+	});
+
 	useEffect(() => {
 		if (!open) {
 			playerRef.current?.stop();
@@ -81,6 +88,21 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 			playerRef.current = null;
 		};
 	}, [open]);
+
+	// Set up player event handlers with useEffectEvent
+	useEffect(() => {
+		const player = playerRef.current;
+		if (!player) return;
+
+		// Set up event handler that doesn't cause effect re-runs
+		player.onended = () => onPlayerEnded();
+
+		return () => {
+			if (player.onended) {
+				player.onended = undefined;
+			}
+		};
+	}, [onPlayerEnded]);
 
 	const getRangeMs = useCallback(() => {
 		if (range === "loop" && loopRegion.enabled) {
@@ -94,152 +116,6 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 			endMs: Math.max(...tracks.map((t) => t.duration), 60000),
 		};
 	}, [range, loopRegion, customStart, customEnd, tracks]);
-
-	const renderPreviewLanes = useCallback(() => {
-		const canvas = previewCanvasRef.current;
-		if (!canvas) return;
-
-		const ctx = canvas.getContext("2d");
-		if (!ctx) return;
-
-		const { startMs, endMs } = getRangeMs();
-		const canvasWidth = 400;
-		const canvasHeight = Math.min(tracks.length * 20 + 40, 200);
-
-		// Setup HiDPI scaling
-		const dpr = window.devicePixelRatio || 1;
-		canvas.width = Math.max(1, Math.floor(canvasWidth * dpr));
-		canvas.height = Math.max(1, Math.floor(canvasHeight * dpr));
-		canvas.style.width = `${canvasWidth}px`;
-		canvas.style.height = `${canvasHeight}px`;
-		ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-		ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-
-		if (endMs <= startMs) return;
-
-		// Get theme colors from CSS variables
-		const styles = getComputedStyle(canvas);
-		const trackBgEven = styles.getPropertyValue("--muted").trim() || "hsl(210 40% 98%)";
-		const trackBgOdd = styles.getPropertyValue("--muted-foreground").trim() || "hsl(210 40% 96%)";
-		const clipFill = styles.getPropertyValue("--primary").trim() || "hsl(221.2 83.2% 53.3%)";
-		const labelColor = styles.getPropertyValue("--muted-foreground").trim() || "hsl(215.4 16.3% 46.9%)";
-		const gridColor = styles.getPropertyValue("--border").trim() || "hsl(214.3 31.8% 91.4%)";
-
-		const pxPerMs = canvasWidth / (endMs - startMs);
-		const rowHeight = 16;
-		const padding = 4;
-
-		// Draw tracks
-		tracks.forEach((track, trackIndex) => {
-			const y = trackIndex * rowHeight + padding;
-
-			// Draw track background with theme colors
-			ctx.fillStyle = trackIndex % 2 === 0 ? trackBgEven : trackBgOdd;
-			ctx.fillRect(0, y, canvasWidth, rowHeight - 2);
-
-			// Draw track clips
-			track.clips?.forEach((clip) => {
-				// Calculate audible windows
-				const trimStart = clip.trimStart || 0;
-				const trimEnd = clip.trimEnd || clip.sourceDurationMs || 0;
-				const clipDuration = trimEnd - trimStart;
-
-				if (clipDuration <= 0) return;
-
-				const audibleStart = Math.max(clip.startTime, startMs);
-				const audibleEnd = Math.min(clip.startTime + clipDuration, endMs);
-
-				// Handle looped clips
-				if (clip.loop) {
-					const cycleLen = clipDuration;
-					const loopEnd = clip.loopEnd || Infinity;
-
-					// Find first cycle start within range
-					let firstCycleStart = clip.startTime;
-					if (startMs > clip.startTime) {
-						const cyclesOffset = Math.ceil(
-							(startMs - clip.startTime) / cycleLen,
-						);
-						firstCycleStart = clip.startTime + cyclesOffset * cycleLen;
-					}
-
-					// Tile cycles across the range
-					let currentStart = firstCycleStart;
-					while (currentStart < endMs && currentStart < loopEnd) {
-						const currentEnd = Math.min(
-							currentStart + cycleLen,
-							endMs,
-							loopEnd,
-						);
-						if (currentEnd > startMs) {
-							const x = (currentStart - startMs) * pxPerMs;
-							const w = (currentEnd - currentStart) * pxPerMs;
-
-							// Draw rounded clip rectangle
-							ctx.fillStyle = clipFill;
-							ctx.beginPath();
-							ctx.roundRect(x, y + 2, w, rowHeight - 6, 2);
-							ctx.fill();
-							
-							// Draw subtle outline
-							ctx.strokeStyle = clipFill;
-							ctx.lineWidth = 0.5;
-							ctx.stroke();
-						}
-						currentStart += cycleLen;
-					}
-				} else {
-					// One-shot clip
-					if (audibleEnd > audibleStart) {
-						const x = (audibleStart - startMs) * pxPerMs;
-						const w = (audibleEnd - audibleStart) * pxPerMs;
-
-						// Draw rounded clip rectangle
-						ctx.fillStyle = clipFill;
-						ctx.beginPath();
-						ctx.roundRect(x, y + 2, w, rowHeight - 6, 2);
-						ctx.fill();
-						
-						// Draw subtle outline
-						ctx.strokeStyle = clipFill;
-						ctx.lineWidth = 0.5;
-						ctx.stroke();
-					}
-				}
-			});
-
-			// Draw track label with theme color
-			ctx.fillStyle = labelColor;
-			ctx.font = "10px sans-serif";
-			ctx.fillText(`Track ${trackIndex + 1}`, 4, y + 12);
-		});
-
-		// Draw time markers with theme colors
-		ctx.strokeStyle = gridColor;
-		ctx.lineWidth = 1;
-		const timeStep = (endMs - startMs) / 8; // 8 time markers
-		for (let i = 0; i <= 8; i++) {
-			const timeMs = startMs + i * timeStep;
-			const x = (timeMs - startMs) * pxPerMs;
-			ctx.beginPath();
-			ctx.moveTo(x, 0);
-			ctx.lineTo(x, canvasHeight);
-			ctx.stroke();
-
-			// Time label with theme color
-			ctx.fillStyle = labelColor;
-			ctx.font = "8px sans-serif";
-			ctx.fillText(`${(timeMs / 1000).toFixed(1)}s`, x + 2, 12);
-		}
-	}, [tracks, getRangeMs]);
-
-	// Render preview lanes when tracks/range changes
-	useEffect(() => {
-		if (showPreviewLanes) {
-			renderPreviewLanes();
-		}
-	}, [showPreviewLanes, renderPreviewLanes]);
 
 	async function onExport() {
 		try {
@@ -467,10 +343,11 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 							<div className="text-xs text-muted-foreground mb-2">
 								Visual preview of audible content in export range
 							</div>
-							<canvas
-								ref={previewCanvasRef}
-								className="border rounded bg-white"
-								style={{ maxWidth: "100%", height: "auto" }}
+							<ExportPreviewLanes
+								width={400}
+								height={Math.min(tracks.length * 20 + 40, 200)}
+								tracks={tracks}
+								range={getRangeMs()}
 							/>
 						</div>
 					</CollapsibleContent>
