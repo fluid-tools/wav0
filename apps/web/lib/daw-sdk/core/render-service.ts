@@ -1,6 +1,6 @@
 import type { Track } from "@/lib/daw-sdk"
 import { audioService } from "@/lib/daw-sdk/core/audio-service"
-import { scheduleTrackEnvelope } from "@/lib/daw-sdk/core/playback-shared"
+import { scheduleTrackEnvelopeInRange } from "@/lib/daw-sdk/core/playback-shared"
 
 export type RenderOptions = {
     startMs?: number
@@ -32,7 +32,13 @@ export async function renderProjectToAudioBuffer(
     for (const track of tracks) {
         const trackGain = ac.createGain()
         trackGain.connect(master)
-        scheduleTrackEnvelope(ac, trackGain.gain, track.volumeEnvelope, 0)
+        scheduleTrackEnvelopeInRange(
+            ac,
+            trackGain.gain,
+            track.volumeEnvelope,
+            startMs,
+            endMs,
+        )
         const clips = track.clips || []
         for (const clip of clips) {
             if (!clip.opfsFileId) continue
