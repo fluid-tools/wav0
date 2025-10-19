@@ -14,7 +14,6 @@ import {
 	ZoomOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 // import { DAW_PIXELS_PER_SECOND_AT_ZOOM_1 } from "@/lib/constants";
 import {
 	DAW_BUTTONS,
@@ -26,7 +25,6 @@ import {
 	playbackAtom,
 	selectedClipIdAtom,
 	selectedTrackIdAtom,
-	setBpmAtom,
 	setCurrentTimeAtom,
 	setTimelineZoomAtom,
 	setTrackHeightZoomAtom,
@@ -48,7 +46,6 @@ export function DAWControls() {
 	const [, togglePlayback] = useAtom(togglePlaybackAtom);
 	const [, stopPlayback] = useAtom(stopPlaybackAtom);
 	const [, setCurrentTime] = useAtom(setCurrentTimeAtom);
-	const [, setBpm] = useAtom(setBpmAtom);
 	const [, setTimelineZoom] = useAtom(setTimelineZoomAtom);
 	const [, setTrackHeightZoom] = useAtom(setTrackHeightZoomAtom);
 	const [totalDuration] = useAtom(totalDurationAtom);
@@ -72,11 +69,6 @@ export function DAWControls() {
 		// Clamp to project duration (don't allow past yellow marker)
 		const clampedTime = Math.min(Math.max(0, time), totalDuration);
 		setCurrentTime(clampedTime);
-	};
-
-	const handleBpmChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		const bpm = parseInt(e.target.value, 10);
-		setBpm(bpm);
 	};
 
 	const handleZoomIn = () => {
@@ -150,7 +142,7 @@ export function DAWControls() {
 		>
 			<div className="flex items-center gap-3">
 				<div className="flex items-center gap-2">
-					<Button variant="ghost" size="sm">
+					<Button variant="ghost" size="sm" aria-label="Skip to beginning">
 						<SkipBack className={DAW_ICONS.MD} />
 					</Button>
 					<Button
@@ -167,6 +159,7 @@ export function DAWControls() {
 							width: DAW_HEIGHTS.BUTTON_LG,
 							height: DAW_HEIGHTS.BUTTON_LG,
 						}}
+						aria-label={playback.isPlaying ? "Pause" : "Play"}
 					>
 						{playback.isPlaying ? (
 							<Pause className={DAW_ICONS.LG} />
@@ -174,10 +167,15 @@ export function DAWControls() {
 							<Play className={DAW_ICONS.LG} />
 						)}
 					</Button>
-					<Button variant="ghost" size="sm" onClick={handleStop}>
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={handleStop}
+						aria-label="Stop"
+					>
 						<Square className={DAW_ICONS.MD} />
 					</Button>
-					<Button variant="ghost" size="sm">
+					<Button variant="ghost" size="sm" aria-label="Skip to end">
 						<SkipForward className={DAW_ICONS.MD} />
 					</Button>
 				</div>
@@ -282,25 +280,13 @@ export function DAWControls() {
 					</Button>
 				</div>
 
-				<div className="flex items-center gap-2">
-					<span className="text-xs text-muted-foreground">BPM</span>
-					<Input
-						type="number"
-						value={playback.bpm}
-						onChange={handleBpmChange}
-						className="w-16 text-sm"
-						style={{ height: DAW_HEIGHTS.BUTTON_MD }}
-						min={60}
-						max={200}
-					/>
-				</div>
-
 				<Button
 					variant={loopState ? "secondary" : "ghost"}
 					size="sm"
 					onClick={(e) => onToggleLoop(e)}
 					disabled={!findSelectedClip()}
 					title="Toggle loop for selected clip (Shift = infinite)"
+					aria-label="Toggle loop for selected clip"
 				>
 					<Repeat className={DAW_ICONS.MD} />
 				</Button>

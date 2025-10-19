@@ -1,7 +1,13 @@
 "use client";
 
 import { z } from "zod";
-import type { Clip, PlaybackOptions, Track } from "../types/schemas";
+import type {
+	Clip,
+	PlaybackOptions,
+	Track,
+	TrackEnvelope,
+} from "../types/schemas";
+import { evaluateEnvelopeGainAt } from "../utils/automation-utils";
 import { dbToGain, volumeToDb } from "../utils/volume-utils";
 import { audioService } from "./audio-service";
 
@@ -21,6 +27,7 @@ type TrackPlaybackState = {
 	muteSoloGainNode: GainNode | null;
 	isPlaying: boolean;
 	automationGeneration: number;
+	lastEnvelopeDesc?: string;
 };
 
 /**
@@ -55,10 +62,42 @@ export class PlaybackService {
 	// Global clip registry: enforces one-track-per-clip ownership
 	private activeClips = new Map<
 		string,
-		{ trackId: string; clipState: ClipPlaybackState }
+		{
+			trackId: string;
+			clipState: ClipPlaybackState;
+			desc: string;
+			generation: number;
+		}
 	>();
+	// Serialization mutex for all sync operations
+	private syncLock: Promise<void> = Promise.resolve();
 
 	private constructor() {}
+
+	private queueSync<T>(fn: () => Promise<T>): Promise<T> {
+		const queued = this.syncLock.then(
+			() => fn(),
+			() => fn(),
+		);
+		this.syncLock = queued.then(
+			() => {},
+			() => {},
+		);
+		return queued;
+	}
+
+	private describeClip(clip: Clip): string {
+		return `${clip.startTime}|${clip.trimStart}|${clip.trimEnd}|${clip.loop ? "1" : "0"}|${clip.loopEnd ?? -1}`;
+	}
+
+	private describeEnvelope(env?: TrackEnvelope): string {
+		if (!env || !env.points?.length) return "";
+		const pts = env.points.map((p) => `${p.time}:${p.value}`).join(",");
+		const segs = (env.segments ?? [])
+			.map((s) => `${s.fromPointId}->${s.toPointId}:${s.curve ?? "0"}`)
+			.join(",");
+		return `${pts}#${segs}`;
+	}
 
 	static getInstance(): PlaybackService {
 		if (!PlaybackService.instance) {
@@ -98,59 +137,9 @@ export class PlaybackService {
 		return this.playbackTimeAtStart;
 	}
 
-	private async stopClipState(
-		trackId: string,
-		clipId: string,
-	): Promise<ClipPlaybackState | null> {
-		const trackState = this.tracks.get(trackId);
-		if (!trackState) return null;
-		const clipState = trackState.clipStates.get(clipId);
-		if (!clipState) return null;
-
-		try {
-			if (clipState.iterator?.return) {
-				await clipState.iterator.return();
-			}
-		} catch (error) {
-			console.warn("Failed to close clip iterator", trackId, clipId, error);
-		}
-		clipState.iterator = null;
-		clipState.generation = (clipState.generation ?? 0) + 1;
-
-		// Stop all audio sources
-		for (const node of clipState.audioSources) {
-			try {
-				node.stop();
-				node.disconnect(); // Explicitly disconnect
-			} catch (error) {
-				console.warn("Failed to stop clip source", trackId, clipId, error);
-			}
-		}
-		clipState.audioSources = [];
-
-		// Explicitly disconnect and clean up gain node
-		if (clipState.gainNode) {
-			try {
-				clipState.gainNode.disconnect();
-				clipState.gainNode = null;
-			} catch (error) {
-				console.warn(
-					"Failed to disconnect clip gain node",
-					trackId,
-					clipId,
-					error,
-				);
-			}
-		}
-
-		// Remove from clip states
-		trackState.clipStates.delete(clipId);
-
-		return clipState;
-	}
-
-	async stopClip(trackId: string, clipId: string): Promise<void> {
-		await this.stopClipState(trackId, clipId);
+	async stopClip(_trackId: string, clipId: string): Promise<void> {
+		// Alias to global stop to prevent bypassing registry
+		await this.stopClipGlobal(clipId);
 	}
 
 	/**
@@ -162,6 +151,18 @@ export class PlaybackService {
 		if (!active) return;
 
 		const clipState = active.clipState;
+		// Micro-fade out to avoid clicks when stopping during playback
+		try {
+			if (this.audioContext && clipState.gainNode) {
+				const now = this.audioContext.currentTime;
+				clipState.gainNode.gain.cancelScheduledValues(now);
+				clipState.gainNode.gain.setValueAtTime(
+					clipState.gainNode.gain.value,
+					now,
+				);
+				clipState.gainNode.gain.linearRampToValueAtTime(0, now + 0.005);
+			}
+		} catch {}
 
 		// Stop iterator
 		try {
@@ -174,10 +175,12 @@ export class PlaybackService {
 		clipState.iterator = null;
 		clipState.generation = (clipState.generation ?? 0) + 1;
 
-		// Stop all audio sources
+		// Stop all audio sources (after short fade window)
 		for (const node of clipState.audioSources) {
 			try {
-				node.stop();
+				node.stop(
+					this.audioContext ? this.audioContext.currentTime + 0.006 : undefined,
+				);
 				node.disconnect();
 			} catch (error) {
 				console.warn("Failed to stop audio source", clipId, error);
@@ -197,6 +200,11 @@ export class PlaybackService {
 
 		// Remove from global registry
 		this.activeClips.delete(clipId);
+
+		// Defensive: remove from any lingering per-track clipStates
+		for (const trackState of this.tracks.values()) {
+			trackState.clipStates.delete(clipId);
+		}
 	}
 
 	/**
@@ -216,15 +224,33 @@ export class PlaybackService {
 			gainNode.connect(trackState.envelopeGainNode);
 		}
 
+		const generation = 0;
 		const clipState: ClipPlaybackState = {
 			iterator: null,
 			gainNode,
 			audioSources: [],
-			generation: 0,
+			generation,
 		};
 
+		// Micro-fade in when starting during playback to avoid edge clicks
+		try {
+			const now = this.audioContext.currentTime;
+			gainNode.gain.cancelScheduledValues(now);
+			const initial = this.isPlaying ? 0 : gainNode.gain.value;
+			gainNode.gain.setValueAtTime(initial, now);
+			if (this.isPlaying) {
+				gainNode.gain.linearRampToValueAtTime(1, now + 0.005);
+			}
+		} catch {}
+
 		// Register globally BEFORE scheduling audio
-		this.activeClips.set(clip.id, { trackId: track.id, clipState });
+		const desc = this.describeClip(clip);
+		this.activeClips.set(clip.id, {
+			trackId: track.id,
+			clipState,
+			desc,
+			generation,
+		});
 
 		// Schedule audio using existing logic
 		await this.scheduleClipWithState(track, clip, trackState, clipState);
@@ -261,12 +287,15 @@ export class PlaybackService {
 		// Step 1: Cancel all existing scheduled values
 		envelopeGain.gain.cancelScheduledValues(now);
 
-		// Step 2: Anchor current value at now
-		envelopeGain.gain.setValueAtTime(envelopeGain.gain.value, now);
-
-		// Convert volume to linear gain using pure dB math
+		// Step 2: Anchor to instantaneous effective gain at current transport time
+		const currentTimeMs = this.getPlaybackTime() * 1000;
 		const baseVolumeDb = track.volumeDb ?? volumeToDb(track.volume ?? 75);
 		const baseVolume = dbToGain(baseVolumeDb);
+		const multiplier = evaluateEnvelopeGainAt(envelope, currentTimeMs);
+		const anchorGain = baseVolume * multiplier;
+		envelopeGain.gain.setValueAtTime(anchorGain, now);
+
+		// baseVolume already computed above
 
 		if (!envelope || !envelope.enabled || envelope.points.length === 0) {
 			envelopeGain.gain.setValueAtTime(baseVolume, now);
@@ -274,7 +303,6 @@ export class PlaybackService {
 		}
 
 		const sorted = [...envelope.points].sort((a, b) => a.time - b.time);
-		const currentTimeMs = this.getPlaybackTime() * 1000;
 
 		// Find current multiplier at playback position with proper interpolation
 		let currentMultiplier = 1.0;
@@ -386,14 +414,6 @@ export class PlaybackService {
 	}
 
 	/**
-	 * Schedule track volume envelope automation
-	 * @deprecated Use rescheduleTrackAutomation instead
-	 */
-	private scheduleTrackEnvelope(track: Track): void {
-		this.rescheduleTrackAutomation(track);
-	}
-
-	/**
 	 * Update track volume during playback without disrupting automation
 	 * Scales the base volume that automation multiplies against
 	 */
@@ -483,10 +503,17 @@ export class PlaybackService {
 				state.muteSoloGainNode.connect(this.masterGainNode);
 			}
 
+			// Detect envelope changes and bump automation generation
+			const desc = this.describeEnvelope(track.volumeEnvelope);
+			if (state.lastEnvelopeDesc !== desc) {
+				state.automationGeneration++;
+				state.lastEnvelopeDesc = desc;
+			}
+
 			const muted = Boolean(track.muted) || (soloEngaged && !track.soloed);
 			this.trackMuteState.set(track.id, muted);
 			state.muteSoloGainNode.gain.value = muted ? 0 : 1;
-			this.scheduleTrackEnvelope(track);
+			this.rescheduleTrackAutomation(track, state.automationGeneration);
 			state.isPlaying = !muted;
 		}
 		this.currentTracks = new Map(tracks.map((track) => [track.id, track]));
@@ -499,14 +526,18 @@ export class PlaybackService {
 	}
 
 	synchronizeTracks(tracks: Track[]): void {
-		this.applySnapshot(tracks);
-
-		// Fire async sync without blocking (use global registry)
 		if (this.isPlaying && this.audioContext) {
-			this.synchronizeClipsGlobal(tracks).catch((err) => {
-				console.error("Failed to synchronize clips during playback:", err);
+			// Atomic: snapshot + clip sync under mutex to avoid gaps
+			this.queueSync(async () => {
+				this.applySnapshot(tracks);
+				await this.synchronizeClipsGlobal(tracks);
+			}).catch((err) => {
+				console.error("Failed to synchronize tracks during playback:", err);
 			});
+			return;
 		}
+		// Not playing: just apply snapshot
+		this.applySnapshot(tracks);
 	}
 
 	/**
@@ -516,51 +547,41 @@ export class PlaybackService {
 	private async synchronizeClipsGlobal(tracks: Track[]): Promise<void> {
 		if (!this.audioContext) return;
 
-		// Build desired state: which clips should be on which tracks
-		const desiredState = new Map<string, { clip: Clip; trackId: string }>();
+		// Build desired state from REAL clips only (no synthetic opfs fallbacks)
+		const desiredState = new Map<
+			string,
+			{ clip: Clip; trackId: string; desc: string }
+		>();
 		for (const track of tracks) {
-			const clips =
-				track.clips && track.clips.length > 0
-					? track.clips
-					: track.opfsFileId
-						? [
-								{
-									id: track.id,
-									name: track.name,
-									opfsFileId: track.opfsFileId,
-									startTime: track.startTime,
-									trimStart: track.trimStart,
-									trimEnd: track.trimEnd,
-									color: track.color,
-									sourceDurationMs: track.duration,
-								} as Clip,
-							]
-						: [];
-
+			const clips = track.clips ?? [];
 			for (const clip of clips) {
-				if (clip.opfsFileId) {
-					desiredState.set(clip.id, { clip, trackId: track.id });
-				}
+				if (!clip.opfsFileId) continue;
+				const desc = this.describeClip(clip);
+				desiredState.set(clip.id, { clip, trackId: track.id, desc });
 			}
 		}
 
-		// Phase 1: Stop clips that shouldn't be playing or are on wrong track
+		// Phase 1: Stop clips that shouldn't be playing, are on wrong track, or have changed params
 		const stopsNeeded: string[] = [];
 		for (const [clipId, active] of this.activeClips) {
 			const desired = desiredState.get(clipId);
-			if (!desired || desired.trackId !== active.trackId) {
+			if (
+				!desired ||
+				desired.trackId !== active.trackId ||
+				desired.desc !== active.desc
+			) {
 				stopsNeeded.push(clipId);
 			}
 		}
 
-		// Await all stops sequentially to prevent race conditions
+		// Await all stops to prevent race conditions
 		await Promise.all(stopsNeeded.map((clipId) => this.stopClipGlobal(clipId)));
 
-		// Phase 2: Start clips that should be playing but aren't
+		// Phase 2: Start clips that should be playing but aren't (or changed)
 		const startsNeeded: Array<{ clip: Clip; trackId: string }> = [];
-		for (const [clipId, { clip, trackId }] of desiredState) {
+		for (const [clipId, { clip, trackId, desc }] of desiredState) {
 			const active = this.activeClips.get(clipId);
-			if (!active || active.trackId !== trackId) {
+			if (!active || active.trackId !== trackId || active.desc !== desc) {
 				const trackState = this.tracks.get(trackId);
 				if (trackState) {
 					startsNeeded.push({ clip, trackId });
@@ -586,17 +607,13 @@ export class PlaybackService {
 		this.tracks.clear();
 
 		for (const track of tracks) {
-			const hasClipRef = (track.clips ?? []).some((c) => !!c.opfsFileId);
-			const hasLegacyRef = !!track.opfsFileId;
-			if (hasClipRef || hasLegacyRef) {
-				this.tracks.set(track.id, {
-					clipStates: new Map(),
-					envelopeGainNode: null,
-					muteSoloGainNode: null,
-					isPlaying: false,
-					automationGeneration: 0,
-				});
-			}
+			this.tracks.set(track.id, {
+				clipStates: new Map(),
+				envelopeGainNode: null,
+				muteSoloGainNode: null,
+				isPlaying: false,
+				automationGeneration: 0,
+			});
 		}
 	}
 
@@ -627,6 +644,7 @@ export class PlaybackService {
 		// Clear global registry before fresh play
 		this.activeClips.clear();
 
+		// Initialize track gain chains
 		for (const track of tracks) {
 			const trackState = this.tracks.get(track.id);
 			if (!trackState) continue;
@@ -639,57 +657,12 @@ export class PlaybackService {
 				trackState.envelopeGainNode.connect(trackState.muteSoloGainNode);
 				trackState.muteSoloGainNode.connect(this.masterGainNode);
 			}
-
-			const clips =
-				track.clips && track.clips.length > 0
-					? track.clips
-					: track.opfsFileId
-						? [
-								{
-									id: track.id,
-									name: track.name,
-									opfsFileId: track.opfsFileId,
-									startTime: track.startTime,
-									trimStart: track.trimStart,
-									trimEnd: track.trimEnd,
-									color: track.color,
-									sourceDurationMs: track.duration,
-								} as Clip,
-							]
-						: [];
-
-			for (const clip of clips) {
-				if (!clip.opfsFileId) continue;
-				// Use global start method
-				await this.startClipGlobal(clip, track, trackState);
-			}
 		}
+
+		// Schedule all clips via mutex
+		await this.queueSync(() => this.synchronizeClipsGlobal(tracks));
 
 		this.startTimeUpdateLoop();
-	}
-
-	private async scheduleClip(
-		track: Track,
-		clip: Clip,
-		trackState: TrackPlaybackState,
-	): Promise<void> {
-		// Get or create clip state from per-track map (legacy path)
-		let cps = trackState.clipStates.get(clip.id);
-		if (!cps && this.audioContext) {
-			cps = {
-				iterator: null,
-				gainNode: this.audioContext.createGain(),
-				audioSources: [],
-				generation: 0,
-			};
-			if (cps.gainNode && trackState.envelopeGainNode) {
-				cps.gainNode.connect(trackState.envelopeGainNode);
-			}
-			trackState.clipStates.set(clip.id, cps);
-		}
-		if (!cps) return;
-
-		await this.scheduleClipWithState(track, clip, trackState, cps);
 	}
 
 	private async scheduleClipWithState(
@@ -699,6 +672,17 @@ export class PlaybackService {
 		cps: ClipPlaybackState,
 	): Promise<void> {
 		if (!this.audioContext || !this.masterGainNode) return;
+
+		// Purge lingering sources defensively
+		if (cps.audioSources.length > 0) {
+			for (const node of cps.audioSources) {
+				try {
+					node.stop();
+					node.disconnect();
+				} catch {}
+			}
+			cps.audioSources = [];
+		}
 
 		let sink = audioService.getAudioBufferSink(clip.opfsFileId);
 		if (!sink) {
@@ -712,6 +696,9 @@ export class PlaybackService {
 		}
 		if (!sink) return;
 
+		// Use current timeline (seconds)
+		const timelineSec = this.getPlaybackTime();
+
 		const clipStartSec = clip.startTime / 1000;
 		const clipTrimStartSec = clip.trimStart / 1000;
 		const clipTrimEndSec = clip.trimEnd / 1000;
@@ -723,34 +710,44 @@ export class PlaybackService {
 				: Number.POSITIVE_INFINITY
 			: clipOneShotEndSec;
 
-		if (this.playbackTimeAtStart >= loopUntilSec) return;
+		if (timelineSec >= loopUntilSec) return;
 
 		let cycleOffsetSec = 0;
 		let timeIntoClip = 0;
 		if (clip.loop) {
-			if (this.playbackTimeAtStart <= clipStartSec) {
+			if (timelineSec <= clipStartSec) {
 				timeIntoClip = 0;
 				cycleOffsetSec = 0;
 			} else {
-				const elapsed = this.playbackTimeAtStart - clipStartSec;
+				const elapsed = timelineSec - clipStartSec;
 				const cycleIndex =
 					clipDurationSec > 0 ? Math.floor(elapsed / clipDurationSec) : 0;
 				cycleOffsetSec = cycleIndex * clipDurationSec;
 				timeIntoClip = clipDurationSec > 0 ? elapsed - cycleOffsetSec : 0;
+				// Guard boundary: if we're exactly at cycle end, roll to next cycle start
+				if (clipDurationSec > 0 && timeIntoClip >= clipDurationSec - 1e-6) {
+					cycleOffsetSec += clipDurationSec;
+					timeIntoClip = 0;
+				}
 			}
 		} else {
-			timeIntoClip = Math.max(0, this.playbackTimeAtStart - clipStartSec);
+			timeIntoClip = Math.max(0, timelineSec - clipStartSec);
 		}
 
 		const audioFileReadStart = clipTrimStartSec + timeIntoClip;
 		if (audioFileReadStart >= clipTrimEndSec) return;
 
-		// Apply fade envelopes
+		// Apply fade envelopes (cancel → anchor → future-only) with generation guard
 		try {
 			const clipGain = cps.gainNode ?? this.masterGainNode;
 			if (!clipGain || !this.audioContext) return;
 			const now = this.audioContext.currentTime;
 			this.cancelGainAutomation(clipGain.gain, now);
+
+			// Anchor at current timeline gain (assume 0..1 linear, fallback 1)
+			const anchorValue = 1;
+			clipGain.gain.setValueAtTime(anchorValue, now);
+
 			const clipStartAC =
 				this.startTime + clipStartSec - this.playbackTimeAtStart;
 			const loopEndAC =
@@ -759,11 +756,10 @@ export class PlaybackService {
 				this.startTime + clipOneShotEndSec - this.playbackTimeAtStart;
 
 			if (clip.fadeIn && clip.fadeIn > 0) {
-				clipGain.gain.setValueAtTime(0, Math.max(now, clipStartAC));
-				clipGain.gain.linearRampToValueAtTime(
-					1,
-					Math.max(now, clipStartAC + clip.fadeIn / 1000),
-				);
+				// From 0 → 1 using curve (use linear for now; curve params available on clip)
+				const startT = Math.max(now, clipStartAC);
+				clipGain.gain.setValueAtTime(0, startT);
+				clipGain.gain.linearRampToValueAtTime(1, startT + clip.fadeIn / 1000);
 			}
 
 			if (clip.fadeOut && clip.fadeOut > 0) {
@@ -773,10 +769,8 @@ export class PlaybackService {
 						: null
 					: oneShotEndAC;
 				if (targetEnd !== null) {
-					clipGain.gain.setValueAtTime(
-						1,
-						Math.max(now, targetEnd - clip.fadeOut / 1000),
-					);
+					const startT = Math.max(now, targetEnd - clip.fadeOut / 1000);
+					clipGain.gain.setValueAtTime(1, startT);
 					clipGain.gain.linearRampToValueAtTime(0, Math.max(now, targetEnd));
 				}
 			}
@@ -826,15 +820,18 @@ export class PlaybackService {
 				const timelinePos = clipStartSec + cycleOffsetSec + timeInTrimmed;
 				if (timelinePos > loopUntilSec) break;
 
-				const startAt = this.startTime + timelinePos - this.playbackTimeAtStart;
+				// Anchor to current timeline
+				const now = this.audioContext.currentTime;
+				const currentTl = this.getPlaybackTime();
+				const startAt = now + (timelinePos - currentTl);
 
-				if (startAt >= this.audioContext.currentTime) {
+				if (startAt >= now) {
 					node.start(startAt);
 					this.nodeStartTimes.set(node, startAt);
 				} else {
-					const offset = this.audioContext.currentTime - startAt;
+					const offset = now - startAt;
 					if (offset < buffer.duration) {
-						const actualStart = this.audioContext.currentTime;
+						const actualStart = now;
 						node.start(actualStart, offset);
 						this.nodeStartTimes.set(node, actualStart);
 					} else {
@@ -896,14 +893,18 @@ export class PlaybackService {
 		}
 	}
 
+	private async stopAllActiveClips(): Promise<void> {
+		const clipIds = Array.from(this.activeClips.keys());
+		await Promise.all(clipIds.map((clipId) => this.stopClipGlobal(clipId)));
+	}
+
 	async pause(): Promise<void> {
 		this.stopMeterUpdates();
 		this.playbackTimeAtStart = this.getPlaybackTime();
 		this.isPlaying = false;
 
-		// Stop all clips via global registry
-		const clipIds = Array.from(this.activeClips.keys());
-		await Promise.all(clipIds.map((clipId) => this.stopClipGlobal(clipId)));
+		// Stop all clips via global registry with mutex
+		await this.queueSync(() => this.stopAllActiveClips());
 
 		// Legacy per-track cleanup (for any orphaned states)
 		for (const trackState of this.tracks.values()) {
@@ -943,63 +944,11 @@ export class PlaybackService {
 	}
 
 	async rescheduleTrack(updatedTrack: Track): Promise<void> {
-		if (!this.isPlaying) return;
-		await this.getAudioContext();
-		if (!this.audioContext) return;
-
-		let trackState = this.tracks.get(updatedTrack.id);
-		if (!trackState) {
-			trackState = {
-				clipStates: new Map(),
-				envelopeGainNode: null,
-				muteSoloGainNode: null,
-				isPlaying: true,
-				automationGeneration: 0,
-			};
-			this.tracks.set(updatedTrack.id, trackState);
-		}
-
-		for (const [clipId] of trackState.clipStates) {
-			await this.stopClipState(updatedTrack.id, clipId);
-		}
-
-		if (!trackState.envelopeGainNode) {
-			trackState.envelopeGainNode = this.audioContext.createGain();
-		}
-		if (!trackState.muteSoloGainNode) {
-			trackState.muteSoloGainNode = this.audioContext.createGain();
-			trackState.envelopeGainNode.connect(trackState.muteSoloGainNode);
-			if (this.masterGainNode) {
-				trackState.muteSoloGainNode.connect(this.masterGainNode);
-			} else if (this.audioContext) {
-				trackState.muteSoloGainNode.connect(this.audioContext.destination);
-			}
-		}
-
-		trackState.isPlaying = true;
-
-		const clips =
-			updatedTrack.clips && updatedTrack.clips.length > 0
-				? updatedTrack.clips
-				: updatedTrack.opfsFileId
-					? [
-							{
-								id: updatedTrack.id,
-								name: updatedTrack.name,
-								opfsFileId: updatedTrack.opfsFileId,
-								startTime: updatedTrack.startTime,
-								trimStart: updatedTrack.trimStart,
-								trimEnd: updatedTrack.trimEnd,
-								color: updatedTrack.color,
-								sourceDurationMs: updatedTrack.duration,
-							} as Clip,
-						]
-					: [];
-
-		for (const clip of clips) {
-			if (!clip.opfsFileId) continue;
-			await this.scheduleClip(updatedTrack, clip, trackState);
-		}
+		// Alias to global synchronization path
+		const tracks = Array.from(this.currentTracks.values()).map((t) =>
+			t.id === updatedTrack.id ? updatedTrack : t,
+		);
+		this.synchronizeTracks(tracks);
 	}
 
 	getCurrentTime(): number {
