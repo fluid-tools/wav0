@@ -89,3 +89,9 @@ export const setHorizontalScrollAtom = atom(
 		set(horizontalScrollAtom, scroll);
 	},
 );
+
+// Deferred zoom atom for smooth high-frequency updates
+export const deferredZoomAtom = atom((get) => {
+	const timeline = get(timelineAtom);
+	return timeline.zoom;
+});

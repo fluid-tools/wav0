@@ -106,14 +106,25 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 		const canvasWidth = 400;
 		const canvasHeight = Math.min(tracks.length * 20 + 40, 200);
 
-		canvas.width = canvasWidth;
-		canvas.height = canvasHeight;
+		// Setup HiDPI scaling
+		const dpr = window.devicePixelRatio || 1;
+		canvas.width = Math.max(1, Math.floor(canvasWidth * dpr));
+		canvas.height = Math.max(1, Math.floor(canvasHeight * dpr));
 		canvas.style.width = `${canvasWidth}px`;
 		canvas.style.height = `${canvasHeight}px`;
+		ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
 		ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
 		if (endMs <= startMs) return;
+
+		// Get theme colors from CSS variables
+		const styles = getComputedStyle(canvas);
+		const trackBgEven = styles.getPropertyValue("--muted").trim() || "hsl(210 40% 98%)";
+		const trackBgOdd = styles.getPropertyValue("--muted-foreground").trim() || "hsl(210 40% 96%)";
+		const clipFill = styles.getPropertyValue("--primary").trim() || "hsl(221.2 83.2% 53.3%)";
+		const labelColor = styles.getPropertyValue("--muted-foreground").trim() || "hsl(215.4 16.3% 46.9%)";
+		const gridColor = styles.getPropertyValue("--border").trim() || "hsl(214.3 31.8% 91.4%)";
 
 		const pxPerMs = canvasWidth / (endMs - startMs);
 		const rowHeight = 16;
@@ -123,8 +134,8 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 		tracks.forEach((track, trackIndex) => {
 			const y = trackIndex * rowHeight + padding;
 
-			// Draw track background
-			ctx.fillStyle = trackIndex % 2 === 0 ? "#f8f9fa" : "#e9ecef";
+			// Draw track background with theme colors
+			ctx.fillStyle = trackIndex % 2 === 0 ? trackBgEven : trackBgOdd;
 			ctx.fillRect(0, y, canvasWidth, rowHeight - 2);
 
 			// Draw track clips
@@ -165,8 +176,16 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 							const x = (currentStart - startMs) * pxPerMs;
 							const w = (currentEnd - currentStart) * pxPerMs;
 
-							ctx.fillStyle = "#3b82f6";
-							ctx.fillRect(x, y + 2, w, rowHeight - 6);
+							// Draw rounded clip rectangle
+							ctx.fillStyle = clipFill;
+							ctx.beginPath();
+							ctx.roundRect(x, y + 2, w, rowHeight - 6, 2);
+							ctx.fill();
+							
+							// Draw subtle outline
+							ctx.strokeStyle = clipFill;
+							ctx.lineWidth = 0.5;
+							ctx.stroke();
 						}
 						currentStart += cycleLen;
 					}
@@ -176,20 +195,28 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 						const x = (audibleStart - startMs) * pxPerMs;
 						const w = (audibleEnd - audibleStart) * pxPerMs;
 
-						ctx.fillStyle = "#3b82f6";
-						ctx.fillRect(x, y + 2, w, rowHeight - 6);
+						// Draw rounded clip rectangle
+						ctx.fillStyle = clipFill;
+						ctx.beginPath();
+						ctx.roundRect(x, y + 2, w, rowHeight - 6, 2);
+						ctx.fill();
+						
+						// Draw subtle outline
+						ctx.strokeStyle = clipFill;
+						ctx.lineWidth = 0.5;
+						ctx.stroke();
 					}
 				}
 			});
 
-			// Draw track label
-			ctx.fillStyle = "#374151";
+			// Draw track label with theme color
+			ctx.fillStyle = labelColor;
 			ctx.font = "10px sans-serif";
 			ctx.fillText(`Track ${trackIndex + 1}`, 4, y + 12);
 		});
 
-		// Draw time markers
-		ctx.strokeStyle = "#6b7280";
+		// Draw time markers with theme colors
+		ctx.strokeStyle = gridColor;
 		ctx.lineWidth = 1;
 		const timeStep = (endMs - startMs) / 8; // 8 time markers
 		for (let i = 0; i <= 8; i++) {
@@ -200,8 +227,8 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 			ctx.lineTo(x, canvasHeight);
 			ctx.stroke();
 
-			// Time label
-			ctx.fillStyle = "#6b7280";
+			// Time label with theme color
+			ctx.fillStyle = labelColor;
 			ctx.font = "8px sans-serif";
 			ctx.fillText(`${(timeMs / 1000).toFixed(1)}s`, x + 2, 12);
 		}
@@ -281,11 +308,11 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="sm:max-w-lg">
+			<DialogContent className="sm:max-w-2xl">
 				<DialogHeader>
 					<DialogTitle>Export</DialogTitle>
 				</DialogHeader>
-				<div className="grid grid-cols-2 gap-3 text-sm">
+				<div className="grid grid-cols-3 gap-4 text-sm">
 					<label className="flex items-center gap-2">
 						Range
 						<select
@@ -374,37 +401,39 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 					</div>
 				)}
 				{stats && (
-					<div className="text-xs font-mono border rounded p-2 bg-muted/20">
-						<div>Duration: {stats.duration}s</div>
-						<div>SR: {stats.sampleRate}</div>
-						<div>Channels: {stats.channels}</div>
-						<div>Peak: {stats.peak}</div>
-						<div>RMS: {stats.rms}</div>
-						<div className="mt-2 text-muted-foreground">
-							Est. size: {(() => {
-								const durSec = parseFloat(stats.duration);
-								const bytesPerSec = stats.sampleRate * stats.channels * 2; // 16-bit
-								const wavBytes = durSec * bytesPerSec;
-								const formatSizes = {
-									wav: wavBytes,
-									flac: wavBytes * 0.4, // ~40% compression
-									m4a: (durSec * 128000) / 8, // 128kbps AAC
-									ogg: (durSec * 192000) / 8, // 192kbps Opus
-								};
-								const estBytes = formatSizes[fmt];
-								const mb = (estBytes / (1024 * 1024)).toFixed(1);
-								return `${mb} MB (${fmt.toUpperCase()})`;
-							})()}
+					<div className="border rounded-md p-3 bg-muted/5">
+						<div className="text-xs font-mono space-y-1">
+							<div>Duration: {stats.duration}s</div>
+							<div>SR: {stats.sampleRate}</div>
+							<div>Channels: {stats.channels}</div>
+							<div>Peak: {stats.peak}</div>
+							<div>RMS: {stats.rms}</div>
+							<div className="mt-2 text-muted-foreground">
+								Est. size: {(() => {
+									const durSec = parseFloat(stats.duration);
+									const bytesPerSec = stats.sampleRate * stats.channels * 2; // 16-bit
+									const wavBytes = durSec * bytesPerSec;
+									const formatSizes = {
+										wav: wavBytes,
+										flac: wavBytes * 0.4, // ~40% compression
+										m4a: (durSec * 128000) / 8, // 128kbps AAC
+										ogg: (durSec * 192000) / 8, // 192kbps Opus
+									};
+									const estBytes = formatSizes[fmt];
+									const mb = (estBytes / (1024 * 1024)).toFixed(1);
+									return `${mb} MB (${fmt.toUpperCase()})`;
+								})()}
+							</div>
 						</div>
 						{previewBuffer && (
-							<div className="mt-2 flex items-center gap-2">
-								<Button size="xs" variant="outline" onClick={playPreview}>
+							<div className="mt-3 flex items-center gap-2">
+								<Button size="sm" variant="outline" onClick={playPreview}>
 									Play
 								</Button>
-								<Button size="xs" variant="outline" onClick={pausePreview}>
+								<Button size="sm" variant="outline" onClick={pausePreview}>
 									Pause
 								</Button>
-								<Button size="xs" variant="outline" onClick={stopPreview}>
+								<Button size="sm" variant="outline" onClick={stopPreview}>
 									Stop
 								</Button>
 								<label className="flex items-center gap-1">

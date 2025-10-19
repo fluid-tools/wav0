@@ -13,7 +13,7 @@ import {
 	Settings,
 	Upload,
 } from "lucide-react";
-import { useState } from "react";
+import { startTransition, useState } from "react";
 import { ExportDialog } from "@/components/daw/dialogs/export-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -68,6 +68,7 @@ export function DAWToolbar() {
 
 	return (
 		<>
+			{/* Primary Toolbar */}
 			<div
 				className="bg-background border-b flex items-center justify-between px-4"
 				style={{ height: DAW_HEIGHTS.TOOLBAR }}
@@ -95,138 +96,6 @@ export function DAWToolbar() {
 						style={{ height: DAW_HEIGHTS.BUTTON_MD }}
 						placeholder="Project name"
 					/>
-					{/* Tempo & Signature */}
-					<div className="flex items-center gap-2 ml-2">
-						<label className="text-xs flex items-center gap-1">
-							BPM
-							<input
-								type="number"
-								min={30}
-								max={300}
-								defaultValue={music.tempoBpm}
-								onChange={(e) => {
-									const target = e.target as HTMLInputElement & { _t?: number };
-									const v = Number(target.value) || 120;
-									window.clearTimeout(target._t);
-									target._t = window.setTimeout(
-										() => setMusic({ ...music, tempoBpm: v }),
-										150,
-									);
-								}}
-								className="w-16 h-7 border rounded px-1 text-xs"
-							/>
-						</label>
-						<label className="text-xs flex items-center gap-1">
-							TS
-							<select
-								className="h-7 border rounded px-1 text-xs"
-								defaultValue={music.timeSignature.num}
-								onChange={(e) => {
-									const target = e.target as HTMLSelectElement & {
-										_t?: number;
-									};
-									const num = Number(target.value) as 2 | 3 | 4 | 5 | 7;
-									window.clearTimeout(target._t);
-									target._t = window.setTimeout(
-										() =>
-											setMusic({
-												...music,
-												timeSignature: { num, den: music.timeSignature.den },
-											}),
-										150,
-									);
-								}}
-							>
-								{[2, 3, 4, 5, 7].map((n) => (
-									<option key={n} value={n}>
-										{n}
-									</option>
-								))}
-							</select>
-							<span>/</span>
-							<select
-								className="h-7 border rounded px-1 text-xs"
-								defaultValue={music.timeSignature.den}
-								onChange={(e) => {
-									const target = e.target as HTMLSelectElement & {
-										_t?: number;
-									};
-									const den = Number(target.value) as 2 | 4 | 8;
-									window.clearTimeout(target._t);
-									target._t = window.setTimeout(
-										() =>
-											setMusic({
-												...music,
-												timeSignature: { num: music.timeSignature.num, den },
-											}),
-										150,
-									);
-								}}
-							>
-								{[2, 4, 8].map((d) => (
-									<option key={d} value={d}>
-										{d}
-									</option>
-								))}
-							</select>
-						</label>
-					</div>
-					{/* Timebase */}
-					<div className="flex items-center gap-1 ml-2">
-						<Button
-							variant={grid.mode === "time" ? "default" : "ghost"}
-							size="sm"
-							onClick={() => setGrid({ ...grid, mode: "time" })}
-						>
-							Time
-						</Button>
-						<Button
-							variant={grid.mode === "bars" ? "default" : "ghost"}
-							size="sm"
-							onClick={() => setGrid({ ...grid, mode: "bars" })}
-						>
-							Bars
-						</Button>
-						<select
-							className="text-xs border rounded px-1 py-1 ml-1"
-							value={grid.resolution}
-							onChange={(e) =>
-								setGrid({
-									...grid,
-									resolution: e.target.value as typeof grid.resolution,
-								})
-							}
-						>
-							{(["1/1", "1/2", "1/4", "1/8", "1/16"] as const).map((r) => (
-								<option key={r} value={r}>
-									{r}
-								</option>
-							))}
-						</select>
-						<label className="text-xs ml-2 flex items-center gap-1">
-							<input
-								type="checkbox"
-								checked={grid.triplet}
-								onChange={(e) =>
-									setGrid({ ...grid, triplet: e.target.checked })
-								}
-							/>
-							Triplet
-						</label>
-						<label className="text-xs ml-2 flex items-center gap-1">
-							Swing
-							<input
-								type="range"
-								min={0}
-								max={0.6}
-								step={0.05}
-								value={grid.swing}
-								onChange={(e) =>
-									setGrid({ ...grid, swing: Number(e.target.value) })
-								}
-							/>
-						</label>
-					</div>
 				</div>
 
 				<div className="flex items-center gap-2">
@@ -349,6 +218,154 @@ export function DAWToolbar() {
 					</DropdownMenu>
 				</div>
 			</div>
+
+			{/* Secondary Toolbar */}
+			<div className="bg-muted/30 border-b flex items-center justify-between px-4 py-2">
+				<div className="flex items-center gap-4">
+					{/* Grid Group */}
+					<div className="flex items-center gap-2">
+						<span className="text-xs text-muted-foreground">Grid:</span>
+						<Button
+							variant={grid.mode === "time" ? "default" : "ghost"}
+							size="sm"
+							onClick={() =>
+								startTransition(() => setGrid({ ...grid, mode: "time" }))
+							}
+						>
+							Time
+						</Button>
+						<Button
+							variant={grid.mode === "bars" ? "default" : "ghost"}
+							size="sm"
+							onClick={() =>
+								startTransition(() => setGrid({ ...grid, mode: "bars" }))
+							}
+						>
+							Bars
+						</Button>
+						<select
+							className="text-xs border rounded px-1 py-1 ml-1"
+							value={grid.resolution}
+							onChange={(e) =>
+								setGrid({
+									...grid,
+									resolution: e.target.value as typeof grid.resolution,
+								})
+							}
+						>
+							<option value="1/1">1/1</option>
+							<option value="1/2">1/2</option>
+							<option value="1/4">1/4</option>
+							<option value="1/8">1/8</option>
+							<option value="1/16">1/16</option>
+						</select>
+						<label className="text-xs flex items-center gap-1">
+							<input
+								type="checkbox"
+								checked={grid.triplet}
+								onChange={(e) =>
+									setGrid({ ...grid, triplet: e.target.checked })
+								}
+							/>
+							Triplet
+						</label>
+						<label className="text-xs flex items-center gap-1">
+							Swing
+							<input
+								type="range"
+								min="0"
+								max="100"
+								value={grid.swing || 0}
+								onChange={(e) =>
+									setGrid({ ...grid, swing: Number(e.target.value) })
+								}
+								className="w-12"
+							/>
+						</label>
+					</div>
+				</div>
+
+				<div className="flex items-center gap-4">
+					{/* Musical Group */}
+					<div className="flex items-center gap-2">
+						<span className="text-xs text-muted-foreground">Musical:</span>
+						<label className="text-xs flex items-center gap-1">
+							BPM
+							<input
+								type="number"
+								min={30}
+								max={300}
+								defaultValue={music.tempoBpm}
+								onChange={(e) => {
+									const target = e.target as HTMLInputElement & { _t?: number };
+									const v = Number(target.value) || 120;
+									window.clearTimeout(target._t);
+									target._t = window.setTimeout(
+										() => setMusic({ ...music, tempoBpm: v }),
+										150,
+									);
+								}}
+								className="w-16 h-7 border rounded px-1 text-xs"
+							/>
+						</label>
+						<label className="text-xs flex items-center gap-1">
+							TS
+							<select
+								className="h-7 border rounded px-1 text-xs"
+								defaultValue={music.timeSignature.num}
+								onChange={(e) => {
+									const target = e.target as HTMLSelectElement & {
+										_t?: number;
+									};
+									const num = Number(target.value) as 2 | 3 | 4 | 5 | 7;
+									window.clearTimeout(target._t);
+									target._t = window.setTimeout(
+										() =>
+											setMusic({
+												...music,
+												timeSignature: { num, den: music.timeSignature.den },
+											}),
+										150,
+									);
+								}}
+							>
+								{[2, 3, 4, 5, 7].map((n) => (
+									<option key={n} value={n}>
+										{n}
+									</option>
+								))}
+							</select>
+							<span>/</span>
+							<select
+								className="h-7 border rounded px-1 text-xs"
+								defaultValue={music.timeSignature.den}
+								onChange={(e) => {
+									const target = e.target as HTMLSelectElement & {
+										_t?: number;
+									};
+									const den = Number(target.value) as 2 | 4 | 8;
+									window.clearTimeout(target._t);
+									target._t = window.setTimeout(
+										() =>
+											setMusic({
+												...music,
+												timeSignature: { num: music.timeSignature.num, den },
+											}),
+										150,
+									);
+								}}
+							>
+								{[2, 4, 8].map((d) => (
+									<option key={d} value={d}>
+										{d}
+									</option>
+								))}
+							</select>
+						</label>
+					</div>
+				</div>
+			</div>
+
 			<ExportDialog open={exportOpen} onOpenChange={setExportOpen} />
 		</>
 	);
