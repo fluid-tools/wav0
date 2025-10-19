@@ -104,6 +104,7 @@ export const gridCacheKeyAtom = atom((get) => {
 	const grid = get(gridAtom);
 	const pxPerMs = get(timelinePxPerMsAtom);
 	const viewSpan = get(viewSpanMsAtom);
+	const viewStart = get(viewStartMsAtom);
 
 	return JSON.stringify({
 		tempo: tempoBpm,
@@ -113,6 +114,7 @@ export const gridCacheKeyAtom = atom((get) => {
 		swing: grid.swing,
 		pxPerMs: Math.round(pxPerMs * 1000) / 1000, // Round to avoid floating point precision issues
 		viewSpan: Math.round(viewSpan),
+		viewStart: Math.round(viewStart),
 	});
 });
 
@@ -196,9 +198,10 @@ export const cachedGridSubdivisionsAtom = atom((get) => {
 				let finalSubMs = subMs;
 				if (grid.swing && grid.swing > 0 && !grid.triplet) {
 					const isEven = i % 2 === 0;
+					const swing01 = grid.swing / 100; // Normalize from 0-100 to 0-1
 					const bias = isEven
 						? 0
-						: grid.swing * (2 / 3 - 1 / 2) * subdivBeats * msPerBeat;
+						: swing01 * (2 / 3 - 1 / 2) * subdivBeats * msPerBeat;
 					finalSubMs += bias;
 				}
 				subs.push(finalSubMs);
@@ -212,9 +215,9 @@ export const cachedGridSubdivisionsAtom = atom((get) => {
 
 	// Filter based on pixel density
 	const filteredBeats =
-		pxPerBeat >= 8
+		pxPerBeat >= 14
 			? beats
-			: pxPerBeat >= 14
+			: pxPerBeat >= 8
 				? beats.filter((b) => b.primary)
 				: [];
 	const filteredSubs = pxPerSub >= 12 ? subs : [];

@@ -13,7 +13,7 @@ import {
 	Settings,
 	Upload,
 } from "lucide-react";
-import { startTransition, useState } from "react";
+import { startTransition, useRef, useState } from "react";
 import { ExportDialog } from "@/components/daw/dialogs/export-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,6 +48,7 @@ export function DAWToolbar() {
 	const [automationViewEnabled, setAutomationViewEnabled] = useAtom(
 		automationViewEnabledAtom,
 	);
+	const bpmDebounceRef = useRef<number | null>(null);
 
 	const handleImportAudio = () => {
 		const input = document.createElement("input");
@@ -79,10 +80,10 @@ export function DAWToolbar() {
 					</h1>
 
 					<div className="flex items-center gap-2">
-						<Button variant="ghost" size="sm" onClick={() => {}}>
+						<Button variant="ghost" size="sm" disabled title="Coming soon" aria-label="Open project">
 							<FolderOpen className={DAW_ICONS.MD} />
 						</Button>
-						<Button variant="ghost" size="sm" onClick={() => {}}>
+						<Button variant="ghost" size="sm" disabled title="Coming soon" aria-label="Save project">
 							<Save className={DAW_ICONS.MD} />
 						</Button>
 					</div>
@@ -204,7 +205,7 @@ export function DAWToolbar() {
 
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
-							<Button variant="ghost" size="sm">
+							<Button variant="ghost" size="sm" aria-label="More options">
 								<MoreHorizontal className={DAW_ICONS.MD} />
 							</Button>
 						</DropdownMenuTrigger>
@@ -297,13 +298,13 @@ export function DAWToolbar() {
 								max={300}
 								defaultValue={music.tempoBpm}
 								onChange={(e) => {
-									const target = e.target as HTMLInputElement & { _t?: number };
-									const v = Number(target.value) || 120;
-									window.clearTimeout(target._t);
-									target._t = window.setTimeout(
-										() => setMusic({ ...music, tempoBpm: v }),
+									const v = Number(e.target.value);
+									const clamped = Math.max(30, Math.min(300, Number.isFinite(v) ? v : 120));
+									if (bpmDebounceRef.current) clearTimeout(bpmDebounceRef.current);
+									bpmDebounceRef.current = setTimeout(
+										() => setMusic({ ...music, tempoBpm: clamped }),
 										150,
-									);
+									) as unknown as number;
 								}}
 								className="w-16 h-7 border rounded px-1 text-xs"
 							/>

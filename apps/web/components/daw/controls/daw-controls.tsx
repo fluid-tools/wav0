@@ -25,7 +25,6 @@ import {
 	playbackAtom,
 	selectedClipIdAtom,
 	selectedTrackIdAtom,
-	setBpmAtom,
 	setCurrentTimeAtom,
 	setTimelineZoomAtom,
 	setTrackHeightZoomAtom,
@@ -47,7 +46,6 @@ export function DAWControls() {
 	const [, togglePlayback] = useAtom(togglePlaybackAtom);
 	const [, stopPlayback] = useAtom(stopPlaybackAtom);
 	const [, setCurrentTime] = useAtom(setCurrentTimeAtom);
-	const [, _setBpm] = useAtom(setBpmAtom);
 	const [, setTimelineZoom] = useAtom(setTimelineZoomAtom);
 	const [, setTrackHeightZoom] = useAtom(setTrackHeightZoomAtom);
 	const [totalDuration] = useAtom(totalDurationAtom);
@@ -144,7 +142,7 @@ export function DAWControls() {
 		>
 			<div className="flex items-center gap-3">
 				<div className="flex items-center gap-2">
-					<Button variant="ghost" size="sm">
+					<Button variant="ghost" size="sm" aria-label="Skip to beginning">
 						<SkipBack className={DAW_ICONS.MD} />
 					</Button>
 					<Button
@@ -161,6 +159,7 @@ export function DAWControls() {
 							width: DAW_HEIGHTS.BUTTON_LG,
 							height: DAW_HEIGHTS.BUTTON_LG,
 						}}
+						aria-label={playback.isPlaying ? "Pause" : "Play"}
 					>
 						{playback.isPlaying ? (
 							<Pause className={DAW_ICONS.LG} />
@@ -168,10 +167,10 @@ export function DAWControls() {
 							<Play className={DAW_ICONS.LG} />
 						)}
 					</Button>
-					<Button variant="ghost" size="sm" onClick={handleStop}>
+					<Button variant="ghost" size="sm" onClick={handleStop} aria-label="Stop">
 						<Square className={DAW_ICONS.MD} />
 					</Button>
-					<Button variant="ghost" size="sm">
+					<Button variant="ghost" size="sm" aria-label="Skip to end">
 						<SkipForward className={DAW_ICONS.MD} />
 					</Button>
 				</div>
@@ -282,6 +281,7 @@ export function DAWControls() {
 					onClick={(e) => onToggleLoop(e)}
 					disabled={!findSelectedClip()}
 					title="Toggle loop for selected clip (Shift = infinite)"
+					aria-label="Toggle loop for selected clip"
 				>
 					<Repeat className={DAW_ICONS.MD} />
 				</Button>

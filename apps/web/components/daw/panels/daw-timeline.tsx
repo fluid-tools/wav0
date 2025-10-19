@@ -150,17 +150,18 @@ export function DAWTimeline() {
 	const [horizontalScroll] = useAtom(horizontalScrollAtom);
 
 	return (
-		<button
+		<div
 			ref={containerRef}
-			type="button"
-			className="h-full w-full relative bg-muted/10 cursor-pointer select-none border-none p-0"
+			className="h-full w-full relative bg-muted/10 cursor-pointer select-none"
 			onClick={(e) => {
 				if (isDraggingEnd) return;
 				handleTimelineClick(e);
 			}}
 			onPointerDown={onTimelinePointerDown}
 			style={{ width: timelineWidth }}
+			role="region"
 			aria-label="Timeline - click to set playback position"
+			tabIndex={0}
 		>
 			{/* Canvas grid for bars mode */}
 			{tGrid.mode === "bars" ? (
@@ -230,6 +231,6 @@ export function DAWTimeline() {
 					))}
 				</div>
 			)}
-		</button>
+		</div>
 	);
 }

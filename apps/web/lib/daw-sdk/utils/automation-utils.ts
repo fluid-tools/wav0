@@ -362,9 +362,6 @@ export function migrateAutomationToSegments(
 		});
 	}
 
-	console.log(
-		`[Migration] Converted ${envelope.points.length} points to ${segments.length} segments`,
-	);
 
 	return {
 		enabled: envelope.enabled,

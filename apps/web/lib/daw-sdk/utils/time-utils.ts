@@ -159,7 +159,7 @@ export function beatsToMs(
 	signature?: { num: number; den: number },
 ): number {
 	const denScale = signature ? 4 / signature.den : 1;
-	const notatedBeats = beats * denScale;
+	const notatedBeats = beats / denScale;
 	const seconds = notatedBeats * (60 / bpm);
 	return seconds * 1000;
 }
@@ -215,7 +215,8 @@ export function snapTimeMs(
 	const snapped = Math.round(beatPos / division) * division;
 	const isEven = Math.round(beatPos / division) % 2 === 0;
 	if (grid.swing && grid.swing > 0 && !grid.triplet) {
-		const bias = division * (isEven ? 0 : grid.swing * (2 / 3 - 1 / 2));
+		const swing01 = grid.swing / 100; // Normalize from 0-100 to 0-1
+		const bias = division * (isEven ? 0 : swing01 * (2 / 3 - 1 / 2));
 		return beatsToMs(snapped + bias, bpm, signature);
 	}
 	return beatsToMs(snapped, bpm, signature);

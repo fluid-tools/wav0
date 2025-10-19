@@ -107,9 +107,10 @@ export function useTimebase() {
 					let finalSubMs = subMs;
 					if (grid.swing && grid.swing > 0 && !grid.triplet) {
 						const isEven = i % 2 === 0;
+						const swing01 = grid.swing / 100; // Normalize from 0-100 to 0-1
 						const bias = isEven
 							? 0
-							: grid.swing * (2 / 3 - 1 / 2) * subdivBeats * msPerBeat;
+							: swing01 * (2 / 3 - 1 / 2) * subdivBeats * msPerBeat;
 						finalSubMs += bias;
 					}
 					subs.push(finalSubMs);
