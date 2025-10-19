@@ -1,9 +1,10 @@
 /** @type {import('next').NextConfig} */
 
-import { withBotId } from "botid/next/config";
 import type { NextConfig } from "next";
+import { withBotId } from 'botid/next/config';
 
-const nextConfig: NextConfig = withBotId({
+
+const nextConfig: NextConfig = {
 	typedRoutes: true,
 	images: {
 		remotePatterns: [
@@ -49,6 +50,6 @@ const nextConfig: NextConfig = withBotId({
 		];
 	},
 	//   skipTrailingSlashRedirect: true,
-});
+};
 
-export default nextConfig;
+export default withBotId(nextConfig);
