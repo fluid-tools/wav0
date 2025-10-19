@@ -33,6 +33,7 @@ export class AudioService {
 	private static instance: AudioService;
 	private audioContext: AudioContext | null = null;
 	private loadedTracks = new Map<string, LoadedAudioTrack>();
+	private audioBufferCache = new Map<string, AudioBuffer>();
 
 	private constructor() {}
 
@@ -176,7 +177,15 @@ export class AudioService {
 	/**
 	 * Get full AudioBuffer for a track (for export/offline rendering)
 	 */
-	async getAudioBuffer(opfsFileId: string, fileName = ""): Promise<AudioBuffer | null> {
+	async getAudioBuffer(
+		opfsFileId: string,
+		fileName = "",
+	): Promise<AudioBuffer | null> {
+		// Check cache first
+		if (this.audioBufferCache.has(opfsFileId)) {
+			return this.audioBufferCache.get(opfsFileId)!;
+		}
+
 		let loadedTrack = this.loadedTracks.get(opfsFileId);
 		if (!loadedTrack) {
 			// Load from OPFS if not already loaded
@@ -195,8 +204,13 @@ export class AudioService {
 			buffers.push(buffer);
 		}
 		if (buffers.length === 0) return null;
-		if (buffers.length === 1) return buffers[0];
-		return this.concatenateBuffers(buffers);
+
+		const result =
+			buffers.length === 1 ? buffers[0] : this.concatenateBuffers(buffers);
+
+		// Cache the result
+		this.audioBufferCache.set(opfsFileId, result);
+		return result;
 	}
 
 	/**
@@ -240,6 +254,7 @@ export class AudioService {
 	 */
 	unloadTrack(trackId: string): void {
 		this.loadedTracks.delete(trackId);
+		this.audioBufferCache.delete(trackId);
 	}
 
 	/**
@@ -247,6 +262,7 @@ export class AudioService {
 	 */
 	async cleanup(): Promise<void> {
 		this.loadedTracks.clear();
+		this.audioBufferCache.clear();
 		if (this.audioContext) {
 			await this.audioContext.close();
 			this.audioContext = null;

@@ -100,11 +100,11 @@ export const TimelineSectionSchema = z.object({
 
 // Project marker (named cue on the timeline)
 export const ProjectMarkerSchema = z.object({
-    id: z.string(),
-    timeMs: z.number().min(0),
-    name: z.string().default(""),
-    color: z.string().default("#ffffff"),
-    durationMs: z.number().min(0).optional(),
+	id: z.string(),
+	timeMs: z.number().min(0),
+	name: z.string().default(""),
+	color: z.string().default("#ffffff"),
+	durationMs: z.number().min(0).optional(),
 });
 
 export const ToolSchema = z.enum(["pointer", "trim", "razor"]);

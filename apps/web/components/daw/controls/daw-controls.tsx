@@ -74,11 +74,6 @@ export function DAWControls() {
 		setCurrentTime(clampedTime);
 	};
 
-	const handleBpmChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		const bpm = parseInt(e.target.value, 10);
-		setBpm(bpm);
-	};
-
 	const handleZoomIn = () => {
 		setTimelineZoom(Math.min(timeline.zoom * 1.5, 4));
 	};
@@ -280,19 +275,6 @@ export function DAWControls() {
 					>
 						<ChevronsUpDown className={DAW_ICONS.SM} />
 					</Button>
-				</div>
-
-				<div className="flex items-center gap-2">
-					<span className="text-xs text-muted-foreground">BPM</span>
-					<Input
-						type="number"
-						value={playback.bpm}
-						onChange={handleBpmChange}
-						className="w-16 text-sm"
-						style={{ height: DAW_HEIGHTS.BUTTON_MD }}
-						min={60}
-						max={200}
-					/>
 				</div>
 
 				<Button

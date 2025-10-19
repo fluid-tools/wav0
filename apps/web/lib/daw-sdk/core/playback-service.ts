@@ -581,15 +581,15 @@ export class PlaybackService {
 		await this.getAudioContext();
 		this.tracks.clear();
 
-    for (const track of tracks) {
-        this.tracks.set(track.id, {
-            clipStates: new Map(),
-            envelopeGainNode: null,
-            muteSoloGainNode: null,
-            isPlaying: false,
-            automationGeneration: 0,
-        });
-    }
+		for (const track of tracks) {
+			this.tracks.set(track.id, {
+				clipStates: new Map(),
+				envelopeGainNode: null,
+				muteSoloGainNode: null,
+				isPlaying: false,
+				automationGeneration: 0,
+			});
+		}
 	}
 
 	async play(tracks: Track[], options: PlaybackOptions = {}): Promise<void> {
@@ -718,9 +718,12 @@ export class PlaybackService {
 			const anchorValue = 1;
 			clipGain.gain.setValueAtTime(anchorValue, now);
 
-			const clipStartAC = this.startTime + clipStartSec - this.playbackTimeAtStart;
-			const loopEndAC = this.startTime + loopUntilSec - this.playbackTimeAtStart;
-			const oneShotEndAC = this.startTime + clipOneShotEndSec - this.playbackTimeAtStart;
+			const clipStartAC =
+				this.startTime + clipStartSec - this.playbackTimeAtStart;
+			const loopEndAC =
+				this.startTime + loopUntilSec - this.playbackTimeAtStart;
+			const oneShotEndAC =
+				this.startTime + clipOneShotEndSec - this.playbackTimeAtStart;
 
 			if (clip.fadeIn && clip.fadeIn > 0) {
 				// From 0 → 1 using curve (use linear for now; curve params available on clip)

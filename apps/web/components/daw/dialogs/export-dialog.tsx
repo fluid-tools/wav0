@@ -101,18 +101,33 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 	}
 
 	const stats = previewBuffer
-		? {
-				duration: previewBuffer.duration.toFixed(2),
-				sampleRate: previewBuffer.sampleRate,
-				channels: previewBuffer.numberOfChannels,
-				peak: Array.from(
-					{ length: previewBuffer.numberOfChannels },
-					(_, ch) => {
-						const data = previewBuffer.getChannelData(ch);
-						return Math.max(...Array.from(data, Math.abs));
-					},
-				).join(", "),
-			}
+		? (() => {
+				const peaks: number[] = [];
+				const rms: number[] = [];
+
+				for (let ch = 0; ch < previewBuffer.numberOfChannels; ch++) {
+					const data = previewBuffer.getChannelData(ch);
+					let peak = 0;
+					let sumSq = 0;
+
+					for (let i = 0; i < data.length; i++) {
+						const abs = Math.abs(data[i]);
+						if (abs > peak) peak = abs;
+						sumSq += data[i] * data[i];
+					}
+
+					peaks.push(peak);
+					rms.push(Math.sqrt(sumSq / data.length));
+				}
+
+				return {
+					duration: previewBuffer.duration.toFixed(2),
+					sampleRate: previewBuffer.sampleRate,
+					channels: previewBuffer.numberOfChannels,
+					peak: peaks.map((p) => p.toFixed(3)).join(", "),
+					rms: rms.map((r) => r.toFixed(3)).join(", "),
+				};
+			})()
 		: null;
 
 	return (
@@ -215,6 +230,23 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 						<div>SR: {stats.sampleRate}</div>
 						<div>Channels: {stats.channels}</div>
 						<div>Peak: {stats.peak}</div>
+						<div>RMS: {stats.rms}</div>
+						<div className="mt-2 text-muted-foreground">
+							Est. size: {(() => {
+								const durSec = parseFloat(stats.duration);
+								const bytesPerSec = stats.sampleRate * stats.channels * 2; // 16-bit
+								const wavBytes = durSec * bytesPerSec;
+								const formatSizes = {
+									wav: wavBytes,
+									flac: wavBytes * 0.4, // ~40% compression
+									m4a: (durSec * 128000) / 8, // 128kbps AAC
+									ogg: (durSec * 192000) / 8, // 192kbps Opus
+								};
+								const estBytes = formatSizes[fmt];
+								const mb = (estBytes / (1024 * 1024)).toFixed(1);
+								return `${mb} MB (${fmt.toUpperCase()})`;
+							})()}
+						</div>
 					</div>
 				)}
 				<div className="flex justify-end gap-2">

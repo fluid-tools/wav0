@@ -248,11 +248,11 @@ export function getEnvelopeMultiplierAtTime(
  * Safe for undefined/disabled envelopes. Returns 1.0 when not applicable.
  */
 export function evaluateEnvelopeGainAt(
-    envelope: TrackEnvelope | undefined,
-    timeMs: number,
+	envelope: TrackEnvelope | undefined,
+	timeMs: number,
 ): number {
-    if (!envelope || !envelope.enabled || !envelope.points?.length) return 1.0
-    return getEnvelopeMultiplierAtTime(envelope, timeMs)
+	if (!envelope || !envelope.enabled || !envelope.points?.length) return 1.0;
+	return getEnvelopeMultiplierAtTime(envelope, timeMs);
 }
 
 /**

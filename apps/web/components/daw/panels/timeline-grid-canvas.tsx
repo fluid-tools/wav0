@@ -53,7 +53,7 @@ export function TimelineGridCanvas({
 		);
 
 		// Draw subdivisions
-		ctx.strokeStyle = "rgba(var(--foreground), 0.15)";
+		ctx.strokeStyle = "var(--timeline-grid-sub)";
 		ctx.lineWidth = 0.5;
 		for (const ms of grid.subs) {
 			const x = ms * pxPerMs - scrollLeft;
@@ -64,7 +64,7 @@ export function TimelineGridCanvas({
 		}
 
 		// Draw beats
-		ctx.strokeStyle = "rgba(var(--foreground), 0.3)";
+		ctx.strokeStyle = "var(--timeline-grid-beat)";
 		ctx.lineWidth = 1;
 		for (const ms of grid.beats) {
 			const x = ms * pxPerMs - scrollLeft;
@@ -75,9 +75,9 @@ export function TimelineGridCanvas({
 		}
 
 		// Draw measures + labels
-		ctx.strokeStyle = "rgba(var(--foreground), 0.5)";
+		ctx.strokeStyle = "var(--timeline-grid-measure)";
 		ctx.lineWidth = 2;
-		ctx.fillStyle = "rgba(var(--foreground), 0.7)";
+		ctx.fillStyle = "var(--timeline-grid-label)";
 		ctx.font = "10px monospace";
 		for (const ms of grid.measures) {
 			const x = ms * pxPerMs - scrollLeft;
@@ -98,4 +98,3 @@ export function TimelineGridCanvas({
 		/>
 	);
 }
-

@@ -140,195 +140,217 @@ export function calculateTimeMarkers(
 }
 
 // === Musical timebase conversions ===
-export function msToBeats(ms: number, bpm: number, signature?: { num: number; den: number }): number {
-    const seconds = ms / 1000
-    const baseBeats = seconds * (bpm / 60)
-    if (!signature) return baseBeats
-    // Adjust for denominator: if den=8, one notated beat is an eighth note.
-    const denScale = 4 / signature.den
-    return baseBeats / denScale
+export function msToBeats(
+	ms: number,
+	bpm: number,
+	signature?: { num: number; den: number },
+): number {
+	const seconds = ms / 1000;
+	const baseBeats = seconds * (bpm / 60);
+	if (!signature) return baseBeats;
+	// Adjust for denominator: if den=8, one notated beat is an eighth note.
+	const denScale = 4 / signature.den;
+	return baseBeats / denScale;
 }
 
-export function beatsToMs(beats: number, bpm: number, signature?: { num: number; den: number }): number {
-    const denScale = signature ? 4 / signature.den : 1
-    const notatedBeats = beats * denScale
-    const seconds = notatedBeats * (60 / bpm)
-    return seconds * 1000
+export function beatsToMs(
+	beats: number,
+	bpm: number,
+	signature?: { num: number; den: number },
+): number {
+	const denScale = signature ? 4 / signature.den : 1;
+	const notatedBeats = beats * denScale;
+	const seconds = notatedBeats * (60 / bpm);
+	return seconds * 1000;
 }
 
 export function msToBarsBeats(
-    ms: number,
-    bpm: number,
-    signature: { num: number; den: number },
+	ms: number,
+	bpm: number,
+	signature: { num: number; den: number },
 ): { bar: number; beat: number; tick: number } {
-    const beats = msToBeats(ms, bpm, signature)
-    const beatsPerBar = signature.num
-    const bar = Math.floor(beats / beatsPerBar)
-    const beat = Math.floor(beats % beatsPerBar)
-    const tick = Math.floor((beats - Math.floor(beats)) * 960) // PPQ=960
-    return { bar: bar + 1, beat: beat + 1, tick }
+	const beats = msToBeats(ms, bpm, signature);
+	const beatsPerBar = signature.num;
+	const bar = Math.floor(beats / beatsPerBar);
+	const beat = Math.floor(beats % beatsPerBar);
+	const tick = Math.floor((beats - Math.floor(beats)) * 960); // PPQ=960
+	return { bar: bar + 1, beat: beat + 1, tick };
 }
 
 export function barsBeatsToMs(
-    pos: { bar: number; beat: number; tick?: number },
-    bpm: number,
-    signature: { num: number; den: number },
+	pos: { bar: number; beat: number; tick?: number },
+	bpm: number,
+	signature: { num: number; den: number },
 ): number {
-    const beatsPerBar = signature.num
-    const totalBeats = (pos.bar - 1) * beatsPerBar + (pos.beat - 1) + (pos.tick ?? 0) / 960
-    return beatsToMs(totalBeats, bpm, signature)
+	const beatsPerBar = signature.num;
+	const totalBeats =
+		(pos.bar - 1) * beatsPerBar + (pos.beat - 1) + (pos.tick ?? 0) / 960;
+	return beatsToMs(totalBeats, bpm, signature);
 }
 
 export function snapTimeMs(
-    timeMs: number,
-    grid: { mode: "time" | "bars"; resolution: "1/1"|"1/2"|"1/4"|"1/8"|"1/16"; triplet?: boolean; swing?: number },
-    bpm: number,
-    signature: { num: number; den: number },
+	timeMs: number,
+	grid: {
+		mode: "time" | "bars";
+		resolution: "1/1" | "1/2" | "1/4" | "1/8" | "1/16";
+		triplet?: boolean;
+		swing?: number;
+	},
+	bpm: number,
+	signature: { num: number; den: number },
 ): number {
-    if (grid.mode === "time") return timeMs
-    const res = grid.resolution
-    const denom = Number(res.split("/")[1])
-    const beatsPerBar = signature.num
-    const baseDivisionBeats = beatsPerBar / denom
-    const beatPos = msToBeats(timeMs, bpm, signature)
+	if (grid.mode === "time") return timeMs;
+	const res = grid.resolution;
+	const denom = Number(res.split("/")[1]);
+	const beatsPerBar = signature.num;
+	const baseDivisionBeats = beatsPerBar / denom;
+	const beatPos = msToBeats(timeMs, bpm, signature);
 
-    // Triplet: divide each division into 3 equal parts
-    let division = baseDivisionBeats
-    if (grid.triplet) division = baseDivisionBeats / 3
+	// Triplet: divide each division into 3 equal parts
+	let division = baseDivisionBeats;
+	if (grid.triplet) division = baseDivisionBeats / 3;
 
-    // Swing: bias every second subdivision toward later time by factor (0–0.6)
-    // Implement as post-snap micro-shift
-    const snapped = Math.round(beatPos / division) * division
-    const isEven = Math.round(beatPos / division) % 2 === 0
-    if (grid.swing && grid.swing > 0 && !grid.triplet) {
-        const bias = division * (isEven ? 0 : grid.swing * (2/3 - 1/2))
-        return beatsToMs(snapped + bias, bpm, signature)
-    }
-    return beatsToMs(snapped, bpm, signature)
+	// Swing: bias every second subdivision toward later time by factor (0–0.6)
+	// Implement as post-snap micro-shift
+	const snapped = Math.round(beatPos / division) * division;
+	const isEven = Math.round(beatPos / division) % 2 === 0;
+	if (grid.swing && grid.swing > 0 && !grid.triplet) {
+		const bias = division * (isEven ? 0 : grid.swing * (2 / 3 - 1 / 2));
+		return beatsToMs(snapped + bias, bpm, signature);
+	}
+	return beatsToMs(snapped, bpm, signature);
 }
 
 export function formatBarsBeatsTicks(
-    ms: number,
-    bpm: number,
-    signature: { num: number; den: number },
+	ms: number,
+	bpm: number,
+	signature: { num: number; den: number },
 ): string {
-    const { bar, beat, tick } = msToBarsBeats(ms, bpm, signature)
-    const tickStr = tick.toString().padStart(3, "0")
-    return `${bar}.${beat}.${tickStr}`
+	const { bar, beat, tick } = msToBarsBeats(ms, bpm, signature);
+	const tickStr = tick.toString().padStart(3, "0");
+	return `${bar}.${beat}.${tickStr}`;
 }
 
 // === Bars grid generation ===
 export function getDivisionBeats(
-    res: "1/1"|"1/2"|"1/4"|"1/8"|"1/16",
-    signature: { num: number; den: number },
+	res: "1/1" | "1/2" | "1/4" | "1/8" | "1/16",
+	signature: { num: number; den: number },
 ): number {
-    const denom = Number(res.split("/")[1])
-    // One division equals barsPerDivision * beatsPerBar, where beats are notated beats
-    const beatsPerBar = signature.num
-    return beatsPerBar / denom
+	const denom = Number(res.split("/")[1]);
+	// One division equals barsPerDivision * beatsPerBar, where beats are notated beats
+	const beatsPerBar = signature.num;
+	return beatsPerBar / denom;
 }
 
 export function generateBarsGrid(
-    widthPx: number,
-    pxPerMs: number,
-    bpm: number,
-    signature: { num: number; den: number },
-    res: "1/1"|"1/2"|"1/4"|"1/8"|"1/16",
-    triplet: boolean,
-    swing: number,
-): Array<{ timeMs: number; posPx: number; emphasis: "measure"|"beat"|"sub" }> {
-    if (pxPerMs <= 0 || widthPx <= 0) return []
-    const out: Array<{ timeMs: number; posPx: number; emphasis: "measure"|"beat"|"sub" }> = []
-    const secondsPerBeat = (60 / bpm) * (4 / signature.den)
-    const beatsPerBar = signature.num
-    const divisionBeats = getDivisionBeats(res, signature)
-    const subdivBeats = triplet ? divisionBeats / 3 : divisionBeats
+	widthPx: number,
+	pxPerMs: number,
+	bpm: number,
+	signature: { num: number; den: number },
+	res: "1/1" | "1/2" | "1/4" | "1/8" | "1/16",
+	triplet: boolean,
+	swing: number,
+): Array<{
+	timeMs: number;
+	posPx: number;
+	emphasis: "measure" | "beat" | "sub";
+}> {
+	if (pxPerMs <= 0 || widthPx <= 0) return [];
+	const out: Array<{
+		timeMs: number;
+		posPx: number;
+		emphasis: "measure" | "beat" | "sub";
+	}> = [];
+	const secondsPerBeat = (60 / bpm) * (4 / signature.den);
+	const beatsPerBar = signature.num;
+	const divisionBeats = getDivisionBeats(res, signature);
+	const subdivBeats = triplet ? divisionBeats / 3 : divisionBeats;
 
-    // Iterate bars until width covered
-    const msPerBeat = secondsPerBeat * 1000
-    const msPerBar = beatsPerBar * msPerBeat
-    const maxBars = Math.ceil((widthPx / pxPerMs) / msPerBar) + 2
+	// Iterate bars until width covered
+	const msPerBeat = secondsPerBeat * 1000;
+	const msPerBar = beatsPerBar * msPerBeat;
+	const maxBars = Math.ceil(widthPx / pxPerMs / msPerBar) + 2;
 
-    for (let bar = 0; bar < maxBars; bar++) {
-        const barStartMs = bar * msPerBar
-        const barPx = barStartMs * pxPerMs
-        if (barPx > widthPx) break
-        out.push({ timeMs: barStartMs, posPx: barPx, emphasis: "measure" })
+	for (let bar = 0; bar < maxBars; bar++) {
+		const barStartMs = bar * msPerBar;
+		const barPx = barStartMs * pxPerMs;
+		if (barPx > widthPx) break;
+		out.push({ timeMs: barStartMs, posPx: barPx, emphasis: "measure" });
 
-        for (let beat = 1; beat < beatsPerBar; beat++) {
-            const beatMs = barStartMs + beat * msPerBeat
-            const beatPx = beatMs * pxPerMs
-            if (beatPx > widthPx) break
-            out.push({ timeMs: beatMs, posPx: beatPx, emphasis: "beat" })
-        }
+		for (let beat = 1; beat < beatsPerBar; beat++) {
+			const beatMs = barStartMs + beat * msPerBeat;
+			const beatPx = beatMs * pxPerMs;
+			if (beatPx > widthPx) break;
+			out.push({ timeMs: beatMs, posPx: beatPx, emphasis: "beat" });
+		}
 
-        // Subdivisions within each beat/measure granularity
-        const subdivMs = subdivBeats * msPerBeat
-        const divisionsPerBar = beatsPerBar / subdivBeats
-        for (let i = 1; i < divisionsPerBar; i++) {
-            const subTime = barStartMs + i * subdivMs
-            let subPx = subTime * pxPerMs
-            if (swing > 0 && !triplet) {
-                // Visual bias only on even subdivisions
-                const isEven = i % 2 === 0
-                const bias = isEven ? 0 : swing * (2 / 3 - 1 / 2) * subdivMs * pxPerMs
-                subPx += bias
-            }
-            if (subPx > widthPx) break
-            out.push({ timeMs: subTime, posPx: subPx, emphasis: "sub" })
-        }
-    }
+		// Subdivisions within each beat/measure granularity
+		const subdivMs = subdivBeats * msPerBeat;
+		const divisionsPerBar = beatsPerBar / subdivBeats;
+		for (let i = 1; i < divisionsPerBar; i++) {
+			const subTime = barStartMs + i * subdivMs;
+			let subPx = subTime * pxPerMs;
+			if (swing > 0 && !triplet) {
+				// Visual bias only on even subdivisions
+				const isEven = i % 2 === 0;
+				const bias = isEven ? 0 : swing * (2 / 3 - 1 / 2) * subdivMs * pxPerMs;
+				subPx += bias;
+			}
+			if (subPx > widthPx) break;
+			out.push({ timeMs: subTime, posPx: subPx, emphasis: "sub" });
+		}
+	}
 
-    return out
+	return out;
 }
 
 export function enumerateGrid(
-    viewStartMs: number,
-    viewEndMs: number,
-    bpm: number,
-    signature: { num: number; den: number },
-    res: "1/1"|"1/2"|"1/4"|"1/8"|"1/16",
-    triplet: boolean,
+	viewStartMs: number,
+	viewEndMs: number,
+	bpm: number,
+	signature: { num: number; den: number },
+	res: "1/1" | "1/2" | "1/4" | "1/8" | "1/16",
+	triplet: boolean,
 ): { measures: number[]; beats: number[]; subs: number[] } {
-    const measures: number[] = []
-    const beats: number[] = []
-    const subs: number[] = []
-    const secondsPerBeat = (60 / bpm) * (4 / signature.den)
-    const beatsPerBar = signature.num
-    const msPerBeat = secondsPerBeat * 1000
-    const msPerBar = beatsPerBar * msPerBeat
-    const divisionBeats = getDivisionBeats(res, signature)
-    const subdivBeats = triplet ? divisionBeats / 3 : divisionBeats
-    const subdivMs = subdivBeats * msPerBeat
+	const measures: number[] = [];
+	const beats: number[] = [];
+	const subs: number[] = [];
+	const secondsPerBeat = (60 / bpm) * (4 / signature.den);
+	const beatsPerBar = signature.num;
+	const msPerBeat = secondsPerBeat * 1000;
+	const msPerBar = beatsPerBar * msPerBeat;
+	const divisionBeats = getDivisionBeats(res, signature);
+	const subdivBeats = triplet ? divisionBeats / 3 : divisionBeats;
+	const subdivMs = subdivBeats * msPerBeat;
 
-    const startBar = Math.floor(viewStartMs / msPerBar)
-    const endBar = Math.ceil(viewEndMs / msPerBar) + 1
+	const startBar = Math.floor(viewStartMs / msPerBar);
+	const endBar = Math.ceil(viewEndMs / msPerBar) + 1;
 
-    for (let bar = startBar; bar < endBar; bar++) {
-        const barMs = bar * msPerBar
-        if (barMs >= viewStartMs && barMs <= viewEndMs) measures.push(barMs)
-        for (let beat = 1; beat < beatsPerBar; beat++) {
-            const beatMs = barMs + beat * msPerBeat
-            if (beatMs >= viewStartMs && beatMs <= viewEndMs) beats.push(beatMs)
-        }
-        const divisionsPerBar = beatsPerBar / subdivBeats
-        for (let i = 1; i < divisionsPerBar; i++) {
-            const subMs = barMs + i * subdivMs
-            if (subMs >= viewStartMs && subMs <= viewEndMs) subs.push(subMs)
-        }
-    }
+	for (let bar = startBar; bar < endBar; bar++) {
+		const barMs = bar * msPerBar;
+		if (barMs >= viewStartMs && barMs <= viewEndMs) measures.push(barMs);
+		for (let beat = 1; beat < beatsPerBar; beat++) {
+			const beatMs = barMs + beat * msPerBeat;
+			if (beatMs >= viewStartMs && beatMs <= viewEndMs) beats.push(beatMs);
+		}
+		const divisionsPerBar = beatsPerBar / subdivBeats;
+		for (let i = 1; i < divisionsPerBar; i++) {
+			const subMs = barMs + i * subdivMs;
+			if (subMs >= viewStartMs && subMs <= viewEndMs) subs.push(subMs);
+		}
+	}
 
-    return { measures, beats, subs }
+	return { measures, beats, subs };
 }
 
 export function computeSubdivisionMs(
-    bpm: number,
-    signature: { num: number; den: number },
-    res: "1/1"|"1/2"|"1/4"|"1/8"|"1/16",
-    triplet: boolean,
+	bpm: number,
+	signature: { num: number; den: number },
+	res: "1/1" | "1/2" | "1/4" | "1/8" | "1/16",
+	triplet: boolean,
 ): number {
-    const secondsPerBeat = (60 / bpm) * (4 / signature.den)
-    const divisionBeats = getDivisionBeats(res, signature)
-    const subdivBeats = triplet ? divisionBeats / 3 : divisionBeats
-    return subdivBeats * secondsPerBeat * 1000
+	const secondsPerBeat = (60 / bpm) * (4 / signature.den);
+	const divisionBeats = getDivisionBeats(res, signature);
+	const subdivBeats = triplet ? divisionBeats / 3 : divisionBeats;
+	return subdivBeats * secondsPerBeat * 1000;
 }
