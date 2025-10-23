@@ -1,0 +1,7 @@
+{
+  "setup-worktree": [
+    "# fnm use",
+    "# bun install",
+    "# cp $ROOT_WORKTREE_PATH/.env .env"
+  ]
+}
