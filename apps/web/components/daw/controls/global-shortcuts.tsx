@@ -17,6 +17,7 @@ import {
 	tracksAtom,
 	updateClipAtom,
 } from "@/lib/daw-sdk";
+import { computeLoopEndMs } from "@/lib/daw-sdk/config/looping";
 
 export function GlobalShortcuts() {
 	const [playback] = useAtom(playbackAtom);
@@ -226,14 +227,7 @@ export function GlobalShortcuts() {
 						loopEnd: undefined,
 					});
 				} else {
-					// Default musical length (8 bars @ current BPM)
-					const beatsPerBar = 4;
-					const msPerBeat =
-						60000 / Math.max(30, Math.min(300, playback.bpm || 120));
-					const defaultLen = 8 * beatsPerBar * msPerBeat;
-					const clipDur = Math.max(0, clip.trimEnd - clip.trimStart);
-					const oneShotEnd = clip.startTime + clipDur;
-					const loopEnd = Math.max(clip.startTime + defaultLen, oneShotEnd);
+					const loopEnd = computeLoopEndMs(clip);
 					updateClip(selectedTrackId, clip.id, { loop: true, loopEnd });
 				}
 				return;
@@ -293,7 +287,6 @@ export function GlobalShortcuts() {
 		return () => window.removeEventListener("keydown", onKey);
 	}, [
 		playback.currentTime,
-		playback.bpm,
 		timeline.gridSize,
 		totalDuration,
 		selectedTrackId,

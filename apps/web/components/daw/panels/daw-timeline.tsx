@@ -31,7 +31,7 @@ export function DAWTimeline() {
 	const [_projectEndOverride, setProjectEndOverride] = useAtom(
 		projectEndOverrideAtom,
 	);
-	const containerRef = useRef<HTMLButtonElement>(null);
+	const containerRef = useRef<HTMLDivElement>(null);
 	const [isDraggingEnd, setIsDraggingEnd] = useState(false);
 	const [playheadViewportPx] = useAtom(playheadViewportPxAtom);
 	const [pxPerMs] = useAtom(timelinePxPerMsAtom);
@@ -146,9 +146,7 @@ export function DAWTimeline() {
 		playback.currentTime,
 	]);
 
-	const onTimelinePointerDown = (
-		event: React.PointerEvent<HTMLButtonElement>,
-	) => {
+	const onTimelinePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
 		if (event.button !== 0) return;
 		event.preventDefault();
 		handleTimelineClick(event);
@@ -160,58 +158,71 @@ export function DAWTimeline() {
 	const [horizontalScroll] = useAtom(horizontalScrollAtom);
 
 	return (
-		<button
+		<div
 			ref={containerRef}
-			type="button"
-			className="h-full w-full relative bg-muted/10 cursor-pointer select-none border-none p-0"
-			onClick={(e) => {
-				if (isDraggingEnd) return;
-				handleTimelineClick(e);
-			}}
-			onKeyDown={(e) => {
-				if (isDraggingEnd) return;
-				if (e.key === "Enter" || e.key === " ") {
-					e.preventDefault();
-					const at = Math.max(0, Math.round(playback.currentTime));
-					const snapped = timeline.snapToGrid
-						? snapTimeMs(at, grid, music.tempoBpm, music.timeSignature)
-						: at;
-					setCurrentTime(snapped);
-				}
-			}}
-			onPointerDown={onTimelinePointerDown}
+			className="h-full w-full relative bg-muted/10"
 			style={{ width: timelineWidth }}
-			aria-label="Timeline - click to set playback position"
 		>
-			{/* Canvas grid for bars mode */}
-			{tGrid.mode === "bars" ? (
-				<TimelineGridCanvas
-					width={timelineWidth}
-					height={400}
-					pxPerMs={pxPerMs}
-					scrollLeft={horizontalScroll}
-				/>
-			) : (
-				timeMarkers.map((marker) => (
-					<div
-						key={`time-${marker.time}`}
-						className="absolute top-0"
-						style={{ left: marker.position }}
-					>
-						<div className="w-px h-3 bg-foreground" />
-						<span className="text-xs text-muted-foreground ml-1 font-mono">
-							{marker.label}
-						</span>
-					</div>
-				))
-			)}
+			{/* Visual layer - non-interactive */}
+			<div className="absolute inset-0 pointer-events-none z-0">
+				{tGrid.mode === "bars" ? (
+					<TimelineGridCanvas
+						width={timelineWidth}
+						height={400}
+						pxPerMs={pxPerMs}
+						scrollLeft={horizontalScroll}
+					/>
+				) : (
+					timeMarkers.map((marker) => (
+						<div
+							key={`time-${marker.time}`}
+							className="absolute top-0"
+							style={{ left: marker.position }}
+						>
+							<div className="w-px h-3 bg-foreground" />
+							<span className="text-xs text-muted-foreground ml-1 font-mono">
+								{marker.label}
+							</span>
+						</div>
+					))
+				)}
+			</div>
 
-			{/* Project markers track */}
-			<MarkerTrack pxPerMs={pxPerMs} width={timelineWidth} />
-
-			{/* Project end marker and buffer zone */}
+			{/* Timeline click layer - interactive background */}
+			{/* biome-ignore lint/a11y/useSemanticElements: Cannot use button element as it would create nested interactive elements with MarkerTrack buttons and project end slider */}
 			<div
-				className="absolute top-0 bottom-0 w-px bg-yellow-500/70 z-30"
+				className="absolute inset-0 cursor-pointer z-10"
+				role="button"
+				tabIndex={0}
+				onClick={(e) => {
+					if (isDraggingEnd) return;
+					handleTimelineClick(e);
+				}}
+				onKeyDown={(e) => {
+					if (isDraggingEnd) return;
+					if (e.key === "Enter" || e.key === " ") {
+						e.preventDefault();
+						const at = Math.max(0, Math.round(playback.currentTime));
+						const snapped = timeline.snapToGrid
+							? snapTimeMs(at, grid, music.tempoBpm, music.timeSignature)
+							: at;
+						setCurrentTime(snapped);
+					}
+				}}
+				onPointerDown={onTimelinePointerDown}
+				aria-label="Timeline - click to set playback position"
+			/>
+
+			{/* Markers layer - higher priority */}
+			<div className="absolute inset-0 pointer-events-none z-20">
+				<div className="pointer-events-auto">
+					<MarkerTrack pxPerMs={pxPerMs} width={timelineWidth} />
+				</div>
+			</div>
+
+			{/* Project end slider - highest priority */}
+			<div
+				className="absolute top-0 bottom-0 w-px bg-yellow-500/70 z-30 pointer-events-auto"
 				style={{
 					left: projectEndPosition,
 					cursor: "ew-resize",
@@ -224,6 +235,7 @@ export function DAWTimeline() {
 				aria-valuenow={Math.max(0, Math.round(projectEndPosition))}
 				onMouseDown={(e) => {
 					e.preventDefault();
+					e.stopPropagation();
 					setIsDraggingEnd(true);
 				}}
 			/>
@@ -241,7 +253,7 @@ export function DAWTimeline() {
 
 			{/* Snap grid overlay */}
 			{timeline.snapToGrid && (
-				<div className="absolute inset-0 pointer-events-none">
+				<div className="absolute inset-0 pointer-events-none z-5">
 					{Array.from({ length: Math.ceil(timelineWidth / 25) }).map((_, i) => (
 						<div
 							key={`snap-grid-${i * 25}`}
@@ -251,6 +263,6 @@ export function DAWTimeline() {
 					))}
 				</div>
 			)}
-		</button>
+		</div>
 	);
 }

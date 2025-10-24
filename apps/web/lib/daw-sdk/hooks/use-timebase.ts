@@ -124,9 +124,9 @@ export function useTimebase() {
 
 		// Filter based on pixel density
 		const filteredBeats =
-			pxPerBeat >= 8
+			pxPerBeat >= 14
 				? beats
-				: pxPerBeat >= 14
+				: pxPerBeat >= 8
 					? beats.filter((b) => b.primary)
 					: [];
 		const filteredSubs = pxPerSub >= 12 ? subs : [];
