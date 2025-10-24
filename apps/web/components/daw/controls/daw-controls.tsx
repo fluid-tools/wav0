@@ -36,6 +36,7 @@ import {
 	tracksAtom,
 	updateClipAtom,
 } from "@/lib/daw-sdk";
+import { computeLoopEndMs } from "@/lib/daw-sdk/config/looping";
 import { formatDuration } from "@/lib/storage/opfs";
 import { MasterMeter } from "./master-meter";
 
@@ -123,14 +124,7 @@ export function DAWControls() {
 		}
 		let loopEnd = clip.loopEnd;
 		if (loopEnd === undefined) {
-			const bars = 8;
-			const beatsPerBar = 4;
-			const msPerBeat =
-				60000 / Math.max(30, Math.min(300, playback.bpm || 120));
-			const defaultLen = bars * beatsPerBar * msPerBeat;
-			const oneShotEnd =
-				clip.startTime + Math.max(0, clip.trimEnd - clip.trimStart);
-			loopEnd = Math.max(clip.startTime + defaultLen, oneShotEnd);
+			loopEnd = computeLoopEndMs(clip);
 		}
 		await updateClip(track.id, clip.id, { loop: true, loopEnd });
 	};
