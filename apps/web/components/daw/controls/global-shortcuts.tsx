@@ -287,7 +287,6 @@ export function GlobalShortcuts() {
 		return () => window.removeEventListener("keydown", onKey);
 	}, [
 		playback.currentTime,
-		playback.bpm,
 		timeline.gridSize,
 		totalDuration,
 		selectedTrackId,

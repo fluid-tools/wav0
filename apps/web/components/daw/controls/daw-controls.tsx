@@ -36,9 +36,9 @@ import {
 	tracksAtom,
 	updateClipAtom,
 } from "@/lib/daw-sdk";
+import { computeLoopEndMs } from "@/lib/daw-sdk/config/looping";
 import { formatDuration } from "@/lib/storage/opfs";
 import { MasterMeter } from "./master-meter";
-import { computeLoopEndMs } from "@/lib/daw-sdk/config/looping";
 
 export function DAWControls() {
 	const [playback] = useAtom(playbackAtom);
