@@ -19,7 +19,10 @@ import {
 	timelineWidthAtom,
 } from "@/lib/daw-sdk";
 import { useTimebase } from "@/lib/daw-sdk/hooks/use-timebase";
-import { calculateTimeMarkers, snapTimeMs } from "@/lib/daw-sdk/utils/time-utils";
+import {
+	calculateTimeMarkers,
+	snapTimeMs,
+} from "@/lib/daw-sdk/utils/time-utils";
 import { useEffectEvent } from "@/lib/react/use-effect-event";
 
 export function DAWTimeline() {
@@ -174,7 +177,11 @@ export function DAWTimeline() {
 	const _timelinePlayheadViewport = playheadViewportPx;
 
 	// Calculate time markers (time mode) - use centralized helper
-	const timeMarkers = calculateTimeMarkers(timelineWidth, pxPerMs, timeline.zoom);
+	const timeMarkers = calculateTimeMarkers(
+		timelineWidth,
+		pxPerMs,
+		timeline.zoom,
+	);
 
 	// Beat markers computation removed; canvas grid handles bars mode
 

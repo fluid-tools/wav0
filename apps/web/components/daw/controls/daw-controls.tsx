@@ -26,8 +26,8 @@ import {
 	selectedClipIdAtom,
 	selectedTrackIdAtom,
 	setCurrentTimeAtom,
-    setTimelineZoomNextAtom,
-    setTimelineZoomPrevAtom,
+	setTimelineZoomNextAtom,
+	setTimelineZoomPrevAtom,
 	setTrackHeightZoomAtom,
 	stopPlaybackAtom,
 	timelineAtom,
@@ -48,8 +48,8 @@ export function DAWControls() {
 	const [, togglePlayback] = useAtom(togglePlaybackAtom);
 	const [, stopPlayback] = useAtom(stopPlaybackAtom);
 	const [, setCurrentTime] = useAtom(setCurrentTimeAtom);
-    const [, zoomNext] = useAtom(setTimelineZoomNextAtom);
-    const [, zoomPrev] = useAtom(setTimelineZoomPrevAtom);
+	const [, zoomNext] = useAtom(setTimelineZoomNextAtom);
+	const [, zoomPrev] = useAtom(setTimelineZoomPrevAtom);
 	const [, setTrackHeightZoom] = useAtom(setTrackHeightZoomAtom);
 	const [totalDuration] = useAtom(totalDurationAtom);
 
@@ -74,13 +74,13 @@ export function DAWControls() {
 		setCurrentTime(clampedTime);
 	};
 
-    const handleZoomIn = () => {
-        zoomNext();
-    };
+	const handleZoomIn = () => {
+		zoomNext();
+	};
 
-    const handleZoomOut = () => {
-        zoomPrev();
-    };
+	const handleZoomOut = () => {
+		zoomPrev();
+	};
 
 	const handleTrackHeightZoomIn = () => {
 		setTrackHeightZoom(Math.min(trackHeightZoom + 0.2, 2.0));

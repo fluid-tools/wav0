@@ -135,7 +135,7 @@ export function calculateTimeMarkers(
 		time * pixelsPerSecond < timelineWidthPx;
 		time += secondsPerMarker
 	) {
-        const timestampMs = time * 1000;
+		const timestampMs = time * 1000;
 		markers.push({
 			time: timestampMs,
 			position: time * pixelsPerSecond,
