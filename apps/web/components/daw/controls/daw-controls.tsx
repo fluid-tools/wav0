@@ -208,11 +208,11 @@ export function DAWControls() {
 			<div className="flex items-center gap-4">
 				{/* Horizontal Zoom Controls */}
 				<div className={DAW_BUTTONS.CONTROL_GROUP}>
-                    <Button
+					<Button
 						variant="ghost"
 						size="sm"
 						onClick={handleZoomOut}
-                        disabled={timeline.zoom <= 0.25}
+						disabled={timeline.zoom <= 0.2}
 						style={{
 							height: DAW_HEIGHTS.BUTTON_SM,
 							width: DAW_HEIGHTS.BUTTON_SM,
@@ -225,11 +225,11 @@ export function DAWControls() {
 					<span className={`${DAW_TEXT.MONO_TIME} min-w-12 text-center`}>
 						{Math.round(timeline.zoom * 100)}%
 					</span>
-                    <Button
+					<Button
 						variant="ghost"
 						size="sm"
 						onClick={handleZoomIn}
-                        disabled={timeline.zoom >= 4}
+						disabled={timeline.zoom >= 5}
 						style={{
 							height: DAW_HEIGHTS.BUTTON_SM,
 							width: DAW_HEIGHTS.BUTTON_SM,

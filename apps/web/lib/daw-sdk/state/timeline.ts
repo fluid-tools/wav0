@@ -60,7 +60,7 @@ export const setTimelineZoomAtom = atom(null, (get, set, zoom: number) => {
 });
 
 // Discrete zoom steps and helpers
-export const ZOOM_STEPS = [0.25, 0.33, 0.5, 0.66, 0.75, 1, 1.5, 2, 3, 4] as const;
+export const ZOOM_STEPS = [0.2, 0.25, 0.33, 0.5, 0.66, 0.75, 1, 1.5, 2, 3, 4, 5] as const;
 
 function nearestZoomIndex(z: number): number {
     let idx = 0;

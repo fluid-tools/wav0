@@ -12,7 +12,7 @@ export { useDAWInitialization } from "./use-daw-initialization";
  */
 export function usePlaybackSync(
 	isPlaying: boolean,
-	_currentTime: number,
+	currentTime: number,
 	callback: (time: number) => void,
 ) {
 	const lastTimeRef = useRef<number | null>(null);
@@ -24,6 +24,7 @@ export function usePlaybackSync(
 		}
 	});
 
+	// During playback: poll playbackService via requestAnimationFrame
 	useEffect(() => {
 		if (!isPlaying) return;
 		let frameId = 0;
@@ -34,6 +35,16 @@ export function usePlaybackSync(
 		frameId = requestAnimationFrame(update);
 		return () => cancelAnimationFrame(frameId);
 	}, [isPlaying, onTick]);
+
+	// While paused: sync on currentTime changes (seeking, scrubbing)
+	useEffect(() => {
+		if (isPlaying) return;
+		const t = currentTime * 1000; // ms
+		if (lastTimeRef.current !== t) {
+			lastTimeRef.current = t;
+			callback(t);
+		}
+	}, [isPlaying, currentTime, callback]);
 }
 
 /**

@@ -120,14 +120,15 @@ export function calculateTimeMarkers(
 }> {
 	if (pxPerMs <= 0) return [];
 	const markers = [];
-    const pixelsPerSecond = pxPerMs * 1000;
-    // Finer granularity as zoom increases
-    let secondsPerMarker: number;
-    if (zoom >= 2.5) secondsPerMarker = 0.25;
-    else if (zoom >= 1.5) secondsPerMarker = 0.5;
-    else if (zoom >= 1) secondsPerMarker = 1;
-    else if (zoom >= 0.5) secondsPerMarker = 5;
-    else secondsPerMarker = 10;
+	const pixelsPerSecond = pxPerMs * 1000;
+	// Finer granularity as zoom increases; avoid sub-second label spam
+	let secondsPerMarker: number;
+	if (zoom >= 5) secondsPerMarker = 0.1;
+	else if (zoom >= 2.5) secondsPerMarker = 0.25;
+	else if (zoom >= 1.5) secondsPerMarker = 0.5;
+	else if (zoom >= 1) secondsPerMarker = 1;
+	else if (zoom >= 0.5) secondsPerMarker = 5;
+	else secondsPerMarker = 10;
 
 	for (
 		let time = 0;

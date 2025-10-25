@@ -103,8 +103,8 @@ export const horizontalScrollAtom = atom<number>(0);
 export const verticalScrollAtom = atom<number>(0);
 
 export const zoomLimitsAtom = atom<{ min: number; max: number }>({
-    min: 0.25,
-    max: 4,
+	min: 0.2,
+	max: 5,
 });
 
 export const playheadDraggingAtom = atom<boolean>(false);

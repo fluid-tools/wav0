@@ -262,7 +262,7 @@ export function DAWContainer() {
 			if (!controllerNow) return;
 			const worldXms = (controllerNow.scrollLeft + localX) / viewport.pxPerMs;
 			const goNext = event.deltaY < 0;
-			const steps = [0.25, 0.33, 0.5, 0.66, 0.75, 1, 1.5, 2, 3, 4];
+			const steps = [0.2, 0.25, 0.33, 0.5, 0.66, 0.75, 1, 1.5, 2, 3, 4, 5];
 			let nearest = 0;
 			let best = Number.POSITIVE_INFINITY;
 			for (let i = 0; i < steps.length; i++) {
@@ -277,15 +277,12 @@ export function DAWContainer() {
 				: Math.max(0, nearest - 1);
 			const newZoom = steps[targetIdx];
 			if (newZoom === viewport.zoom) return;
-            const newPxPerMs = (viewport.pxPerMs / viewport.zoom) * newZoom;
-            const targetScrollLeft = Math.max(0, worldXms * newPxPerMs - localX);
+			const newPxPerMs = (viewport.pxPerMs / viewport.zoom) * newZoom;
+			const targetScrollLeft = Math.max(0, worldXms * newPxPerMs - localX);
 			setTimelineZoom(newZoom);
-			controllerNow.setScroll(
-                targetScrollLeft,
-				controllerNow.scrollTop,
-			);
-            // Reflect the new scroll immediately; avoid stale value
-            setHorizontalScroll(targetScrollLeft);
+			controllerNow.setScroll(targetScrollLeft, controllerNow.scrollTop);
+			// Reflect the new scroll immediately; avoid stale value
+			setHorizontalScroll(targetScrollLeft);
 		};
 
 		const handlePointerMove = (event: PointerEvent) => {

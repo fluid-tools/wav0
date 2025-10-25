@@ -19,9 +19,8 @@ import {
 	timelineWidthAtom,
 } from "@/lib/daw-sdk";
 import { useTimebase } from "@/lib/daw-sdk/hooks/use-timebase";
-import { snapTimeMs } from "@/lib/daw-sdk/utils/time-utils";
+import { calculateTimeMarkers, snapTimeMs } from "@/lib/daw-sdk/utils/time-utils";
 import { useEffectEvent } from "@/lib/react/use-effect-event";
-import { formatDuration } from "@/lib/storage/opfs";
 
 export function DAWTimeline() {
 	const [timeline] = useAtom(timelineAtom);
@@ -39,7 +38,7 @@ export function DAWTimeline() {
 	const [, addMarker] = useAtom(addMarkerAtom);
 	const [grid] = useAtom(gridAtom);
 	const [music] = useAtom(musicalMetadataAtom);
-	const [hScroll] = useAtom(horizontalScrollAtom);
+	const [horizontalScroll] = useAtom(horizontalScrollAtom);
 	const { grid: tGrid } = useTimebase();
 
 	// legacy marker drag removed in favor of dedicated MarkerTrack
@@ -66,7 +65,7 @@ export function DAWTimeline() {
 			if (!containerRef.current || pxPerMs <= 0) return;
 			const rect = containerRef.current.getBoundingClientRect();
 			const localX = clientX - rect.left;
-			const absoluteX = Math.max(0, localX + hScroll);
+			const absoluteX = Math.max(0, localX + horizontalScroll);
 			let nextMs = Math.max(0, absoluteX / pxPerMs);
 			if (timeline.snapToGrid && !shiftKey) {
 				const secondsPerBeat = 60 / playback.bpm;
@@ -88,7 +87,7 @@ export function DAWTimeline() {
 			}
 		},
 		[
-			hScroll,
+			horizontalScroll,
 			pxPerMs,
 			playback.bpm,
 			setProjectEndOverride,
@@ -130,7 +129,7 @@ export function DAWTimeline() {
 			const tick = () => {
 				const st = edgeScrollRef.current;
 				if (!st) return;
-				const nextLeft = Math.max(0, hScroll + st.velocity);
+				const nextLeft = Math.max(0, horizontalScroll + st.velocity);
 				dispatchScrollLeft(nextLeft);
 				st.raf = requestAnimationFrame(tick);
 			};
@@ -174,29 +173,8 @@ export function DAWTimeline() {
 	}, [onDragPointerMove, onDragPointerUp]);
 	const _timelinePlayheadViewport = playheadViewportPx;
 
-	// Calculate time markers (time mode)
-	const getTimeMarkers = () => {
-		if (pxPerMs <= 0) return [];
-		const markers = [];
-		const pixelsPerSecond = pxPerMs * 1000;
-		const secondsPerMarker =
-			timeline.zoom < 0.5 ? 10 : timeline.zoom < 1 ? 5 : 1;
-
-		for (
-			let time = 0;
-			time * pixelsPerSecond < timelineWidth;
-			time += secondsPerMarker
-		) {
-			const timestampMs = time * 1000;
-			markers.push({
-				time: timestampMs,
-				position: time * pixelsPerSecond,
-				label: formatDuration(timestampMs),
-			});
-		}
-
-		return markers;
-	};
+	// Calculate time markers (time mode) - use centralized helper
+	const timeMarkers = calculateTimeMarkers(timelineWidth, pxPerMs, timeline.zoom);
 
 	// Beat markers computation removed; canvas grid handles bars mode
 
@@ -257,9 +235,6 @@ export function DAWTimeline() {
 	};
 
 	// Playhead position calculation (now handled by DAWPlayhead component)
-
-	const timeMarkers = getTimeMarkers();
-	const [horizontalScroll] = useAtom(horizontalScrollAtom);
 
 	return (
 		<div
