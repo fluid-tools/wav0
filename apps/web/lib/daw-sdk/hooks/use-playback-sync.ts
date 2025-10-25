@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useEffectEvent } from "@/lib/react/use-effect-event";
+import { playbackService } from "../core/playback-service";
 
 export { useDAWInitialization } from "./use-daw-initialization";
 
@@ -10,27 +12,28 @@ export { useDAWInitialization } from "./use-daw-initialization";
  */
 export function usePlaybackSync(
 	isPlaying: boolean,
-	currentTime: number,
+	_currentTime: number,
 	callback: (time: number) => void,
 ) {
-	const callbackRef = useRef(callback);
-	callbackRef.current = callback;
+	const lastTimeRef = useRef<number | null>(null);
+	const onTick = useEffectEvent(() => {
+		const t = playbackService.getCurrentTime() * 1000; // ms
+		if (lastTimeRef.current !== t) {
+			lastTimeRef.current = t;
+			callback(t);
+		}
+	});
 
 	useEffect(() => {
 		if (!isPlaying) return;
-
-		let frameId: number;
+		let frameId = 0;
 		const update = () => {
-			callbackRef.current(currentTime);
+			onTick();
 			frameId = requestAnimationFrame(update);
 		};
-
 		frameId = requestAnimationFrame(update);
-
-		return () => {
-			cancelAnimationFrame(frameId);
-		};
-	}, [isPlaying, currentTime]);
+		return () => cancelAnimationFrame(frameId);
+	}, [isPlaying, onTick]);
 }
 
 /**

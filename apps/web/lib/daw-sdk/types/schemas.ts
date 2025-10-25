@@ -84,7 +84,7 @@ export const PlaybackStateSchema = z.object({
 });
 
 export const TimelineStateSchema = z.object({
-	zoom: z.number().min(0.05).max(5),
+    zoom: z.number().min(0.25).max(4),
 	scrollPosition: z.number().min(0),
 	snapToGrid: z.boolean(),
 	gridSize: z.number().min(0),

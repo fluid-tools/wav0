@@ -12,6 +12,7 @@ import {
 	timelineAtom,
 	timelinePxPerMsAtom,
 } from "@/lib/daw-sdk";
+import { useEffectEvent } from "@/lib/react/use-effect-event";
 
 export function UnifiedOverlay() {
 	const [playheadViewport] = useAtom(playheadViewportAtom);
@@ -126,29 +127,27 @@ export function UnifiedOverlay() {
 		setPlayheadDragging(false);
 	}, [setCurrentTime, setPlayheadDragging]);
 
+	const onPointerMove = useEffectEvent((event: PointerEvent) => {
+		const state = dragRef.current;
+		if (!state?.active || state.pointerId !== event.pointerId) return;
+		updateTime(event.clientX, event.timeStamp);
+	});
+	const onPointerUp = useEffectEvent((event: PointerEvent) => {
+		const state = dragRef.current;
+		if (!state?.active || state.pointerId !== event.pointerId) return;
+		stopDrag();
+	});
+
 	useEffect(() => {
-		const handlePointerMove = (event: PointerEvent) => {
-			const state = dragRef.current;
-			if (!state?.active || state.pointerId !== event.pointerId) return;
-			updateTime(event.clientX, event.timeStamp);
-		};
-
-		const handlePointerUp = (event: PointerEvent) => {
-			const state = dragRef.current;
-			if (!state?.active || state.pointerId !== event.pointerId) return;
-			stopDrag();
-		};
-
-		window.addEventListener("pointermove", handlePointerMove);
-		window.addEventListener("pointerup", handlePointerUp);
-		window.addEventListener("pointercancel", handlePointerUp);
-
+		window.addEventListener("pointermove", onPointerMove as EventListener);
+		window.addEventListener("pointerup", onPointerUp as EventListener);
+		window.addEventListener("pointercancel", onPointerUp as EventListener);
 		return () => {
-			window.removeEventListener("pointermove", handlePointerMove);
-			window.removeEventListener("pointerup", handlePointerUp);
-			window.removeEventListener("pointercancel", handlePointerUp);
+			window.removeEventListener("pointermove", onPointerMove as EventListener);
+			window.removeEventListener("pointerup", onPointerUp as EventListener);
+			window.removeEventListener("pointercancel", onPointerUp as EventListener);
 		};
-	}, [stopDrag, updateTime]);
+	}, [onPointerMove, onPointerUp]);
 
 	return (
 		<div

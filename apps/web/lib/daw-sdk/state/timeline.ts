@@ -59,6 +59,40 @@ export const setTimelineZoomAtom = atom(null, (get, set, zoom: number) => {
 	set(timelineAtom, { ...timeline, zoom: clamped });
 });
 
+// Discrete zoom steps and helpers
+export const ZOOM_STEPS = [0.25, 0.33, 0.5, 0.66, 0.75, 1, 1.5, 2, 3, 4] as const;
+
+function nearestZoomIndex(z: number): number {
+    let idx = 0;
+    let best = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < ZOOM_STEPS.length; i++) {
+        const d = Math.abs(ZOOM_STEPS[i] - z);
+        if (d < best) {
+            best = d;
+            idx = i;
+        }
+    }
+    return idx;
+}
+
+export const setTimelineZoomPrevAtom = atom(null, (get, set) => {
+    const limits = get(zoomLimitsAtom);
+    const timeline = get(timelineAtom);
+    const i = nearestZoomIndex(timeline.zoom);
+    const j = Math.max(0, i - 1);
+    const next = Math.max(limits.min, ZOOM_STEPS[j]);
+    set(timelineAtom, { ...timeline, zoom: next });
+});
+
+export const setTimelineZoomNextAtom = atom(null, (get, set) => {
+    const limits = get(zoomLimitsAtom);
+    const timeline = get(timelineAtom);
+    const i = nearestZoomIndex(timeline.zoom);
+    const j = Math.min(ZOOM_STEPS.length - 1, i + 1);
+    const next = Math.min(limits.max, ZOOM_STEPS[j]);
+    set(timelineAtom, { ...timeline, zoom: next });
+});
+
 export const setTimelineScrollAtom = atom(
 	null,
 	(get, set, scrollPosition: number) => {

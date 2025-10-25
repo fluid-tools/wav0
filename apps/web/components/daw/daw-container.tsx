@@ -2,7 +2,7 @@
 
 import { useAtom } from "jotai";
 import { Plus } from "lucide-react";
-import { useCallback, useEffect, useRef } from "react";
+import { startTransition, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	ResizableHandle,
@@ -33,6 +33,7 @@ import {
 	userIsManuallyScrollingAtom,
 	verticalScrollAtom,
 } from "@/lib/daw-sdk";
+import { useEffectEvent } from "@/lib/react/use-effect-event";
 import { DAWControls } from "./controls/daw-controls";
 import { DAWToolbar } from "./controls/daw-toolbar";
 import { GlobalShortcuts } from "./controls/global-shortcuts";
@@ -85,50 +86,47 @@ export function DAWContainer() {
 	 */
 	const scrollRef = useRef({ left: 0, top: 0 });
 
-	useEffect(() => {
-		const handlePanLock = (event: Event) => {
-			const customEvent = event as CustomEvent<boolean>;
-			const locked = Boolean(customEvent.detail);
-			panLockRef.current = locked;
-			if (locked) {
-				gridControllerRef.current?.cancelAnimation();
-			}
-		};
+	const onPanLock = useEffectEvent((event: Event) => {
+		const customEvent = event as CustomEvent<boolean>;
+		const locked = Boolean(customEvent.detail);
+		panLockRef.current = locked;
+		if (locked) {
+			gridControllerRef.current?.cancelAnimation();
+		}
+	});
 
-		const handleScrollRequest = (event: Event) => {
-			const customEvent = event as CustomEvent<{
-				left?: number;
-				top?: number;
-			}>;
-			const detail = customEvent.detail || {};
-			const controller = gridControllerRef.current;
-			if (!controller) return;
-			const left =
-				detail.left !== undefined ? detail.left : controller.scrollLeft;
-			const top = detail.top !== undefined ? detail.top : controller.scrollTop;
-			controller.setScroll(left, top);
+	const onScrollRequest = useEffectEvent((event: Event) => {
+		const customEvent = event as CustomEvent<{ left?: number; top?: number }>;
+		const detail = customEvent.detail || {};
+		const controller = gridControllerRef.current;
+		if (!controller) return;
+		const left =
+			detail.left !== undefined ? detail.left : controller.scrollLeft;
+		const top = detail.top !== undefined ? detail.top : controller.scrollTop;
+		controller.setScroll(left, top);
+		startTransition(() => {
 			setHorizontalScroll(left);
 			setVerticalScroll(top);
-		};
-		window.addEventListener(
-			"wav0:grid-pan-lock",
-			handlePanLock as EventListener,
-		);
+		});
+	});
+
+	useEffect(() => {
+		window.addEventListener("wav0:grid-pan-lock", onPanLock as EventListener);
 		window.addEventListener(
 			"wav0:grid-scroll-request",
-			handleScrollRequest as EventListener,
+			onScrollRequest as EventListener,
 		);
 		return () => {
 			window.removeEventListener(
 				"wav0:grid-pan-lock",
-				handlePanLock as EventListener,
+				onPanLock as EventListener,
 			);
 			window.removeEventListener(
 				"wav0:grid-scroll-request",
-				handleScrollRequest as EventListener,
+				onScrollRequest as EventListener,
 			);
 		};
-	}, [setHorizontalScroll, setVerticalScroll]);
+	}, [onPanLock, onScrollRequest]);
 
 	// Initialize audio from OPFS on component mount
 	useEffect(() => {
@@ -254,14 +252,40 @@ export function DAWContainer() {
 		};
 		gridControllerRef.current = controller;
 
-		const handleWheel = (event: WheelEvent) => {
+		const onWheel = (event: WheelEvent) => {
 			if (!event.ctrlKey) return;
 			event.preventDefault();
-			const delta = event.deltaY;
-			const zoomFactor = delta < 0 ? 1.1 : 0.9;
-			const { zoom } = viewport;
-			const clamped = Math.min(Math.max(zoom * zoomFactor, 0.05), 5);
-			setTimelineZoom(clamped);
+			const el = (event.currentTarget as HTMLElement) ?? gridEl;
+			const rect = el.getBoundingClientRect();
+			const localX = event.clientX - rect.left;
+			const controllerNow = gridControllerRef.current;
+			if (!controllerNow) return;
+			const worldXms = (controllerNow.scrollLeft + localX) / viewport.pxPerMs;
+			const goNext = event.deltaY < 0;
+			const steps = [0.25, 0.33, 0.5, 0.66, 0.75, 1, 1.5, 2, 3, 4];
+			let nearest = 0;
+			let best = Number.POSITIVE_INFINITY;
+			for (let i = 0; i < steps.length; i++) {
+				const d = Math.abs(steps[i] - viewport.zoom);
+				if (d < best) {
+					best = d;
+					nearest = i;
+				}
+			}
+			const targetIdx = goNext
+				? Math.min(steps.length - 1, nearest + 1)
+				: Math.max(0, nearest - 1);
+			const newZoom = steps[targetIdx];
+			if (newZoom === viewport.zoom) return;
+            const newPxPerMs = (viewport.pxPerMs / viewport.zoom) * newZoom;
+            const targetScrollLeft = Math.max(0, worldXms * newPxPerMs - localX);
+			setTimelineZoom(newZoom);
+			controllerNow.setScroll(
+                targetScrollLeft,
+				controllerNow.scrollTop,
+			);
+            // Reflect the new scroll immediately; avoid stale value
+            setHorizontalScroll(targetScrollLeft);
 		};
 
 		const handlePointerMove = (event: PointerEvent) => {
@@ -282,7 +306,9 @@ export function DAWContainer() {
 			automationDragActiveRef.current = false;
 		};
 
-		gridEl.addEventListener("wheel", handleWheel, { passive: false });
+		gridEl.addEventListener("wheel", onWheel as EventListener, {
+			passive: false,
+		});
 		gridEl.addEventListener("pointermove", handlePointerMove);
 		window.addEventListener(
 			"wav0:automation-drag-start",
@@ -296,7 +322,7 @@ export function DAWContainer() {
 		return () => {
 			gridControllerRef.current = null;
 			controller.cancelAnimation();
-			gridEl.removeEventListener("wheel", handleWheel);
+			gridEl.removeEventListener("wheel", onWheel as EventListener);
 			gridEl.removeEventListener("pointermove", handlePointerMove);
 			window.removeEventListener(
 				"wav0:automation-drag-start",
@@ -307,7 +333,7 @@ export function DAWContainer() {
 				handleAutomationDragEnd,
 			);
 		};
-	}, [viewport, setTimelineZoom]);
+	}, [viewport, setTimelineZoom, setHorizontalScroll]);
 
 	useEffect(() => {
 		// Prevent back/forward swipe gestures interfering with DAW grid

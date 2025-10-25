@@ -26,7 +26,8 @@ import {
 	selectedClipIdAtom,
 	selectedTrackIdAtom,
 	setCurrentTimeAtom,
-	setTimelineZoomAtom,
+    setTimelineZoomNextAtom,
+    setTimelineZoomPrevAtom,
 	setTrackHeightZoomAtom,
 	stopPlaybackAtom,
 	timelineAtom,
@@ -47,7 +48,8 @@ export function DAWControls() {
 	const [, togglePlayback] = useAtom(togglePlaybackAtom);
 	const [, stopPlayback] = useAtom(stopPlaybackAtom);
 	const [, setCurrentTime] = useAtom(setCurrentTimeAtom);
-	const [, setTimelineZoom] = useAtom(setTimelineZoomAtom);
+    const [, zoomNext] = useAtom(setTimelineZoomNextAtom);
+    const [, zoomPrev] = useAtom(setTimelineZoomPrevAtom);
 	const [, setTrackHeightZoom] = useAtom(setTrackHeightZoomAtom);
 	const [totalDuration] = useAtom(totalDurationAtom);
 
@@ -72,13 +74,13 @@ export function DAWControls() {
 		setCurrentTime(clampedTime);
 	};
 
-	const handleZoomIn = () => {
-		setTimelineZoom(Math.min(timeline.zoom * 1.5, 4));
-	};
+    const handleZoomIn = () => {
+        zoomNext();
+    };
 
-	const handleZoomOut = () => {
-		setTimelineZoom(Math.max(timeline.zoom / 1.5, 0.25));
-	};
+    const handleZoomOut = () => {
+        zoomPrev();
+    };
 
 	const handleTrackHeightZoomIn = () => {
 		setTrackHeightZoom(Math.min(trackHeightZoom + 0.2, 2.0));
@@ -206,11 +208,11 @@ export function DAWControls() {
 			<div className="flex items-center gap-4">
 				{/* Horizontal Zoom Controls */}
 				<div className={DAW_BUTTONS.CONTROL_GROUP}>
-					<Button
+                    <Button
 						variant="ghost"
 						size="sm"
 						onClick={handleZoomOut}
-						disabled={timeline.zoom <= 0.25}
+                        disabled={timeline.zoom <= 0.25}
 						style={{
 							height: DAW_HEIGHTS.BUTTON_SM,
 							width: DAW_HEIGHTS.BUTTON_SM,
@@ -223,11 +225,11 @@ export function DAWControls() {
 					<span className={`${DAW_TEXT.MONO_TIME} min-w-12 text-center`}>
 						{Math.round(timeline.zoom * 100)}%
 					</span>
-					<Button
+                    <Button
 						variant="ghost"
 						size="sm"
 						onClick={handleZoomIn}
-						disabled={timeline.zoom >= 4}
+                        disabled={timeline.zoom >= 4}
 						style={{
 							height: DAW_HEIGHTS.BUTTON_SM,
 							width: DAW_HEIGHTS.BUTTON_SM,
