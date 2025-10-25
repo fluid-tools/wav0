@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useEffectEvent } from "@/lib/react/use-effect-event";
+import { useEffectEvent } from "react";
 import { playbackService } from "../core/playback-service";
 
 export { useDAWInitialization } from "./use-daw-initialization";

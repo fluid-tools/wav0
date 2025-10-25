@@ -12,7 +12,13 @@ import {
 	timelineAtom,
 	timelinePxPerMsAtom,
 } from "@/lib/daw-sdk";
-import { useEffectEvent } from "@/lib/react/use-effect-event";
+import { useEffectEvent } from "react";
+import {
+	alignHairline,
+	clientXToMs,
+	snapMs,
+	type Scale,
+} from "@/lib/daw-sdk/utils/scale";
 
 export function UnifiedOverlay() {
 	const [playheadViewport] = useAtom(playheadViewportAtom);
@@ -53,17 +59,12 @@ export function UnifiedOverlay() {
 		(clientX: number, timeStamp?: number) => {
 			if (!containerRef.current || pxPerMs <= 0) return;
 			const rect = containerRef.current.getBoundingClientRect();
-			const localX = clientX - rect.left;
-			const absoluteX = Math.max(0, localX + horizontalScroll);
-			if (!Number.isFinite(absoluteX)) return;
-
-			const rawMs = Math.max(0, absoluteX / pxPerMs);
-			let nextMs = rawMs;
+			const scale: Scale = { pxPerMs, scrollLeft: horizontalScroll };
+			let nextMs = clientXToMs(clientX, rect.left, scale);
 
 			if (snapConfig) {
-				const snappedSeconds =
-					Math.round(rawMs / 1000 / snapConfig) * snapConfig;
-				nextMs = Math.max(0, snappedSeconds * 1000);
+				const stepMs = snapConfig * 1000;
+				nextMs = snapMs(nextMs, stepMs);
 			}
 
 			const state = dragRef.current;
@@ -158,9 +159,9 @@ export function UnifiedOverlay() {
 				type="button"
 				className="cursor-ew pointer-events-auto absolute top-0 bottom-0 w-6 -translate-x-1/2 bg-transparent outline-none"
 				style={{
-					transform: `translate3d(${playheadViewport.viewportPx}px,0,0) translateX(-50%)`,
+					transform: `translate3d(${alignHairline(playheadViewport.viewportPx)}px,0,0) translateX(-50%)`,
 					willChange: "transform",
-					WebkitTransform: `translate3d(${playheadViewport.viewportPx}px,0,0) translateX(-50%)`,
+					WebkitTransform: `translate3d(${alignHairline(playheadViewport.viewportPx)}px,0,0) translateX(-50%)`,
 					left: 0,
 				}}
 				onPointerDown={(event) => {
@@ -187,7 +188,7 @@ export function UnifiedOverlay() {
 			</button>
 			<div
 				className="pointer-events-none absolute top-0 bottom-0 w-px bg-yellow-500/70"
-				style={{ left: projectEndX }}
+				style={{ left: alignHairline(projectEndX) }}
 			/>
 		</div>
 	);

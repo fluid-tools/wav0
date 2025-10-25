@@ -18,7 +18,7 @@ import {
 	updateClipAtom,
 } from "@/lib/daw-sdk";
 import { computeLoopEndMs } from "@/lib/daw-sdk/config/looping";
-import { useEffectEvent } from "@/lib/react/use-effect-event";
+import { useEffectEvent } from "react";
 
 export function GlobalShortcuts() {
 	const [playback] = useAtom(playbackAtom);

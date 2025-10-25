@@ -1,44 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { use, useEffect } from "react";
 import { audioService } from "../core/audio-service";
 import { playbackService } from "../core/playback-service";
+import { ensureAudioReady } from "../init/resource";
 
 /**
- * Initialize DAW SDK on app mount
- * This hook ensures services are ready before use
+ * React 19 audio initialization gate using Suspense
+ * Use this component wrapped in <Suspense> to block rendering until audio is ready
+ */
+export function AudioInitGate() {
+	use(ensureAudioReady());
+	console.log("[DAW SDK] Initialized successfully");
+	return null;
+}
+
+/**
+ * Legacy hook-based initialization for backward compatibility
+ * Prefer using AudioInitGate with Suspense instead
+ * @deprecated Use AudioInitGate with Suspense
  */
 export function useDAWInitialization() {
-	const [isInitialized, setIsInitialized] = useState(false);
-	const [error, setError] = useState<Error | null>(null);
-
-	useEffect(() => {
-		let mounted = true;
-
-		async function initialize() {
-			try {
-				// Initialize audio context
-				await audioService.getAudioContext();
-
-				if (mounted) {
-					setIsInitialized(true);
-					console.log("[DAW SDK] Initialized successfully");
-				}
-			} catch (err) {
-				if (mounted) {
-					const error = err instanceof Error ? err : new Error(String(err));
-					setError(error);
-					console.error("[DAW SDK] Initialization failed:", error);
-				}
-			}
-		}
-
-		initialize();
-
-		return () => {
-			mounted = false;
-		};
-	}, []);
+	// For backward compatibility, wrap the resource in a hook
+	const _init = use(ensureAudioReady());
 
 	// Cleanup on unmount
 	useEffect(() => {
@@ -51,5 +35,5 @@ export function useDAWInitialization() {
 		};
 	}, []);
 
-	return { isInitialized, error };
+	return { isInitialized: true, error: null };
 }

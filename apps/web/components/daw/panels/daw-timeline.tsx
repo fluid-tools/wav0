@@ -1,7 +1,13 @@
 "use client";
 
 import { useAtom } from "jotai";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+	useCallback,
+	useEffect,
+	useEffectEvent,
+	useRef,
+	useState,
+} from "react";
 import { MarkerTrack } from "@/components/daw/panels/marker-track";
 import { TimelineGridCanvas } from "@/components/daw/panels/timeline-grid-canvas";
 import {
@@ -20,10 +26,16 @@ import {
 } from "@/lib/daw-sdk";
 import { useTimebase } from "@/lib/daw-sdk/hooks/use-timebase";
 import {
+	alignHairline,
+	clientXToMs,
+	msToViewportPx,
+	type Scale,
+	snapMs,
+} from "@/lib/daw-sdk/utils/scale";
+import {
 	calculateTimeMarkers,
 	snapTimeMs,
 } from "@/lib/daw-sdk/utils/time-utils";
-import { useEffectEvent } from "@/lib/react/use-effect-event";
 
 export function DAWTimeline() {
 	const [timeline] = useAtom(timelineAtom);
@@ -46,16 +58,44 @@ export function DAWTimeline() {
 
 	// legacy marker drag removed in favor of dedicated MarkerTrack
 
-	// Project end drag state and helpers
+	// Project end drag state and helpers with live refs
 	const dragRef = useRef<{
 		active: boolean;
 		pointerId: number | null;
 		raf: number;
-		pendingMs: number;
 		lastClientX: number;
-	}>({ active: false, pointerId: null, raf: 0, pendingMs: 0, lastClientX: 0 });
+	}>({ active: false, pointerId: null, raf: 0, lastClientX: 0 });
 
 	const edgeScrollRef = useRef<{ raf: number; velocity: number } | null>(null);
+
+	// Live refs to avoid stale closures during RAF
+	const scrollLeftRef = useRef(horizontalScroll);
+	const pxPerMsRef = useRef(pxPerMs);
+	const snapConfigRef = useRef<{
+		secondsPerBeat: number;
+		snapSeconds: number;
+	} | null>(null);
+
+	// Keep refs in sync
+	useEffect(() => {
+		scrollLeftRef.current = horizontalScroll;
+	}, [horizontalScroll]);
+
+	useEffect(() => {
+		pxPerMsRef.current = pxPerMs;
+	}, [pxPerMs]);
+
+	useEffect(() => {
+		if (timeline.snapToGrid) {
+			const secondsPerBeat = 60 / playback.bpm;
+			snapConfigRef.current = {
+				secondsPerBeat,
+				snapSeconds: secondsPerBeat / 4,
+			};
+		} else {
+			snapConfigRef.current = null;
+		}
+	}, [timeline.snapToGrid, playback.bpm]);
 
 	const dispatchScrollLeft = (left: number) => {
 		window.dispatchEvent(
@@ -63,47 +103,37 @@ export function DAWTimeline() {
 		);
 	};
 
-	const updateProjectEnd = useCallback(
-		(clientX: number, shiftKey?: boolean, altKey?: boolean) => {
-			if (!containerRef.current || pxPerMs <= 0) return;
-			const rect = containerRef.current.getBoundingClientRect();
-			const localX = clientX - rect.left;
-			const absoluteX = Math.max(0, localX + horizontalScroll);
-			let nextMs = Math.max(0, absoluteX / pxPerMs);
-			if (timeline.snapToGrid && !shiftKey) {
-				const secondsPerBeat = 60 / playback.bpm;
-				const snapSeconds = secondsPerBeat / 4;
-				const snappedSeconds =
-					Math.round(nextMs / 1000 / snapSeconds) * snapSeconds;
-				nextMs = Math.max(0, snappedSeconds * 1000);
-			} else if (altKey) {
-				// Fine mode: 100ms
-				nextMs = Math.round(nextMs / 100) * 100;
-			}
-			dragRef.current.pendingMs = nextMs;
-			if (!dragRef.current.raf) {
-				dragRef.current.raf = requestAnimationFrame(() => {
-					const s = dragRef.current;
-					s.raf = 0;
-					setProjectEndOverride(Math.max(0, Math.round(s.pendingMs)));
-				});
-			}
-		},
-		[
-			horizontalScroll,
-			pxPerMs,
-			playback.bpm,
-			setProjectEndOverride,
-			timeline.snapToGrid,
-		],
-	);
+	// Unified drag tick that reads from live refs
+	const dragTick = useCallback(() => {
+		const s = dragRef.current;
+		if (!s.active || !containerRef.current) return;
+
+		const scale: Scale = {
+			pxPerMs: pxPerMsRef.current,
+			scrollLeft: scrollLeftRef.current,
+		};
+		let nextMs = clientXToMs(
+			s.lastClientX,
+			containerRef.current.getBoundingClientRect().left,
+			scale,
+		);
+
+		if (snapConfigRef.current) {
+			const snappedSeconds =
+				Math.round(nextMs / 1000 / snapConfigRef.current.snapSeconds) *
+				snapConfigRef.current.snapSeconds;
+			nextMs = Math.max(0, snappedSeconds * 1000);
+		}
+
+		setProjectEndOverride(Math.max(0, Math.round(nextMs)));
+		s.raf = requestAnimationFrame(dragTick);
+	}, [setProjectEndOverride]);
 
 	const onDragPointerMove = useEffectEvent((...args: unknown[]) => {
 		const e = args[0] as PointerEvent;
 		const s = dragRef.current;
 		if (!s.active || s.pointerId !== e.pointerId) return;
 		s.lastClientX = e.clientX;
-		updateProjectEnd(e.clientX, e.shiftKey, e.altKey);
 
 		// Edge autoscroll: within 32px of edges
 		const el = containerRef.current;
@@ -123,20 +153,21 @@ export function DAWTimeline() {
 				cancelAnimationFrame(edgeScrollRef.current.raf);
 				edgeScrollRef.current = null;
 			}
-			return;
-		}
-		// Start/refresh autoscroll loop
-		if (!edgeScrollRef.current) edgeScrollRef.current = { raf: 0, velocity };
-		edgeScrollRef.current.velocity = velocity;
-		if (!edgeScrollRef.current.raf) {
-			const tick = () => {
-				const st = edgeScrollRef.current;
-				if (!st) return;
-				const nextLeft = Math.max(0, horizontalScroll + st.velocity);
-				dispatchScrollLeft(nextLeft);
-				st.raf = requestAnimationFrame(tick);
-			};
-			edgeScrollRef.current.raf = requestAnimationFrame(tick);
+		} else {
+			// Start/refresh autoscroll loop (separate from dragTick)
+			if (!edgeScrollRef.current) edgeScrollRef.current = { raf: 0, velocity };
+			edgeScrollRef.current.velocity = velocity;
+			if (!edgeScrollRef.current.raf) {
+				const tick = () => {
+					const st = edgeScrollRef.current;
+					if (!st) return;
+					const nextLeft = Math.max(0, scrollLeftRef.current + st.velocity);
+					scrollLeftRef.current = nextLeft; // Update ref immediately
+					dispatchScrollLeft(nextLeft);
+					st.raf = requestAnimationFrame(tick);
+				};
+				edgeScrollRef.current.raf = requestAnimationFrame(tick);
+			}
 		}
 	});
 
@@ -149,7 +180,6 @@ export function DAWTimeline() {
 			active: false,
 			pointerId: null,
 			raf: 0,
-			pendingMs: 0,
 			lastClientX: 0,
 		};
 		setIsDraggingEnd(false);
@@ -187,19 +217,18 @@ export function DAWTimeline() {
 
 	const handleTimelineClick = (e: React.MouseEvent | React.PointerEvent) => {
 		const rect = e.currentTarget.getBoundingClientRect();
-		const x = e.clientX - rect.left;
 		if (pxPerMs <= 0) return;
 
-		// Allow clicking past project end; snap playhead and move if needed
+		const scale: Scale = { pxPerMs, scrollLeft: horizontalScroll };
+		let time = clientXToMs(e.clientX, rect.left, scale);
 
-		// Snap-to-grid (quarter note)
-		const secondsPerBeat = 60 / playback.bpm;
-		const snapSeconds = secondsPerBeat / 4; // 16th grid
-		const rawSeconds = x / (pxPerMs * 1000);
-		const snappedSeconds = timeline.snapToGrid
-			? Math.round(rawSeconds / snapSeconds) * snapSeconds
-			: rawSeconds;
-		const time = snappedSeconds * 1000; // ms
+		// Snap-to-grid if enabled
+		if (timeline.snapToGrid) {
+			const secondsPerBeat = 60 / playback.bpm;
+			const stepMs = (secondsPerBeat / 4) * 1000; // 16th grid
+			time = snapMs(time, stepMs);
+		}
+
 		setCurrentTime(Math.max(0, time));
 	};
 
@@ -259,18 +288,22 @@ export function DAWTimeline() {
 						scrollLeft={horizontalScroll}
 					/>
 				) : (
-					timeMarkers.map((marker) => (
-						<div
-							key={`time-${marker.time}`}
-							className="absolute top-0"
-							style={{ left: marker.position }}
-						>
-							<div className="w-px h-3 bg-foreground" />
-							<span className="text-xs text-muted-foreground ml-1 font-mono">
-								{marker.label}
-							</span>
-						</div>
-					))
+					timeMarkers.map((marker) => {
+						const scale: Scale = { pxPerMs, scrollLeft: horizontalScroll };
+						const viewportX = msToViewportPx(marker.time, scale);
+						return (
+							<div
+								key={`time-${marker.time}`}
+								className="absolute top-0"
+								style={{ left: alignHairline(viewportX) }}
+							>
+								<div className="w-px h-3 bg-foreground" />
+								<span className="text-xs text-muted-foreground ml-1 font-mono">
+									{marker.label}
+								</span>
+							</div>
+						);
+					})
 				)}
 			</div>
 
@@ -327,7 +360,8 @@ export function DAWTimeline() {
 					dragRef.current.pointerId = e.pointerId;
 					(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
 					dragRef.current.lastClientX = e.clientX;
-					updateProjectEnd(e.clientX, e.shiftKey, e.altKey);
+					// Start the unified drag tick loop
+					dragRef.current.raf = requestAnimationFrame(dragTick);
 				}}
 			/>
 

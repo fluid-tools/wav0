@@ -2,7 +2,13 @@
 
 import { useAtom } from "jotai";
 import { Plus } from "lucide-react";
-import { startTransition, useCallback, useEffect, useRef } from "react";
+import {
+	startTransition,
+	useCallback,
+	useEffect,
+	useEffectEvent,
+	useRef,
+} from "react";
 import { Button } from "@/components/ui/button";
 import {
 	ResizableHandle,
@@ -33,7 +39,6 @@ import {
 	userIsManuallyScrollingAtom,
 	verticalScrollAtom,
 } from "@/lib/daw-sdk";
-import { useEffectEvent } from "@/lib/react/use-effect-event";
 import { DAWControls } from "./controls/daw-controls";
 import { DAWToolbar } from "./controls/daw-toolbar";
 import { GlobalShortcuts } from "./controls/global-shortcuts";
@@ -279,10 +284,13 @@ export function DAWContainer() {
 			if (newZoom === viewport.zoom) return;
 			const newPxPerMs = (viewport.pxPerMs / viewport.zoom) * newZoom;
 			const targetScrollLeft = Math.max(0, worldXms * newPxPerMs - localX);
-			setTimelineZoom(newZoom);
-			controllerNow.setScroll(targetScrollLeft, controllerNow.scrollTop);
-			// Reflect the new scroll immediately; avoid stale value
-			setHorizontalScroll(targetScrollLeft);
+
+			// Batch zoom and scroll updates in a single microtask to avoid visual jumps
+			Promise.resolve().then(() => {
+				setTimelineZoom(newZoom);
+				controllerNow.setScroll(targetScrollLeft, controllerNow.scrollTop);
+				setHorizontalScroll(targetScrollLeft);
+			});
 		};
 
 		const handlePointerMove = (event: PointerEvent) => {

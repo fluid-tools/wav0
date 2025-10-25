@@ -3,6 +3,8 @@
  * Uses Path2D batching and requestAnimationFrame for smooth 60fps performance
  */
 
+import { alignHairline, msToViewportPx, type Scale } from "./scale";
+
 export interface GridSubdivisions {
 	measures: Array<{ ms: number; bar: number }>;
 	beats: Array<{ ms: number; primary: boolean }>;
@@ -133,10 +135,12 @@ export class CanvasGridController {
 		width: number,
 		height: number,
 	): void {
+		const scale: Scale = { pxPerMs, scrollLeft };
+
 		// Build subdivisions path
 		this.subsPath = new Path2D();
 		for (const ms of grid.subs) {
-			const x = ms * pxPerMs - scrollLeft;
+			const x = alignHairline(msToViewportPx(ms, scale));
 			if (x >= 0 && x <= width) {
 				this.subsPath.moveTo(x, 0);
 				this.subsPath.lineTo(x, height);
@@ -146,7 +150,7 @@ export class CanvasGridController {
 		// Build beats path
 		this.beatsPath = new Path2D();
 		for (const beat of grid.beats) {
-			const x = beat.ms * pxPerMs - scrollLeft;
+			const x = alignHairline(msToViewportPx(beat.ms, scale));
 			if (x >= 0 && x <= width) {
 				this.beatsPath.moveTo(x, 0);
 				this.beatsPath.lineTo(x, height);
@@ -157,7 +161,7 @@ export class CanvasGridController {
 		this.measuresPath = new Path2D();
 		this.measuresData = [];
 		for (const measure of grid.measures) {
-			const x = measure.ms * pxPerMs - scrollLeft;
+			const x = alignHairline(msToViewportPx(measure.ms, scale));
 			if (x >= 0 && x <= width) {
 				this.measuresPath.moveTo(x, 0);
 				this.measuresPath.lineTo(x, height);
@@ -190,10 +194,11 @@ export class CanvasGridController {
 		this.ctx.lineWidth = 1.5;
 
 		// Create a new path for primary beats only
+		const scale: Scale = { pxPerMs: this.pxPerMs, scrollLeft: this.scrollLeft };
 		const primaryBeatsPath = new Path2D();
 		for (const beat of this.grid?.beats || []) {
 			if (beat.primary) {
-				const x = beat.ms * this.pxPerMs - this.scrollLeft;
+				const x = alignHairline(msToViewportPx(beat.ms, scale));
 				if (x >= 0 && x <= this.width) {
 					primaryBeatsPath.moveTo(x, 0);
 					primaryBeatsPath.lineTo(x, this.height);

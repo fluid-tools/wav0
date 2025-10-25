@@ -2,6 +2,7 @@
 import { useAtom } from "jotai";
 import { useMemo } from "react";
 import { cachedGridSubdivisionsAtom } from "@/lib/daw-sdk/state/view";
+import { msToViewportPx, type Scale } from "@/lib/daw-sdk/utils/scale";
 
 type Props = {
 	width: number;
@@ -26,8 +27,9 @@ export function TimelineGridHeader({
 		let lastLabelX = -1e9;
 		const minLabelSpacing = 28; // px
 
+		const scale: Scale = { pxPerMs, scrollLeft };
 		for (const measure of grid.measures) {
-			const x = measure.ms * pxPerMs - scrollLeft;
+			const x = msToViewportPx(measure.ms, scale);
 
 			// Only render labels that are visible and have enough spacing
 			if (x - lastLabelX >= minLabelSpacing && x >= 0 && x <= width) {

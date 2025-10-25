@@ -18,7 +18,7 @@ import { projectNameAtom, tracksAtom } from "@/lib/daw-sdk";
 import { createPreviewPlayer } from "@/lib/daw-sdk/core/preview-player";
 import { renderProjectToAudioBuffer } from "@/lib/daw-sdk/core/render-service";
 import { loopRegionAtom } from "@/lib/daw-sdk/state/timeline";
-import { useEffectEvent } from "@/lib/react/use-effect-event";
+import { useEffectEvent } from "react";
 
 type Props = { open: boolean; onOpenChange: (v: boolean) => void };
 
