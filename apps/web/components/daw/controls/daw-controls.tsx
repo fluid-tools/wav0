@@ -1,6 +1,7 @@
 "use client";
 
 import { useAtom } from "jotai";
+import { useMemo } from "react";
 import {
 	ChevronsUpDown,
 	Pause,
@@ -23,6 +24,7 @@ import {
 } from "@/lib/constants/daw-design";
 import {
 	playbackAtom,
+	playheadRenderAtom,
 	selectedClipIdAtom,
 	selectedTrackIdAtom,
 	setCurrentTimeAtom,
@@ -52,6 +54,11 @@ export function DAWControls() {
 	const [, zoomPrev] = useAtom(setTimelineZoomPrevAtom);
 	const [, setTrackHeightZoom] = useAtom(setTrackHeightZoomAtom);
 	const [totalDuration] = useAtom(totalDurationAtom);
+	const [playheadRender] = useAtom(playheadRenderAtom);
+
+	// Memoize time formatting to avoid re-computation on every render
+	const displayTime = useMemo(() => formatDuration(playheadRender), [playheadRender]);
+	const displayDuration = useMemo(() => formatDuration(totalDuration), [totalDuration]);
 
 	// Selection and clip update atoms
 	const [selectedTrackId] = useAtom(selectedTrackIdAtom);
@@ -179,9 +186,9 @@ export function DAWControls() {
 				<div
 					className={`flex items-center gap-3 ${DAW_BUTTONS.PANEL} px-3 py-1.5`}
 				>
-					<span className={`${DAW_TEXT.MONO_TIME} min-w-14`}>
-						{formatDuration(playback.currentTime)}
-					</span>
+				<span className={`${DAW_TEXT.MONO_TIME} min-w-14`}>
+					{displayTime}
+				</span>
 					<div className="relative flex-1">
 						<input
 							type="range"
@@ -200,7 +207,7 @@ export function DAWControls() {
 						/>
 					</div>
 					<span className={`${DAW_TEXT.MONO_TIME} min-w-14`}>
-						{formatDuration(totalDuration)}
+						{displayDuration}
 					</span>
 				</div>
 			</div>

@@ -1,8 +1,13 @@
 "use client";
 import { useAtom } from "jotai";
 import { useMemo } from "react";
+import { coordinatesAtom } from "@/lib/daw-sdk/state/coordinates";
 import { cachedGridSubdivisionsAtom } from "@/lib/daw-sdk/state/view";
-import { msToViewportPx, type Scale } from "@/lib/daw-sdk/utils/scale";
+import {
+	alignHairline,
+	msToViewportPx,
+	type Scale,
+} from "@/lib/daw-sdk/utils/scale";
 
 type Props = {
 	width: number;
@@ -18,6 +23,11 @@ export function TimelineGridHeader({
 	scrollLeft,
 }: Props) {
 	const [grid] = useAtom(cachedGridSubdivisionsAtom);
+	const [coords] = useAtom(coordinatesAtom);
+
+	// Compute playhead position using unified scale conversions
+	const scale: Scale = { pxPerMs, scrollLeft };
+	const playheadVx = alignHairline(msToViewportPx(coords.playheadMs, scale));
 
 	// Memoize SVG elements for performance
 	const svgElements = useMemo(() => {
@@ -62,6 +72,17 @@ export function TimelineGridHeader({
 			aria-label="Timeline grid labels"
 		>
 			<title>Timeline Grid Labels</title>
+			{/* Playhead indicator line */}
+			{playheadVx >= 0 && playheadVx <= width && (
+				<line
+					x1={playheadVx}
+					y1={0}
+					x2={playheadVx}
+					y2={height}
+					stroke="rgb(239, 68, 68)"
+					strokeWidth={1}
+				/>
+			)}
 			{svgElements}
 		</svg>
 	);

@@ -104,3 +104,20 @@ export const toggleLoopingAtom = atom(null, (get, set) => {
 	const playback = get(playbackAtom);
 	set(playbackAtom, { ...playback, looping: !playback.looping });
 });
+
+// Throttled playhead render atom for 60Hz visual updates
+let playheadLast = { now: 0, value: 0 };
+
+export const playheadRenderAtom = atom<number>((get) => {
+	const playback = get(playbackAtom);
+	const t = playback.currentTime;
+	const now = performance.now();
+
+	// Only update display at 60fps max (16ms intervals)
+	if (playheadLast.now > 0 && now - playheadLast.now < 16) {
+		return playheadLast.value;
+	}
+
+	playheadLast = { now, value: t };
+	return t;
+});

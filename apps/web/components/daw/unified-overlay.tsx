@@ -1,35 +1,42 @@
 "use client";
 
 import { useAtom } from "jotai";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import {
+	coordinatesAtom,
+	gridAtom,
 	horizontalScrollAtom,
 	playbackAtom,
 	playheadDraggingAtom,
-	playheadViewportAtom,
-	projectEndViewportPxAtom,
 	setCurrentTimeAtom,
 	timelineAtom,
 	timelinePxPerMsAtom,
 } from "@/lib/daw-sdk";
+import { useTimebase } from "@/lib/daw-sdk/hooks/use-timebase";
 import { useEffectEvent } from "react";
 import {
 	alignHairline,
 	clientXToMs,
-	snapMs,
+	msToViewportPx,
 	type Scale,
 } from "@/lib/daw-sdk/utils/scale";
 
 export function UnifiedOverlay() {
-	const [playheadViewport] = useAtom(playheadViewportAtom);
-	const [projectEndX] = useAtom(projectEndViewportPxAtom);
+	const [coords] = useAtom(coordinatesAtom);
 	const [pxPerMs] = useAtom(timelinePxPerMsAtom);
 	const [timeline] = useAtom(timelineAtom);
 	const [playback] = useAtom(playbackAtom);
 	const [horizontalScroll] = useAtom(horizontalScrollAtom);
 	const [, setCurrentTime] = useAtom(setCurrentTimeAtom);
 	const [, setPlayheadDragging] = useAtom(playheadDraggingAtom);
+	const [grid] = useAtom(gridAtom);
+	const { snap } = useTimebase();
 	const containerRef = useRef<HTMLDivElement>(null);
+
+	// Compute viewport positions using unified scale conversions
+	const scale: Scale = { pxPerMs, scrollLeft: horizontalScroll };
+	const playheadVx = alignHairline(msToViewportPx(coords.playheadMs, scale));
+	const projectEndVx = alignHairline(msToViewportPx(coords.projectEndMs, scale));
 	const dragRef = useRef<{
 		active: boolean;
 		pointerId: number | null;
@@ -48,13 +55,6 @@ export function UnifiedOverlay() {
 		return () => ro.disconnect();
 	}, []);
 
-	const snapConfig = useMemo(() => {
-		if (!timeline.snapToGrid) return null;
-		const bpm = Math.max(30, Math.min(300, playback.bpm || 120));
-		const secondsPerBeat = 60 / bpm;
-		return secondsPerBeat / 4;
-	}, [playback.bpm, timeline.snapToGrid]);
-
 	const updateTime = useCallback(
 		(clientX: number, timeStamp?: number) => {
 			if (!containerRef.current || pxPerMs <= 0) return;
@@ -62,9 +62,9 @@ export function UnifiedOverlay() {
 			const scale: Scale = { pxPerMs, scrollLeft: horizontalScroll };
 			let nextMs = clientXToMs(clientX, rect.left, scale);
 
-			if (snapConfig) {
-				const stepMs = snapConfig * 1000;
-				nextMs = snapMs(nextMs, stepMs);
+			// Apply snapping only when snap-to-grid is enabled
+			if (timeline.snapToGrid) {
+				nextMs = snap(nextMs);
 			}
 
 			const state = dragRef.current;
@@ -86,7 +86,7 @@ export function UnifiedOverlay() {
 				});
 			}
 		},
-		[horizontalScroll, pxPerMs, setCurrentTime, snapConfig],
+		[horizontalScroll, pxPerMs, setCurrentTime, snap, timeline.snapToGrid],
 	);
 
 	const stopDrag = useCallback(() => {
@@ -155,15 +155,15 @@ export function UnifiedOverlay() {
 			ref={containerRef}
 			className="pointer-events-none absolute inset-0 z-50"
 		>
-			<button
-				type="button"
-				className="cursor-ew pointer-events-auto absolute top-0 bottom-0 w-6 -translate-x-1/2 bg-transparent outline-none"
-				style={{
-					transform: `translate3d(${alignHairline(playheadViewport.viewportPx)}px,0,0) translateX(-50%)`,
-					willChange: "transform",
-					WebkitTransform: `translate3d(${alignHairline(playheadViewport.viewportPx)}px,0,0) translateX(-50%)`,
-					left: 0,
-				}}
+		<button
+			type="button"
+			className="cursor-ew pointer-events-auto absolute top-0 bottom-0 w-6 -translate-x-1/2 bg-transparent outline-none"
+			style={{
+				transform: `translate3d(${playheadVx}px,0,0) translateX(-50%)`,
+				willChange: "transform",
+				WebkitTransform: `translate3d(${playheadVx}px,0,0) translateX(-50%)`,
+				left: 0,
+			}}
 				onPointerDown={(event) => {
 					event.preventDefault();
 					if (event.button !== 0) return;
@@ -186,10 +186,10 @@ export function UnifiedOverlay() {
 					<span className="h-3 w-4 rounded bg-red-500 shadow-[0_1px_3px_rgba(0,0,0,0.25)]" />
 				</span>
 			</button>
-			<div
-				className="pointer-events-none absolute top-0 bottom-0 w-px bg-yellow-500/70"
-				style={{ left: alignHairline(projectEndX) }}
-			/>
+		<div
+			className="pointer-events-none absolute top-0 bottom-0 w-px bg-yellow-500/70"
+			style={{ left: projectEndVx }}
+		/>
 		</div>
 	);
 }

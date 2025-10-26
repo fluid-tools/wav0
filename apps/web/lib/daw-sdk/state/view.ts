@@ -7,7 +7,12 @@
 import { atom } from "jotai";
 import { DAW_PIXELS_PER_SECOND_AT_ZOOM_1 } from "@/lib/constants";
 import { getDivisionBeats } from "../utils/time-utils";
-import { horizontalScrollAtom, playbackAtom, timelineAtom } from "./atoms";
+import {
+	horizontalScrollAtom,
+	playbackAtom,
+	projectEndOverrideAtom,
+	timelineAtom,
+} from "./atoms";
 import { gridAtom, musicalMetadataAtom } from "./index";
 import { totalDurationAtom } from "./tracks";
 
@@ -24,6 +29,7 @@ export const timelineViewportAtom = atom<TimelineViewportMetrics>((get) => {
 	const playback = get(playbackAtom);
 	const scroll = get(horizontalScrollAtom);
 	const durationMs = get(totalDurationAtom);
+	const override = get(projectEndOverrideAtom);
 
 	const pxPerMs = (DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * timeline.zoom) / 1000;
 	const clampedPxPerMs = Number.isFinite(pxPerMs) ? pxPerMs : 0;
@@ -32,13 +38,14 @@ export const timelineViewportAtom = atom<TimelineViewportMetrics>((get) => {
 		? playback.currentTime
 		: 0;
 	const safeDurationMs = Number.isFinite(durationMs) ? durationMs : 0;
+	const effectiveEndMs = override !== null ? override : safeDurationMs;
 
 	return {
 		pxPerMs: clampedPxPerMs,
 		zoom: timeline.zoom,
 		horizontalScroll: clampedScroll,
 		playheadViewportPx: safeCurrentTime * clampedPxPerMs - clampedScroll,
-		projectEndViewportPx: safeDurationMs * clampedPxPerMs - clampedScroll,
+		projectEndViewportPx: effectiveEndMs * clampedPxPerMs - clampedScroll,
 	};
 });
 

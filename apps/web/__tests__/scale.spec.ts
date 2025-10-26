@@ -9,6 +9,7 @@ import {
 } from "@/lib/daw-sdk/utils/scale";
 
 describe("scale utils precision", () => {
+	const DAW_PIXELS_PER_SECOND_AT_ZOOM_1 = 100;
 	const zoomLevels = [0.2, 0.25, 0.33, 0.5, 0.66, 0.75, 1, 1.5, 2, 3, 4, 5];
 	const scrollLevels = [0, 1, 5, 13, 29, 97];
 	const timeSamples = [0, 10, 123, 1000, 10000, 60321];
@@ -16,7 +17,7 @@ describe("scale utils precision", () => {
 	it("roundtrip: ms → viewport px → ms", () => {
 		for (const zoom of zoomLevels) {
 			for (const scroll of scrollLevels) {
-				const pxPerMs = (100 * zoom) / 1000; // DAW_PIXELS_PER_SECOND_AT_ZOOM_1 = 100
+				const pxPerMs = (DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * zoom) / 1000;
 				const scale: Scale = { pxPerMs, scrollLeft: scroll };
 
 				for (const ms of timeSamples) {
@@ -33,7 +34,7 @@ describe("scale utils precision", () => {
 	it("roundtrip: viewport px → ms → viewport px", () => {
 		for (const zoom of zoomLevels) {
 			for (const scroll of scrollLevels) {
-				const pxPerMs = (100 * zoom) / 1000;
+				const pxPerMs = (DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * zoom) / 1000;
 				const scale: Scale = { pxPerMs, scrollLeft: scroll };
 
 				for (let px = 0; px < 10000; px += 50) {
@@ -44,6 +45,27 @@ describe("scale utils precision", () => {
 					expect(error).toBeLessThan(0.01);
 				}
 			}
+		}
+	});
+
+	it("click-at-label test: 10s marker precision", () => {
+		const DAW_PIXELS_PER_SECOND_AT_ZOOM_1 = 100;
+		const zoomLevels = [0.25, 0.5, 1, 2, 4];
+		
+		for (const zoom of zoomLevels) {
+			const pxPerMs = (DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * zoom) / 1000;
+			const scale: Scale = { pxPerMs, scrollLeft: 0 };
+			
+			// Simulate clicking at "10s" label position
+			const targetMs = 10000; // 10 seconds
+			const targetPx = msToViewportPx(targetMs, scale);
+			
+			// Round-trip back to ms
+			const computedMs = viewportPxToMs(targetPx, scale);
+			const error = Math.abs(computedMs - targetMs);
+			
+			// Should be within ±1ms
+			expect(error).toBeLessThan(1);
 		}
 	});
 

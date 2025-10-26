@@ -3,6 +3,7 @@
 import { useAtom } from "jotai";
 import { Plus } from "lucide-react";
 import {
+	flushSync,
 	startTransition,
 	useCallback,
 	useEffect,
@@ -84,6 +85,7 @@ export function DAWContainer() {
 	const gridControllerRef = useRef<GridController | null>(null);
 	const automationDragActiveRef = useRef(false);
 	const panLockRef = useRef(false);
+	const scrollRafRef = useRef<number>(0);
 
 	/**
 	 * Cache zoom and scroll state locally so wheel + pointer interactions
@@ -186,8 +188,13 @@ export function DAWContainer() {
 			const { scrollLeft: left, scrollTop: top } = target;
 			scrollRef.current = { left, top };
 			scheduleScrollSync(left, top);
-			setHorizontalScroll(left);
-			setVerticalScroll(top);
+
+			// RAF-coalesce atom updates to avoid cascading re-renders
+			if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current);
+			scrollRafRef.current = requestAnimationFrame(() => {
+				setHorizontalScroll(left);
+				setVerticalScroll(top);
+			});
 
 			// Mark user as scrolling
 			setUserIsScrolling(true);
@@ -280,17 +287,17 @@ export function DAWContainer() {
 			const targetIdx = goNext
 				? Math.min(steps.length - 1, nearest + 1)
 				: Math.max(0, nearest - 1);
-			const newZoom = steps[targetIdx];
-			if (newZoom === viewport.zoom) return;
-			const newPxPerMs = (viewport.pxPerMs / viewport.zoom) * newZoom;
-			const targetScrollLeft = Math.max(0, worldXms * newPxPerMs - localX);
+		const newZoom = steps[targetIdx];
+		if (newZoom === viewport.zoom) return;
+		const newPxPerMs = (viewport.pxPerMs / viewport.zoom) * newZoom;
+		const targetScrollLeft = Math.max(0, worldXms * newPxPerMs - localX);
 
-			// Batch zoom and scroll updates in a single microtask to avoid visual jumps
-			Promise.resolve().then(() => {
-				setTimelineZoom(newZoom);
-				controllerNow.setScroll(targetScrollLeft, controllerNow.scrollTop);
-				setHorizontalScroll(targetScrollLeft);
-			});
+		// Synchronous batched update to avoid visual jumps
+		flushSync(() => {
+			setTimelineZoom(newZoom);
+			setHorizontalScroll(targetScrollLeft);
+		});
+		controllerNow.setScroll(targetScrollLeft, controllerNow.scrollTop);
 		};
 
 		const handlePointerMove = (event: PointerEvent) => {

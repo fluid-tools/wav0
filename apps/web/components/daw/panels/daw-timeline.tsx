@@ -30,12 +30,8 @@ import {
 	clientXToMs,
 	msToViewportPx,
 	type Scale,
-	snapMs,
 } from "@/lib/daw-sdk/utils/scale";
-import {
-	calculateTimeMarkers,
-	snapTimeMs,
-} from "@/lib/daw-sdk/utils/time-utils";
+import { calculateTimeMarkers } from "@/lib/daw-sdk/utils/time-utils";
 
 export function DAWTimeline() {
 	const [timeline] = useAtom(timelineAtom);
@@ -215,6 +211,8 @@ export function DAWTimeline() {
 
 	// Beat markers computation removed; canvas grid handles bars mode
 
+	const { snap } = useTimebase();
+
 	const handleTimelineClick = (e: React.MouseEvent | React.PointerEvent) => {
 		const rect = e.currentTarget.getBoundingClientRect();
 		if (pxPerMs <= 0) return;
@@ -222,11 +220,9 @@ export function DAWTimeline() {
 		const scale: Scale = { pxPerMs, scrollLeft: horizontalScroll };
 		let time = clientXToMs(e.clientX, rect.left, scale);
 
-		// Snap-to-grid if enabled
+		// Apply snapping only when snap-to-grid is enabled
 		if (timeline.snapToGrid) {
-			const secondsPerBeat = 60 / playback.bpm;
-			const stepMs = (secondsPerBeat / 4) * 1000; // 16th grid
-			time = snapMs(time, stepMs);
+			time = snap(time);
 		}
 
 		setCurrentTime(Math.max(0, time));
@@ -250,13 +246,8 @@ export function DAWTimeline() {
 			return;
 		}
 		if (e.key.toLowerCase() !== "m") return;
-		const timeMs = Math.max(0, Math.round(playback.currentTime));
-		const snapped = snapTimeMs(
-			timeMs,
-			grid,
-			music.tempoBpm,
-			music.timeSignature,
-		);
+		const timeMs = Math.max(0, playback.currentTime);
+		const snapped = snap(timeMs);
 		addMarker({ timeMs: snapped, name: "", color: "#ffffff" });
 	});
 	useEffect(() => {
@@ -321,10 +312,8 @@ export function DAWTimeline() {
 					if (isDraggingEnd) return;
 					if (e.key === "Enter" || e.key === " ") {
 						e.preventDefault();
-						const at = Math.max(0, Math.round(playback.currentTime));
-						const snapped = timeline.snapToGrid
-							? snapTimeMs(at, grid, music.tempoBpm, music.timeSignature)
-							: at;
+						const at = Math.max(0, playback.currentTime);
+						const snapped = timeline.snapToGrid ? snap(at) : at;
 						setCurrentTime(snapped);
 					}
 				}}
