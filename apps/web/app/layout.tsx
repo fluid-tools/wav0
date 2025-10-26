@@ -73,7 +73,7 @@ export default function RootLayout({
 }>) {
 	return (
 		<html lang="en" suppressHydrationWarning>
-			<head>
+			{/* <head>
 				{process.env.NODE_ENV === "development" && (
 					<Script
 						src="//unpkg.com/react-grab/dist/index.global.js"
@@ -82,7 +82,7 @@ export default function RootLayout({
 						data-enabled="true"
 					/>
 				)}
-			</head>
+			</head> */}
 			<body
 				className={`${geistSans.variable} ${geistMono.variable} antialiased`}
 			>

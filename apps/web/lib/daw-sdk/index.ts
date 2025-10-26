@@ -18,6 +18,8 @@ export * from "./hooks/use-live-automation-gain";
 export * from "./hooks/use-playback-sync";
 // ===== State Management =====
 export * from "./state";
+export type { Coordinates } from "./state/coordinates";
+export { coordinatesAtom } from "./state/coordinates";
 export { loopRegionAtom } from "./state/timeline";
 // ===== Type Schemas & Validation =====
 export * from "./types/schemas";

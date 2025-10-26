@@ -3,6 +3,8 @@
  * Ensures exact precision across all zoom levels
  */
 
+const EPS = 1e-9;
+
 export type Scale = {
 	pxPerMs: number;
 	scrollLeft: number;
@@ -24,9 +26,10 @@ export function msToViewportPx(ms: number, s: Scale): number {
 
 /**
  * Convert viewport pixel position to milliseconds
+ * Guards against division by near-zero pxPerMs
  */
 export function viewportPxToMs(x: number, s: Scale): number {
-	return (x + s.scrollLeft) / s.pxPerMs;
+	return s.pxPerMs > EPS ? (x + s.scrollLeft) / s.pxPerMs : 0;
 }
 
 /**
