@@ -1,8 +1,7 @@
 "use client";
 import { useAtom } from "jotai";
 import { useDeferredValue, useEffect, useMemo, useRef } from "react";
-import { cachedGridSubdivisionsAtom } from "@/lib/daw-sdk/state/view";
-import { CanvasGridController } from "@/lib/daw-sdk/utils/canvas-grid-controller";
+import { cachedTimeGridAtom } from "@/lib/daw-sdk/state/view";
 import { TimelineGridHeader } from "./timeline-grid-header";
 
 type Props = {
@@ -19,14 +18,13 @@ export function TimelineGridCanvas({
 	scrollLeft,
 }: Props) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
-	const controllerRef = useRef<CanvasGridController | null>(null);
 
 	// Use deferred values for smooth high-frequency updates
 	const deferredPxPerMs = useDeferredValue(pxPerMs);
 	const deferredScrollLeft = useDeferredValue(scrollLeft);
 
-	// Use cached grid subdivisions atom for optimal performance
-	const grid = useAtom(cachedGridSubdivisionsAtom)[0];
+	// Use cached time grid atom
+	const timeGrid = useAtom(cachedTimeGridAtom)[0];
 
 	// Memoize theme colors to avoid repeated getComputedStyle calls
 	const themeColors = useMemo(() => {
@@ -34,50 +32,52 @@ export function TimelineGridCanvas({
 
 		const styles = getComputedStyle(canvasRef.current);
 		return {
-			sub:
-				styles.getPropertyValue("--timeline-grid-sub").trim() ||
+			minor:
+				styles.getPropertyValue("--timeline-grid-minor").trim() ||
 				"rgba(255,255,255,0.15)",
-			beat:
-				styles.getPropertyValue("--timeline-grid-beat").trim() ||
-				"rgba(255,255,255,0.3)",
-			measure:
-				styles.getPropertyValue("--timeline-grid-measure").trim() ||
-				"rgba(255,255,255,0.5)",
-			label:
-				styles.getPropertyValue("--timeline-grid-label").trim() ||
-				"rgba(255,255,255,0.7)",
+			major:
+				styles.getPropertyValue("--timeline-grid-major").trim() ||
+				"rgba(255,255,255,0.4)",
 		};
 	}, []); // Only compute once on mount
 
-	// Initialize controller
-	useEffect(() => {
-		const canvas = canvasRef.current;
-		if (!canvas) return;
-
-		controllerRef.current = new CanvasGridController(canvas);
-
-		return () => {
-			if (controllerRef.current) {
-				controllerRef.current.dispose();
-				controllerRef.current = null;
-			}
-		};
-	}, []);
-
 	// Draw grid when dependencies change
 	useEffect(() => {
-		const controller = controllerRef.current;
-		if (!controller || !themeColors) return;
+		const canvas = canvasRef.current;
+		if (!canvas || !themeColors) return;
 
-		controller.draw({
-			width,
-			height,
-			pxPerMs: deferredPxPerMs,
-			scrollLeft: deferredScrollLeft,
-			grid,
-			themeColors,
-		});
-	}, [width, height, deferredPxPerMs, deferredScrollLeft, grid, themeColors]);
+		const ctx = canvas.getContext("2d");
+		if (!ctx) return;
+
+		// Clear canvas
+		ctx.clearRect(0, 0, width, height);
+
+		// Draw minor grid lines
+		ctx.strokeStyle = themeColors.minor;
+		ctx.lineWidth = 1;
+		ctx.beginPath();
+		for (const ms of timeGrid.minors) {
+			const x = ms * deferredPxPerMs - deferredScrollLeft;
+			if (x >= 0 && x <= width) {
+				ctx.moveTo(x, 0);
+				ctx.lineTo(x, height);
+			}
+		}
+		ctx.stroke();
+
+		// Draw major grid lines
+		ctx.strokeStyle = themeColors.major;
+		ctx.lineWidth = 1;
+		ctx.beginPath();
+		for (const marker of timeGrid.majors) {
+			const x = marker.ms * deferredPxPerMs - deferredScrollLeft;
+			if (x >= 0 && x <= width) {
+				ctx.moveTo(x, 0);
+				ctx.lineTo(x, height);
+			}
+		}
+		ctx.stroke();
+	}, [width, height, deferredPxPerMs, deferredScrollLeft, timeGrid, themeColors]);
 
 	return (
 		<div className="relative" style={{ width, height }}>
