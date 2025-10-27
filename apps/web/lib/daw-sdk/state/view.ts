@@ -6,6 +6,7 @@
 
 import { atom } from "jotai";
 import { DAW_PIXELS_PER_SECOND_AT_ZOOM_1 } from "@/lib/constants";
+import { generateTimeGrid, type TimeGrid } from "../utils/time-grid";
 import { getDivisionBeats } from "../utils/time-utils";
 import { horizontalScrollAtom, playbackAtom, timelineAtom } from "./atoms";
 import { gridAtom, musicalMetadataAtom } from "./index";
@@ -97,7 +98,20 @@ export const viewSpanMsAtom = atom((get) => {
 	return end - start;
 });
 
-// Cache key for grid subdivisions
+// Cache key for time grid
+export const timeGridCacheKeyAtom = atom((get) => {
+	const pxPerMs = get(timelinePxPerMsAtom);
+	const viewSpan = get(viewSpanMsAtom);
+	const viewStart = get(viewStartMsAtom);
+
+	return JSON.stringify({
+		pxPerMs: Math.round(pxPerMs * 1000) / 1000, // Round to 3 decimal places
+		viewSpan: Math.round(viewSpan * 10) / 10, // Round to 0.1ms precision
+		viewStart: Math.round(viewStart * 10) / 10, // Round to 0.1ms precision
+	});
+});
+
+// Cache key for grid subdivisions (bars mode - legacy)
 export const gridCacheKeyAtom = atom((get) => {
 	const tempoBpm = get(musicalMetadataAtom).tempoBpm;
 	const timeSignature = get(musicalMetadataAtom).timeSignature;
@@ -113,8 +127,8 @@ export const gridCacheKeyAtom = atom((get) => {
 		triplet: grid.triplet,
 		swing: grid.swing,
 		pxPerMs: Math.round(pxPerMs * 1000) / 1000, // Round to avoid floating point precision issues
-		viewSpan: Math.round(viewSpan),
-		viewStart: Math.round(viewStart),
+		viewSpan: Math.round(viewSpan * 10) / 10, // Round to 0.1ms precision
+		viewStart: Math.round(viewStart * 10) / 10, // Round to 0.1ms precision
 	});
 });
 
@@ -236,6 +250,43 @@ export const cachedGridSubdivisionsAtom = atom((get) => {
 		const firstKey = gridSubdivisionsCache.keys().next().value;
 		if (firstKey) {
 			gridSubdivisionsCache.delete(firstKey);
+		}
+	}
+
+	return result;
+});
+
+// Cached time grid atom with memoization
+const timeGridCache = new Map<string, TimeGrid>();
+
+export const cachedTimeGridAtom = atom((get) => {
+	const cacheKey = get(timeGridCacheKeyAtom);
+
+	// Return cached result if available
+	const cached = timeGridCache.get(cacheKey);
+	if (cached) {
+		return cached;
+	}
+
+	// Compute new time grid
+	const viewStartMs = get(viewStartMsAtom);
+	const viewEndMs = get(viewEndMsAtom);
+	const pxPerMs = get(timelinePxPerMsAtom);
+
+	const result = generateTimeGrid({
+		viewStartMs,
+		viewEndMs,
+		pxPerMs,
+	});
+
+	// Cache the result
+	timeGridCache.set(cacheKey, result);
+
+	// Limit cache size to prevent memory leaks
+	if (timeGridCache.size > 50) {
+		const firstKey = timeGridCache.keys().next().value;
+		if (firstKey) {
+			timeGridCache.delete(firstKey);
 		}
 	}
 
