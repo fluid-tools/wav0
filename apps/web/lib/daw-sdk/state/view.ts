@@ -260,6 +260,13 @@ export const cachedGridSubdivisionsAtom = atom((get) => {
 const timeGridCache = new Map<string, TimeGrid>();
 
 export const cachedTimeGridAtom = atom((get) => {
+	const grid = get(gridAtom);
+	
+	// Only generate time grid if mode is "time"
+	if (grid.mode !== "time") {
+		return { majors: [], minors: [] };
+	}
+
 	const cacheKey = get(timeGridCacheKeyAtom);
 
 	// Return cached result if available
