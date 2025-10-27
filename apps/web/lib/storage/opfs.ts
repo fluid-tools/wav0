@@ -202,48 +202,7 @@ export function formatBytes(bytes: number): string {
 	return `${parseFloat((bytes / k ** i).toFixed(2))} ${sizes[i]}`;
 }
 
-export function formatDuration(
-	durationMs: number,
-	options: {
-		precision?: "auto" | "ms" | "deciseconds" | "seconds";
-		pxPerMs?: number; // For auto precision based on zoom
-	} = {},
-): string {
-	if (!Number.isFinite(durationMs)) return "0:00";
-	const totalMs = Math.max(0, Math.round(durationMs));
-	const minutes = Math.floor(totalMs / 60000);
-	const seconds = Math.floor((totalMs % 60000) / 1000);
-	const milliseconds = totalMs % 1000;
-	const deciseconds = Math.floor(milliseconds / 100);
-
-	// Auto precision based on zoom level (pxPerMs)
-	let precision = options.precision ?? "auto";
-	if (precision === "auto" && options.pxPerMs !== undefined) {
-		const pxPerMs = options.pxPerMs;
-		// More zoomed in = show more precision
-		if (pxPerMs >= 0.5) {
-			precision = "ms"; // Very zoomed in: show milliseconds
-		} else if (pxPerMs >= 0.1) {
-			precision = "deciseconds"; // Medium zoom: show deciseconds
-		} else {
-			precision = "seconds"; // Zoomed out: just seconds
-		}
-	} else if (precision === "auto") {
-		precision = "ms"; // Default to ms when pxPerMs not provided
-	}
-
-	const secStr = seconds.toString().padStart(2, "0");
-	const msStr = milliseconds.toString().padStart(3, "0");
-
-	switch (precision) {
-		case "ms":
-			return `${minutes}:${secStr}.${msStr}`;
-		case "deciseconds":
-			return `${minutes}:${secStr}.${deciseconds}`;
-		default:
-			return `${minutes}:${secStr}`;
-	}
-}
+// formatDuration moved to @/lib/daw-sdk/utils/time-utils.ts
 
 // Export singleton instance
 export const opfsManager = OPFSManager.getInstance();

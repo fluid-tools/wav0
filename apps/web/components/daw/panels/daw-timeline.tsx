@@ -6,6 +6,7 @@ import { MarkerTrack } from "@/components/daw/panels/marker-track";
 import { TimelineGridCanvas } from "@/components/daw/panels/timeline-grid-canvas";
 import {
 	addMarkerAtom,
+	formatDuration,
 	gridAtom,
 	horizontalScrollAtom,
 	musicalMetadataAtom,
@@ -20,7 +21,6 @@ import {
 } from "@/lib/daw-sdk";
 import { useTimebase } from "@/lib/daw-sdk/hooks/use-timebase";
 import { snapTimeMs } from "@/lib/daw-sdk/utils/time-utils";
-import { formatDuration } from "@/lib/storage/opfs";
 
 export function DAWTimeline() {
 	const [timeline] = useAtom(timelineAtom);
