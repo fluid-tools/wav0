@@ -9,6 +9,7 @@ import {
 	clampAutomationDb,
 	dbToMultiplier,
 	formatDb,
+	formatDuration,
 	getEffectiveDb,
 	getSegmentCurveDescription,
 	multiplierToDb,
@@ -16,7 +17,6 @@ import {
 	updateSegmentCurve,
 	volumeToDb,
 } from "@/lib/daw-sdk";
-import { formatDuration } from "@/lib/storage/opfs";
 import { SegmentCurvePreview } from "../controls/segment-curve-preview";
 
 type EnvelopeEditorProps = {

@@ -2,8 +2,8 @@
 
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { Clip } from "@/lib/daw-sdk";
+import { formatDuration } from "@/lib/daw-sdk";
 import { evaluateSegmentCurve } from "@/lib/daw-sdk/utils/curve-functions";
-import { formatDuration } from "@/lib/storage/opfs";
 import { cn } from "@/lib/utils";
 
 type ClipFadeHandlesProps = {

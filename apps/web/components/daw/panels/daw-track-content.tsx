@@ -16,6 +16,7 @@ import {
 	clipMoveHistoryAtom,
 	dragMachineAtom,
 	dragPreviewAtom,
+	formatDuration,
 	loadAudioFileAtom,
 	playbackAtom,
 	playbackService,
@@ -36,7 +37,6 @@ import {
 	shiftTrackAutomationInRange,
 	transferAutomationEnvelope,
 } from "@/lib/daw-sdk/utils/automation-utils";
-import { formatDuration } from "@/lib/storage/opfs";
 import { cn } from "@/lib/utils";
 
 export function DAWTrackContent() {

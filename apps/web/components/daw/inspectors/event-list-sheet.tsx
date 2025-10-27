@@ -26,9 +26,9 @@ import {
 	clipInspectorOpenAtom,
 	clipInspectorTargetAtom,
 	eventListOpenAtom,
+	formatDuration,
 	tracksAtom,
 } from "@/lib/daw-sdk";
-import { formatDuration } from "@/lib/storage/opfs";
 
 type EventRow = {
 	trackId: string;

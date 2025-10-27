@@ -22,6 +22,7 @@ import {
 	DAW_TEXT,
 } from "@/lib/constants/daw-design";
 import {
+	formatDuration,
 	playbackAtom,
 	selectedClipIdAtom,
 	selectedTrackIdAtom,
@@ -37,7 +38,6 @@ import {
 	updateClipAtom,
 } from "@/lib/daw-sdk";
 import { computeLoopEndMs } from "@/lib/daw-sdk/config/looping";
-import { formatDuration } from "@/lib/storage/opfs";
 import { MasterMeter } from "./master-meter";
 
 export function DAWControls() {

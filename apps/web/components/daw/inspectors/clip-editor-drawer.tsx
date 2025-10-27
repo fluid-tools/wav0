@@ -14,8 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { useClipInspector } from "@/lib/daw-sdk";
-import { formatDuration } from "@/lib/storage/opfs";
+import { formatDuration, useClipInspector } from "@/lib/daw-sdk";
 import { SegmentCurvePreview } from "../controls/segment-curve-preview";
 import { EnvelopeEditor } from "./envelope-editor";
 import { InspectorCard, InspectorSection } from "./inspector-section";

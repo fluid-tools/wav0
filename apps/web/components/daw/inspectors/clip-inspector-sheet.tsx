@@ -14,8 +14,7 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from "@/components/ui/sheet";
-import { useClipInspector } from "@/lib/daw-sdk";
-import { formatDuration } from "@/lib/storage/opfs";
+import { formatDuration, useClipInspector } from "@/lib/daw-sdk";
 import { EnvelopeEditor } from "./envelope-editor";
 import { InspectorCard, InspectorSection } from "./inspector-section";
 
