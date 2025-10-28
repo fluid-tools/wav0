@@ -6,24 +6,46 @@
 
 import type { DAW, DAWConfig } from "@wav0/daw-sdk";
 import { Provider as JotaiProvider } from "jotai";
-import { createContext, type ReactNode, useContext, useEffect } from "react";
+import {
+	createContext,
+	type ReactNode,
+	useContext,
+	useEffect,
+	useState,
+} from "react";
+import { AudioServiceBridge, PlaybackServiceBridge } from "../bridges";
 import { useDAW } from "../hooks/use-daw";
 import { type StorageAdapter, setStorageAdapter } from "../storage/adapter";
 
-const DAWContext = createContext<DAW | null>(null);
+interface DAWContextValue {
+	daw: DAW;
+	audioBridge: AudioServiceBridge | null;
+	playbackBridge: PlaybackServiceBridge | null;
+}
+
+const DAWContext = createContext<DAWContextValue | null>(null);
 
 export interface DAWProviderProps {
 	children: ReactNode;
 	config?: DAWConfig;
 	storageAdapter?: StorageAdapter;
+	/** Legacy services for bridge pattern during migration */
+	legacyAudioService?: any;
+	legacyPlaybackService?: any;
 }
 
 export function DAWProvider({
 	children,
 	config,
 	storageAdapter,
+	legacyAudioService,
+	legacyPlaybackService,
 }: DAWProviderProps) {
 	const daw = useDAW(config);
+	const [bridges, setBridges] = useState<{
+		audio: AudioServiceBridge | null;
+		playback: PlaybackServiceBridge | null;
+	}>({ audio: null, playback: null });
 
 	// Set storage adapter if provided
 	useEffect(() => {
@@ -32,19 +54,62 @@ export function DAWProvider({
 		}
 	}, [storageAdapter]);
 
+	// Setup bridges if legacy services provided
+	useEffect(() => {
+		if (!daw) return;
+
+		let audioBridge: AudioServiceBridge | null = null;
+		let playbackBridge: PlaybackServiceBridge | null = null;
+
+		if (legacyAudioService) {
+			audioBridge = new AudioServiceBridge(daw, legacyAudioService);
+		}
+
+		if (legacyPlaybackService) {
+			playbackBridge = new PlaybackServiceBridge(daw, legacyPlaybackService);
+		}
+
+		setBridges({ audio: audioBridge, playback: playbackBridge });
+
+		return () => {
+			audioBridge?.dispose();
+			playbackBridge?.dispose();
+		};
+	}, [daw, legacyAudioService, legacyPlaybackService]);
+
 	if (!daw) return null;
 
+	const contextValue: DAWContextValue = {
+		daw,
+		audioBridge: bridges.audio,
+		playbackBridge: bridges.playback,
+	};
+
 	return (
-		<DAWContext.Provider value={daw}>
+		<DAWContext.Provider value={contextValue}>
 			<JotaiProvider>{children}</JotaiProvider>
 		</DAWContext.Provider>
 	);
 }
 
 export function useDAWContext(): DAW {
-	const daw = useContext(DAWContext);
-	if (!daw) {
+	const context = useContext(DAWContext);
+	if (!context) {
 		throw new Error("useDAWContext must be used within DAWProvider");
 	}
-	return daw;
+	return context.daw;
+}
+
+export function useBridges(): {
+	audio: AudioServiceBridge | null;
+	playback: PlaybackServiceBridge | null;
+} {
+	const context = useContext(DAWContext);
+	if (!context) {
+		throw new Error("useBridges must be used within DAWProvider");
+	}
+	return {
+		audio: context.audioBridge,
+		playback: context.playbackBridge,
+	};
 }

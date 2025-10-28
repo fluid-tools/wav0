@@ -39,7 +39,12 @@ export class Transport extends EventTarget {
 
 		this.dispatchEvent(
 			new CustomEvent<TransportEvent>("transport", {
-				detail: { type: "play", timestamp: fromTime },
+				detail: {
+					type: "play",
+					state: "playing",
+					currentTime: fromTime,
+					timestamp: fromTime,
+				},
 			}),
 		);
 	}
@@ -106,7 +111,12 @@ export class Transport extends EventTarget {
 
 		this.dispatchEvent(
 			new CustomEvent<TransportEvent>("transport", {
-				detail: { type: "stop", timestamp: this.getCurrentTime() },
+				detail: {
+					type: "stop",
+					state: "stopped",
+					currentTime: this.getCurrentTime(),
+					timestamp: this.getCurrentTime(),
+				},
 			}),
 		);
 	}
@@ -118,7 +128,12 @@ export class Transport extends EventTarget {
 
 		this.dispatchEvent(
 			new CustomEvent<TransportEvent>("transport", {
-				detail: { type: "pause", timestamp: this.getCurrentTime() },
+				detail: {
+					type: "pause",
+					state: "paused",
+					currentTime: this.getCurrentTime(),
+					timestamp: this.getCurrentTime(),
+				},
 			}),
 		);
 	}
@@ -130,7 +145,13 @@ export class Transport extends EventTarget {
 
 		this.dispatchEvent(
 			new CustomEvent<TransportEvent>("transport", {
-				detail: { type: "seek", timestamp: timeMs, position: timeMs },
+				detail: {
+					type: "seek",
+					state: this.state,
+					currentTime: timeMs,
+					timestamp: timeMs,
+					position: timeMs,
+				},
 			}),
 		);
 

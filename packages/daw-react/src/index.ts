@@ -19,13 +19,15 @@ export { automation, curves, time, volume } from "@wav0/daw-sdk";
 
 // Atoms
 export * from "./atoms";
-
+// Bridges (for migration)
+export { AudioServiceBridge, PlaybackServiceBridge } from "./bridges";
 // Hooks
-export { useDAW } from "./hooks/use-daw";
+export * from "./hooks";
 // Providers
 export {
 	DAWProvider,
 	type DAWProviderProps,
+	useBridges,
 	useDAWContext,
 } from "./providers/daw-provider";
 // Storage

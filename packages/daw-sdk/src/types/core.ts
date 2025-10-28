@@ -13,6 +13,8 @@ export type TransportState = "stopped" | "playing" | "paused" | "recording";
 
 export interface TransportEvent {
 	type: "play" | "stop" | "pause" | "seek" | "loop";
+	state: TransportState;
+	currentTime: number;
 	timestamp: number;
 	position?: number;
 }
