@@ -1,6 +1,6 @@
 "use client";
 import { useAtom } from "jotai";
-import { useDeferredValue, useEffect, useMemo, useRef } from "react";
+import { memo, useDeferredValue, useEffect, useMemo, useRef } from "react";
 import { cachedTimeGridAtom } from "@/lib/daw-sdk/state/view";
 import { TimelineGridHeader } from "./timeline-grid-header";
 
@@ -11,7 +11,7 @@ type Props = {
 	scrollLeft: number;
 };
 
-export function TimelineGridCanvas({
+export const TimelineGridCanvas = memo(function TimelineGridCanvas({
 	width,
 	height,
 	pxPerMs,
@@ -94,4 +94,4 @@ export function TimelineGridCanvas({
 			/>
 		</div>
 	);
-}
+});

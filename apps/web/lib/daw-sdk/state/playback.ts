@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * Playback State Atoms - Legacy Layer
+ * 
+ * NOTE: These write atoms use the old playbackService directly.
+ * For new code, prefer using `useBridgeMutations()` from @wav0/daw-react
+ * which provides bridge-based mutations with event-driven sync.
+ * 
+ * These atoms remain for backward compatibility during migration.
+ */
+
 import { atom, type Getter, type Setter } from "jotai";
 import { playbackService } from "../index";
 import { playbackAtom, tracksAtom } from "./atoms";
