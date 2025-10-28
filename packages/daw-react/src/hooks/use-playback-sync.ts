@@ -1,12 +1,13 @@
 /**
  * Playback Sync Hook
  * Synchronize playback state between SDK and Jotai atoms
+ * Uses useEffectEvent for stable callbacks and optimal performance
  */
 
 "use client";
 
 import { useAtom } from "jotai";
-import { useCallback, useEffect } from "react";
+import { useEffect, useEffectEvent } from "react";
 import { useTransportEvents } from "./use-transport-events";
 
 /**
@@ -24,6 +25,7 @@ interface UsePlaybackSyncOptions<T extends PlaybackStateAtom> {
 
 /**
  * Hook to keep playback state synced between Transport and atoms
+ * Performance optimized with useEffectEvent to avoid recreating callbacks
  */
 export function usePlaybackSync<T extends PlaybackStateAtom>({
 	playbackAtom,
@@ -31,37 +33,40 @@ export function usePlaybackSync<T extends PlaybackStateAtom>({
 }: UsePlaybackSyncOptions<T>) {
 	const [playbackState, setPlaybackState] = useAtom<T, [T], void>(playbackAtom);
 
-	const handleStateChange = useCallback(
-		(state: string, currentTime: number) => {
-			if (!enabled) return;
+	// Non-reactive state change handler - always reads latest playbackState
+	const handleStateChange = useEffectEvent((state: string, currentTime: number) => {
+		if (!enabled) return;
 
-			setPlaybackState({
-				...playbackState,
-				isPlaying: state === "playing",
-				currentTime,
-			} as T);
-		},
-		[enabled, playbackState, setPlaybackState],
-	);
-
-	const { transport, getCurrentTime } = useTransportEvents({
-		onStateChange: handleStateChange,
+		setPlaybackState({
+			...playbackState,
+			isPlaying: state === "playing",
+			currentTime,
+		} as T);
 	});
 
-	// Periodic time updates during playback
-	useEffect(() => {
-		if (!enabled || !playbackState.isPlaying) return;
+	// Non-reactive time updater - always reads latest values
+	const updateTime = useEffectEvent(() => {
+		if (!playbackState.isPlaying || !enabled) return;
 
-		const interval = setInterval(() => {
-			const currentTime = getCurrentTime();
-			setPlaybackState({
-				...playbackState,
-				currentTime,
-			} as T);
-		}, 16); // ~60fps
+		const currentTime = getCurrentTime();
+		setPlaybackState({
+			...playbackState,
+			currentTime,
+		} as T);
+	});
+
+	const { transport, getCurrentTime } = useTransportEvents({
+		onStateChange: handleStateChange, // Stable reference now
+	});
+
+	// Single stable interval - only recreates when enabled changes
+	useEffect(() => {
+		if (!enabled) return;
+
+		const interval = setInterval(updateTime, 16); // ~60fps
 
 		return () => clearInterval(interval);
-	}, [enabled, playbackState.isPlaying, getCurrentTime, setPlaybackState]);
+	}, [enabled, updateTime]); // Minimal, stable dependencies
 
 	return {
 		transport,

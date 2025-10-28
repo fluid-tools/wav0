@@ -106,12 +106,22 @@ export function DAWTrackContent() {
 			}
 		};
 		update();
+		
+		// Debounce window resize to avoid excessive updates during resize
+		let resizeTimeout: NodeJS.Timeout;
+		const debouncedUpdate = () => {
+			clearTimeout(resizeTimeout);
+			resizeTimeout = setTimeout(update, 100);
+		};
+		
 		const ro =
 			typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
 		if (ro && containerRef.current) ro.observe(containerRef.current);
-		window.addEventListener("resize", update);
+		window.addEventListener("resize", debouncedUpdate);
+		
 		return () => {
-			window.removeEventListener("resize", update);
+			clearTimeout(resizeTimeout);
+			window.removeEventListener("resize", debouncedUpdate);
 			if (ro && containerRef.current) ro.unobserve(containerRef.current);
 		};
 	}, []);
