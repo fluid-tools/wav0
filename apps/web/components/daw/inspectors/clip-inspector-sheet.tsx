@@ -14,7 +14,8 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from "@/components/ui/sheet";
-import { formatDuration, useClipInspector } from "@/lib/daw-sdk";
+import { time } from "@wav0/daw-sdk";
+import { useClipInspector } from "@/lib/daw-sdk";
 import { EnvelopeEditor } from "./envelope-editor";
 import { InspectorCard, InspectorSection } from "./inspector-section";
 
@@ -89,7 +90,7 @@ export function ClipInspectorSheet() {
 											Start
 										</dt>
 										<dd className="font-medium text-foreground">
-											{formatDuration(clip.startTime)}
+											{time.formatDuration(clip.startTime)}
 										</dd>
 									</div>
 									<div className="space-y-1">
@@ -97,8 +98,8 @@ export function ClipInspectorSheet() {
 											Trim window
 										</dt>
 										<dd className="font-medium text-foreground">
-											{formatDuration(clip.trimStart)} –{" "}
-											{formatDuration(clip.trimEnd)}
+										{time.formatDuration(clip.trimStart)} –{" "}
+										{time.formatDuration(clip.trimEnd)}
 										</dd>
 									</div>
 									<div className="space-y-1">
@@ -106,7 +107,7 @@ export function ClipInspectorSheet() {
 											Playable length
 										</dt>
 										<dd className="font-medium text-foreground">
-											{formatDuration(clip.trimEnd - clip.trimStart)}
+											{time.formatDuration(clip.trimEnd - clip.trimStart)}
 										</dd>
 									</div>
 								</dl>
