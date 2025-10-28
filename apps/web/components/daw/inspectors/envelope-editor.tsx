@@ -1,9 +1,9 @@
 "use client";
 
+import { automation, curves, time, volume } from "@wav0/daw-sdk";
 import { MoveVertical, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { time, volume, curves, automation } from "@wav0/daw-sdk";
 import type { TrackEnvelope } from "@/lib/daw-sdk";
 import { SegmentCurvePreview } from "../controls/segment-curve-preview";
 
@@ -72,7 +72,11 @@ export function EnvelopeEditor({
 	};
 
 	const handleSegmentCurveChange = (segmentId: string, curve: number) => {
-		const updatedEnvelope = automation.updateSegmentCurve(envelope, segmentId, curve);
+		const updatedEnvelope = automation.updateSegmentCurve(
+			envelope,
+			segmentId,
+			curve,
+		);
 		onChange(updatedEnvelope);
 	};
 
@@ -107,7 +111,7 @@ export function EnvelopeEditor({
 					);
 
 					// Calculate effective dB for this point
-					const effectiveDb = volume.getEffectiveDb(point.value, trackVolume);
+					const effectiveDb = volume.getEffectiveDb(trackVolume, point.value);
 
 					return (
 						<div key={point.id} className="space-y-3">
@@ -164,12 +168,14 @@ export function EnvelopeEditor({
 											<Input
 												id={`point-value-${point.id}`}
 												type="text"
-												value={volume.formatDb(volume.multiplierToDb(point.value))}
+												value={volume.formatDb(
+													volume.multiplierToDb(point.value),
+												)}
 												onChange={(e) => {
 													const db = parseFloat(e.target.value);
 													if (Number.isFinite(db)) {
-													const clampedDb = volume.clampAutomationDb(db);
-													const multiplier = volume.dbToMultiplier(clampedDb);
+														const clampedDb = volume.clampAutomationDb(db);
+														const multiplier = volume.dbToMultiplier(clampedDb);
 														handlePointChange(point.id, undefined, multiplier);
 													}
 												}}
@@ -180,9 +186,10 @@ export function EnvelopeEditor({
 									</div>
 
 									<div className="text-[10px] text-muted-foreground">
-									Effective: {volume.formatDb(effectiveDb)} (
-									{volume.volumeToDb(trackVolume)} track +{" "}
-									{volume.formatDb(volume.multiplierToDb(point.value))} automation)
+										Effective: {volume.formatDb(effectiveDb)} (
+										{volume.volumeToDb(trackVolume)} track +{" "}
+										{volume.formatDb(volume.multiplierToDb(point.value))}{" "}
+										automation)
 									</div>
 								</div>
 							</div>

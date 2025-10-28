@@ -15,6 +15,7 @@ import {
 	type InputAudioTrack,
 } from "mediabunny";
 import type { AudioData } from "../types/core";
+import type { OPFSManager } from "./opfs-manager";
 
 export interface LoadedTrack {
 	id: string;
@@ -27,7 +28,10 @@ export interface LoadedTrack {
 export class AudioEngine extends EventTarget {
 	private loadedTracks = new Map<string, LoadedTrack>();
 
-	constructor(private audioContext: AudioContext) {
+	constructor(
+		private audioContext: AudioContext,
+		private opfsManager?: OPFSManager,
+	) {
 		super();
 	}
 
@@ -91,6 +95,61 @@ export class AudioEngine extends EventTarget {
 
 	hasTrack(audioId: string): boolean {
 		return this.loadedTracks.has(audioId);
+	}
+
+	async saveToOPFS(audioId: string, buffer: ArrayBuffer): Promise<void> {
+		if (!this.opfsManager) {
+			throw new Error("OPFS manager not configured");
+		}
+		await this.opfsManager.saveAudioFile(audioId, buffer);
+	}
+
+	async loadFromOPFS(
+		audioId: string,
+		fileName: string,
+	): Promise<AudioData | null> {
+		if (!this.opfsManager) {
+			throw new Error("OPFS manager not configured");
+		}
+
+		const arrayBuffer = await this.opfsManager.loadAudioFile(audioId);
+		if (!arrayBuffer) {
+			return null;
+		}
+
+		const input = new Input({
+			formats: ALL_FORMATS,
+			source: new BlobSource(new Blob([arrayBuffer])),
+		});
+
+		const audioTrack = await input.getPrimaryAudioTrack();
+		if (!audioTrack) throw new Error("No audio track in OPFS file");
+
+		const sink = new AudioBufferSink(audioTrack);
+		const duration = await audioTrack.computeDuration();
+
+		this.loadedTracks.set(audioId, {
+			id: audioId,
+			input,
+			sink,
+			audioTrack,
+			duration,
+		});
+
+		return {
+			id: audioId,
+			duration,
+			sampleRate: audioTrack.sampleRate,
+			numberOfChannels: audioTrack.numberOfChannels,
+		};
+	}
+
+	async deleteFromOPFS(audioId: string): Promise<void> {
+		if (!this.opfsManager) {
+			throw new Error("OPFS manager not configured");
+		}
+		await this.opfsManager.deleteAudioFile(audioId);
+		this.loadedTracks.delete(audioId);
 	}
 
 	dispose(): void {
