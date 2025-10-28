@@ -45,6 +45,14 @@ export class AudioServiceBridge {
 		// Load through SDK
 		const audioData = await this.sdk.getAudioEngine().loadAudio(file, id);
 
+		// Save to OPFS via SDK if available
+		const audioFileData = await file.arrayBuffer();
+		try {
+			await this.sdk.getAudioEngine().saveToOPFS(id, audioFileData);
+		} catch (error) {
+			console.warn("[AudioBridge] OPFS save failed:", error);
+		}
+
 		// Also load in legacy service for backward compatibility
 		try {
 			await this.legacyService.loadAudioFile(file, id);
@@ -59,8 +67,24 @@ export class AudioServiceBridge {
 	 * Load audio from OPFS through both systems
 	 */
 	async loadFromOPFS(opfsFileId: string, fileName: string): Promise<void> {
-		// Legacy service handles OPFS loading
-		await this.legacyService.loadTrackFromOPFS(opfsFileId, fileName);
+		// Try SDK OPFS first
+		try {
+			const audioData = await this.sdk
+				.getAudioEngine()
+				.loadFromOPFS(opfsFileId, fileName);
+			if (audioData) {
+				console.log("[AudioBridge] Loaded from SDK OPFS:", opfsFileId);
+			}
+		} catch (error) {
+			console.warn("[AudioBridge] SDK OPFS load failed:", error);
+		}
+
+		// Also load via legacy service for backward compatibility
+		try {
+			await this.legacyService.loadTrackFromOPFS(opfsFileId, fileName);
+		} catch (error) {
+			console.warn("[AudioBridge] Legacy OPFS load failed:", error);
+		}
 	}
 
 	/**
@@ -82,6 +106,24 @@ export class AudioServiceBridge {
 	 */
 	unloadTrack(trackId: string): void {
 		this.legacyService.unloadTrack(trackId);
+	}
+
+	/**
+	 * Delete track from OPFS
+	 */
+	async deleteFromOPFS(trackId: string): Promise<void> {
+		try {
+			await this.sdk.getAudioEngine().deleteFromOPFS(trackId);
+		} catch (error) {
+			console.warn("[AudioBridge] SDK OPFS delete failed:", error);
+		}
+
+		// Also delete via legacy service
+		try {
+			await this.legacyService.deleteTrackFromOPFS(trackId);
+		} catch (error) {
+			console.warn("[AudioBridge] Legacy OPFS delete failed:", error);
+		}
 	}
 
 	/**

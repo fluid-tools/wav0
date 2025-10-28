@@ -21,6 +21,8 @@ export function useAudioEvents(options: UseAudioEventsOptions = {}) {
 	const daw = useDAWContext();
 
 	useEffect(() => {
+		if (!daw) return;
+
 		const audioEngine = daw.getAudioEngine();
 
 		const handleTrackLoaded = ((
@@ -38,6 +40,6 @@ export function useAudioEvents(options: UseAudioEventsOptions = {}) {
 	}, [daw, options.onTrackLoaded]);
 
 	return {
-		audioEngine: daw.getAudioEngine(),
+		audioEngine: daw?.getAudioEngine() ?? null,
 	};
 }

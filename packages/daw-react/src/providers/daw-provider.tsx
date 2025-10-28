@@ -77,13 +77,14 @@ export function DAWProvider({
 		};
 	}, [daw, legacyAudioService, legacyPlaybackService]);
 
-	if (!daw) return null;
-
-	const contextValue: DAWContextValue = {
-		daw,
-		audioBridge: bridges.audio,
-		playbackBridge: bridges.playback,
-	};
+	// Don't block render - allow children to mount even if DAW not ready
+	const contextValue: DAWContextValue | null = daw
+		? {
+				daw,
+				audioBridge: bridges.audio,
+				playbackBridge: bridges.playback,
+			}
+		: null;
 
 	return (
 		<DAWContext.Provider value={contextValue}>
@@ -92,12 +93,12 @@ export function DAWProvider({
 	);
 }
 
-export function useDAWContext(): DAW {
+export function useDAWContext(): DAW | null {
 	const context = useContext(DAWContext);
-	if (!context) {
+	if (context === undefined) {
 		throw new Error("useDAWContext must be used within DAWProvider");
 	}
-	return context.daw;
+	return context?.daw ?? null;
 }
 
 export function useBridges(): {

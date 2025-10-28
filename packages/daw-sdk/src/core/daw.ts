@@ -9,16 +9,24 @@
 
 import type { DAWConfig } from "../types/core";
 import { AudioEngine } from "./audio-engine";
+import { OPFSManager } from "./opfs-manager";
 import { Transport } from "./transport";
 
 export class DAW {
 	private audioEngine: AudioEngine;
 	private transport: Transport;
 	private audioContext: AudioContext;
+	private opfsManager?: OPFSManager;
 
 	constructor(config: DAWConfig = {}) {
 		this.audioContext = config.audioContext || new AudioContext();
-		this.audioEngine = new AudioEngine(this.audioContext);
+
+		// Initialize OPFS if in browser
+		if (typeof window !== "undefined") {
+			this.opfsManager = new OPFSManager();
+		}
+
+		this.audioEngine = new AudioEngine(this.audioContext, this.opfsManager);
 		this.transport = new Transport(this.audioEngine, this.audioContext);
 	}
 
@@ -32,6 +40,10 @@ export class DAW {
 
 	getAudioContext(): AudioContext {
 		return this.audioContext;
+	}
+
+	getOPFSManager(): OPFSManager | undefined {
+		return this.opfsManager;
 	}
 
 	async resumeContext(): Promise<void> {

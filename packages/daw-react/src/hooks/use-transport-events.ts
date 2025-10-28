@@ -25,6 +25,8 @@ export function useTransportEvents(options: UseTransportEventsOptions = {}) {
 	const daw = useDAWContext();
 
 	useEffect(() => {
+		if (!daw) return;
+
 		const transport = daw.getTransport();
 
 		const handleTransportEvent = ((event: CustomEvent<TransportEvent>) => {
@@ -61,8 +63,8 @@ export function useTransportEvents(options: UseTransportEventsOptions = {}) {
 	]);
 
 	return {
-		transport: daw.getTransport(),
-		getCurrentTime: () => daw.getTransport().getCurrentTime(),
-		getState: () => daw.getTransport().getState(),
+		transport: daw?.getTransport() ?? null,
+		getCurrentTime: () => daw?.getTransport().getCurrentTime() ?? 0,
+		getState: () => daw?.getTransport().getState() ?? "stopped",
 	};
 }
