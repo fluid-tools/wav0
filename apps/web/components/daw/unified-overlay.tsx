@@ -32,14 +32,7 @@ export function UnifiedOverlay() {
 		raf: number;
 	} | null>(null);
 
-	// Re-render on resize to ensure full-height
-	useEffect(() => {
-		const el = containerRef.current;
-		if (!el) return;
-		const ro = new ResizeObserver(() => {});
-		ro.observe(el);
-		return () => ro.disconnect();
-	}, []);
+	// Remove unnecessary ResizeObserver - layout handles height automatically
 
 	const snapConfig = useMemo(() => {
 		if (!timeline.snapToGrid) return null;
