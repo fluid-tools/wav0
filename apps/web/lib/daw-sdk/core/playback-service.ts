@@ -368,6 +368,8 @@ export class PlaybackService {
 		let lastTime = currentTimeMs;
 
 		// Schedule future segments without overlaps
+		const schedulingEpsilon = 0.0001;
+		let lastScheduledEnd = now;
 		for (const point of futurePoints) {
 			const segmentStart = lastTime;
 			const segmentEnd = point.time;
@@ -411,7 +413,23 @@ export class PlaybackService {
 
 			// Calculate absolute AudioContext time for this segment
 			const acStart = now + (segmentStart - currentTimeMs) / 1000;
-			envelopeGain.gain.setValueCurveAtTime(values, acStart, durationSec);
+			let adjustedStart = acStart;
+			if (adjustedStart < lastScheduledEnd) {
+				adjustedStart = lastScheduledEnd + schedulingEpsilon;
+			}
+			const adjustedDuration = durationSec - (adjustedStart - acStart);
+			if (adjustedDuration <= 0) {
+				lastTime = point.time;
+				lastMultiplier = point.value;
+				continue;
+			}
+			const safeDuration = Math.max(adjustedDuration, schedulingEpsilon);
+			envelopeGain.gain.setValueCurveAtTime(
+				values,
+				adjustedStart,
+				safeDuration,
+			);
+			lastScheduledEnd = adjustedStart + safeDuration;
 
 			lastTime = point.time;
 			lastMultiplier = point.value;
@@ -743,10 +761,7 @@ export class PlaybackService {
 			timeIntoClip = Math.max(0, timelineSec - clipStartSec);
 		}
 
-		if (
-			timeIntoClip > 0 &&
-			timeIntoClip < PlaybackService.START_GRACE_SEC
-		) {
+		if (timeIntoClip > 0 && timeIntoClip < PlaybackService.START_GRACE_SEC) {
 			timeIntoClip = 0;
 		}
 
@@ -840,10 +855,10 @@ export class PlaybackService {
 				const now = this.audioContext.currentTime;
 				const currentTl = this.getPlaybackTime();
 				let leadSec = timelinePos - currentTl;
-				this.lastScheduleLeadMs = leadSec * 1000;
-				if (Math.abs(leadSec) < PlaybackService.START_GRACE_SEC) {
-					leadSec = 0;
+				if (leadSec >= 0) {
+					leadSec = Math.max(leadSec, PlaybackService.START_GRACE_SEC);
 				}
+				this.lastScheduleLeadMs = leadSec * 1000;
 				const startAt = now + leadSec;
 
 				if (startAt >= now) {

@@ -32,10 +32,6 @@ export const updateClipAtom = atom(
 			updates.startTime !== undefined &&
 			originalClip &&
 			originalClip.startTime !== updates.startTime;
-		const clipTimeDelta =
-			clipMoved && updates.startTime !== undefined
-				? updates.startTime - originalClip.startTime
-				: 0;
 		const updatedTracks = tracks.map((track) => {
 			if (track.id !== trackId || !track.clips) return track;
 
@@ -52,10 +48,6 @@ export const updateClipAtom = atom(
 
 			// Handle automation movement
 			if (track.volumeEnvelope && originalClip && clipMoved) {
-				const clipEndTime =
-					originalClip.startTime +
-					(originalClip.trimEnd - originalClip.trimStart);
-
 				// Move two types of automation:
 				// 1. Clip-bound automation (always moves with clip)
 				// 2. Range-based automation (if moveAutomation flag is set)
@@ -72,15 +64,6 @@ export const updateClipAtom = atom(
 							time: nextStartTime + relativeTime,
 							clipRelativeTime: relativeTime,
 						};
-					}
-
-					// Track-level points inside the clip window follow the clip delta
-					if (
-						!point.clipId &&
-						point.time >= originalClip.startTime &&
-						point.time <= clipEndTime
-					) {
-						return { ...point, time: point.time + clipTimeDelta };
 					}
 
 					return point;

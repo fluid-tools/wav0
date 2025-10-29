@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { playbackAtom, tracksAtom } from "../../state/atoms";
+import { updateClipAtom } from "../../state/clips";
+import type { Clip, Track } from "../../state/types";
 import type { TrackEnvelope } from "../../types/schemas";
 import {
 	computeAutomationTransfer,
@@ -29,22 +32,19 @@ describe("computeAutomationTransfer", () => {
 			{ mode: "clip-attached" },
 		);
 
-		expect(result.pointsToAdd).toHaveLength(3); // p1, p2, p3 (range)
-		const [firstPoint, secondPoint, thirdPoint] = result.pointsToAdd;
+		expect(result.pointsToAdd).toHaveLength(2); // p1, p2
+		const [firstPoint, secondPoint] = result.pointsToAdd;
 		expect(firstPoint.clipId).toBe("clip1");
 		expect(firstPoint.time).toBe(300);
 		expect(firstPoint.clipRelativeTime).toBe(0);
 		expect(secondPoint.clipId).toBe("clip1");
 		expect(secondPoint.time).toBe(350); // 300 + 50ms relative
 		expect(secondPoint.clipRelativeTime).toBe(50);
-		expect(thirdPoint.clipId).toBe("clip1");
-		expect(thirdPoint.time).toBe(400);
-		expect(thirdPoint.clipRelativeTime).toBe(100);
 		expect(result.segmentsToAdd).toHaveLength(1);
-		expect(result.pointIdsToRemove).toHaveLength(3);
+		expect(result.pointIdsToRemove).toHaveLength(2);
 	});
 
-	it("includes track-level points in range when moving clip", () => {
+	it("ignores track-level points in clip-attached mode", () => {
 		const result = computeAutomationTransfer(
 			mockEnvelope,
 			"clip1",
@@ -56,9 +56,9 @@ describe("computeAutomationTransfer", () => {
 			{ mode: "clip-attached" },
 		);
 
-		expect(result.pointsToAdd).toHaveLength(3);
+		expect(result.pointsToAdd).toHaveLength(2);
 		expect(result.pointsToAdd.every((p) => p.clipId === "clip1")).toBe(true);
-		expect(result.pointsToAdd.map((p) => p.time)).toEqual([0, 50, 100]);
+		expect(result.pointsToAdd.map((p) => p.time)).toEqual([0, 50]);
 	});
 
 	it("clamps points to valid range", () => {
@@ -73,7 +73,7 @@ describe("computeAutomationTransfer", () => {
 			{ mode: "clip-attached" },
 		);
 
-		expect(result.pointsToAdd.map((p) => p.time)).toEqual([0, 0, 0]);
+		expect(result.pointsToAdd.map((p) => p.time)).toEqual([0, 0]);
 	});
 
 	it("excludes points at end boundary when includeEndBoundary is false", () => {
@@ -221,6 +221,91 @@ describe("computeAutomationTransfer", () => {
 			result.pointsToAdd.every((p) => p.clipRelativeTime === undefined),
 		).toBe(true);
 		expect(result.segmentsToAdd).toHaveLength(1);
+	});
+});
+
+describe("updateClipAtom same-track automation", () => {
+	it("keeps track-level automation stationary while moving clip-bound points", async () => {
+		const clip: Clip = {
+			id: "clip1",
+			name: "Test Clip",
+			opfsFileId: "file-1",
+			startTime: 100,
+			trimStart: 0,
+			trimEnd: 400,
+			sourceDurationMs: 400,
+			fadeInCurve: 0,
+			fadeOutCurve: 0,
+		};
+
+		const track: Track = {
+			id: "track1",
+			name: "Track 1",
+			duration: 1000,
+			startTime: 0,
+			trimStart: 0,
+			trimEnd: 1000,
+			muted: false,
+			soloed: false,
+			color: "#ff0000",
+			clips: [clip],
+			volumeEnvelope: {
+				enabled: true,
+				points: [
+					{
+						id: "clip-point",
+						time: 120,
+						value: 0.8,
+						clipId: "clip1",
+						clipRelativeTime: 20,
+					},
+					{ id: "track-point", time: 300, value: 1.2 },
+				],
+				segments: [],
+			},
+		};
+
+		let tracksState: Track[] = [track];
+		const playbackState = {
+			isPlaying: false,
+			currentTime: 0,
+			duration: 0,
+			bpm: 120,
+			looping: false,
+		};
+
+		const mockGet = (atomRef: unknown) => {
+			if (atomRef === tracksAtom) return tracksState;
+			if (atomRef === playbackAtom) return playbackState;
+			throw new Error("Unexpected atom read");
+		};
+
+		const mockSet = (atomRef: unknown, value: unknown) => {
+			if (atomRef === tracksAtom) {
+				tracksState = value as Track[];
+				return;
+			}
+			throw new Error("Unexpected atom write");
+		};
+
+		await updateClipAtom.write(mockGet, mockSet, "track1", "clip1", {
+			startTime: 400,
+		});
+
+		const updatedTrack = tracksState[0];
+		const updatedClip = updatedTrack.clips?.[0];
+		expect(updatedClip?.startTime).toBe(400);
+
+		const clipPoint = updatedTrack.volumeEnvelope?.points.find(
+			(point) => point.id === "clip-point",
+		);
+		expect(clipPoint?.time).toBe(420);
+		expect(clipPoint?.clipRelativeTime).toBe(20);
+
+		const trackPoint = updatedTrack.volumeEnvelope?.points.find(
+			(point) => point.id === "track-point",
+		);
+		expect(trackPoint?.time).toBe(300);
 	});
 });
 
