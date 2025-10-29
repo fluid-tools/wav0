@@ -1,4 +1,4 @@
-<!-- 02f73b8e-0a29-4305-a4b9-1279cc5bd86f db111659-426a-44bd-b370-1a6f9220406b -->
+<!-- 02f73b8e-0a29-4305-a4b9-1279cc5bd86f d547779d-b221-4c6f-af2d-331c7e6e74da -->
 # Fix Automation & Playback Issues
 
 ## Issues Identified
@@ -23,38 +23,39 @@
 
 ## Implementation Steps
 
-### Step 1: Fix clip-attached filter logic
+### Step 1: Fix clip-attached filter logic and validate same-track moves
 
 - File: `apps/web/lib/daw-sdk/utils/automation-migration-helpers.ts`
 - Change line 105 from `if (point.clipId && point.clipId !== clipId) return false;` to `if (point.clipId !== clipId) return false;`
-- Update tests if needed to verify track-level points are excluded in clip-attached mode
+- File: `apps/web/lib/daw-sdk/state/clips.ts`
+- Confirm same-track moves only shift clip-bound automation (range points stay put)
+- Update unit coverage around both helpers to prevent regressions
 
 ### Step 2: Prevent setValueCurveAtTime overlaps
 
 - File: `apps/web/lib/daw-sdk/core/playback-service.ts`
-- In `rescheduleTrackAutomation`, track `lastScheduledEnd` (AudioContext time) after each `setValueCurveAtTime` call
-- Before scheduling a new segment, check if `acStart < lastScheduledEnd`:
-- If so, skip or adjust `acStart` to `lastScheduledEnd + epsilon` (e.g., 0.001s)
-- Initialize `lastScheduledEnd = now` after anchor point is set
+- Track `lastScheduledEnd` (AudioContext time) after each `setValueCurveAtTime`
+- If `acStart < lastScheduledEnd`, bump start to `lastScheduledEnd + epsilon` (e.g., 0.001s)
+- Initialize `lastScheduledEnd = now` once anchor gain is set
 
-### Step 3: Improve visual playback accuracy
+### Step 3: Align audio scheduling with playhead visuals
 
 - File: `apps/web/lib/daw-sdk/core/playback-service.ts`
-- In `runClipAudioIterator`, refine the grace window logic so audio never fires before the playhead crosses the clip boundary:
-- Replace `if (Math.abs(leadSec) < START_GRACE_SEC) leadSec = 0;` with a guard that clamps small positive leads to `START_GRACE_SEC` but leaves negative leads untouched, e.g. `if (leadSec >= 0 && leadSec < START_GRACE_SEC) leadSec = START_GRACE_SEC;`
-- Verify `getPlaybackTime()` accuracy (interaction between `startTime` and `playbackTimeAtStart`) and confirm transport time pushes to UI on the same animation frame
-- If residual drift remains, record the delta and expose a small configurable visual offset for UI reconciliation
+- Replace `if (Math.abs(leadSec) < START_GRACE_SEC) leadSec = 0;` with logic that preserves positive lead while clamping negatives (e.g., `leadSec = Math.max(leadSec, MIN_POSITIVE_LEAD)`)
+- Instrument lead vs. visual playhead delta (dev-mode logging or `lastScheduleLeadMs`) to verify across zoom levels
+- Double-check `getPlaybackTime()` and frame update cadence so UI stays in sync
 
-### Step 4: Update tests
+### Step 4: Update automated coverage
 
 - File: `apps/web/lib/daw-sdk/utils/__tests__/automation-transfer.test.ts`
-- Verify "ignores unattached points when transferring clip-bound automation" test excludes undefined clipIds
-- Add test case for overlapping automation segments if possible
+- Ensure clip-attached tests exclude undefined clipIds for cross-track moves
+- Reintroduce regression tests around same-track moves to guarantee range automation stays put
+- If practical, add a smoke test exercising automation scheduling overlap logic
 
 ### Step 5: Migration status assessment
 
-- Check usage of legacy vs new SDK components
-- Document current migration state in comments or migration notes
+- Review current usage of legacy vs `daw-sdk`/`daw-react` modules
+- Summarize outstanding migration gaps (plan doc or inline comment) so future tasks are scoped
 
 ## Files to Modify
 
@@ -68,12 +69,3 @@
 - Manual QA: Move clip with track-level automation, verify it stays on source track
 - Manual QA: Play project with automation segments, verify no console errors
 - Manual QA: Play from various positions and zoom levels, verify audio starts when playhead visually reaches clip
-
-### To-dos
-
-- [ ] Refine computeAutomationTransfer for clip-only moves and clip-relative remap
-- [ ] Adjust drop handlers to remove shiftTrackAutomationInRange and use ms clamps
-- [ ] Update automation-transfer tests for new semantics
-- [ ] Instrument playback scheduling and UI playhead to locate early-start bug
-- [ ] Implement timing correction once measurements confirm root cause
-- [ ] Run bun typecheck/lint/build and manual DAW QA
