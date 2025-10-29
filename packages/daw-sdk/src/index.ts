@@ -6,6 +6,7 @@
 export { AudioEngine } from "./core/audio-engine";
 // Core classes
 export { createDAW, DAW } from "./core/daw";
+export { OPFSManager } from "./core/opfs-manager";
 export { Transport } from "./core/transport";
 
 // Core types
@@ -23,10 +24,11 @@ export {
 	TrackEnvelopeSegmentSchema,
 	TrackSchema,
 } from "./types/schemas";
+
+// Utilities as namespaces
 export { audioBuffer } from "./utils/audio-buffer";
 export { automation } from "./utils/automation";
 export { curves } from "./utils/curves";
-// Utilities as namespaces
 export { time } from "./utils/time";
 export { volume } from "./utils/volume";
 

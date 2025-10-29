@@ -1,5 +1,6 @@
 "use client";
 
+import { automation, volume } from "@wav0/daw-sdk";
 import { z } from "zod";
 import type {
 	Clip,
@@ -7,8 +8,6 @@ import type {
 	Track,
 	TrackEnvelope,
 } from "../types/schemas";
-import { evaluateEnvelopeGainAt } from "../utils/automation-utils";
-import { dbToGain, volumeToDb } from "../utils/volume-utils";
 import { audioService } from "./audio-service";
 
 type ClipPlaybackState = {
@@ -289,9 +288,13 @@ export class PlaybackService {
 
 		// Step 2: Anchor to instantaneous effective gain at current transport time
 		const currentTimeMs = this.getPlaybackTime() * 1000;
-		const baseVolumeDb = track.volumeDb ?? volumeToDb(track.volume ?? 75);
-		const baseVolume = dbToGain(baseVolumeDb);
-		const multiplier = evaluateEnvelopeGainAt(envelope, currentTimeMs);
+		const baseVolumeDb =
+			track.volumeDb ?? volume.volumeToDb(track.volume ?? 75);
+		const baseVolume = volume.dbToGain(baseVolumeDb);
+		const multiplier = automation.evaluateEnvelopeGainAt(
+			envelope,
+			currentTimeMs,
+		);
 		const anchorGain = baseVolume * multiplier;
 		envelopeGain.gain.setValueAtTime(anchorGain, now);
 
@@ -988,11 +991,11 @@ export class PlaybackService {
 		this.applySnapshot(tracks);
 	}
 
-	updateMasterVolume(volume: number): void {
+	updateMasterVolume(volumePercent: number): void {
 		if (this.masterGainNode && this.audioContext) {
 			// Convert volume percentage to dB, then to linear gain
-			const volumeDb = volumeToDb(volume);
-			const gain = dbToGain(volumeDb);
+			const volumeDb = volume.volumeToDb(volumePercent);
+			const gain = volume.dbToGain(volumeDb);
 			const now = this.audioContext.currentTime;
 			this.cancelGainAutomation(this.masterGainNode.gain, now);
 			this.masterGainNode.gain.setValueAtTime(gain, now);

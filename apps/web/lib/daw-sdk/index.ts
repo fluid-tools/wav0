@@ -22,12 +22,10 @@ export * from "./hooks/use-playback-sync";
 
 // ===== State Management =====
 export * from "./state";
-
+// ===== Utilities (Pure Functions) =====
+// NOTE: Core utils migrated to @wav0/daw-sdk namespaces (time, volume, automation, curves)
+// Migration and helper functions remain here temporarily
+export * from "./state/automation-migration";
 // ===== Type Schemas & Validation =====
 export * from "./types/schemas";
-
-// ===== Utilities (Pure Functions) =====
-export * from "./utils/automation-utils";
-export * from "./utils/curve-functions";
-export * from "./utils/time-utils";
-export * from "./utils/volume-utils";
+export * from "./utils/automation-migration-helpers";

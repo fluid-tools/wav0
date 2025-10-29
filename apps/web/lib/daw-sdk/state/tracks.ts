@@ -1,18 +1,17 @@
 /**
  * Track State Atoms - Legacy Layer
- * 
+ *
  * NOTE: These write atoms use the old audioService/playbackService directly.
  * For new code, prefer using `useBridgeMutations()` from @wav0/daw-react
  * which provides bridge-based mutations with event-driven sync.
- * 
+ *
  * These atoms remain for backward compatibility during migration.
  */
 
+import { automation, volume } from "@wav0/daw-sdk";
 import { atom } from "jotai";
 import { generateTrackId } from "@/lib/storage/opfs";
 import { audioService, playbackService } from "../index";
-import { migrateAutomationToSegments } from "../utils/automation-utils";
-import { volumeToDb } from "../utils/volume-utils";
 import {
 	playbackAtom,
 	projectEndOverrideAtom,
@@ -20,6 +19,7 @@ import {
 	selectedTrackIdAtom,
 	tracksAtom,
 } from "./atoms";
+import { migrateAutomationToSegments } from "./automation-migration";
 import type { Clip, Track, TrackEnvelope, TrackEnvelopePoint } from "./types";
 import { clampEnvelopeGain, createDefaultEnvelope } from "./types";
 
@@ -263,7 +263,7 @@ export const clearTracksAtom = atom(null, (_get, set) => {
 		trimStart: 0,
 		trimEnd: 0,
 		volume: 75,
-		volumeDb: volumeToDb(75),
+		volumeDb: volume.volumeToDb(75),
 		muted: false,
 		soloed: false,
 		color: "#3b82f6",
@@ -295,7 +295,7 @@ export const resetProjectAtom = atom(null, (_get, set) => {
 		trimStart: 0,
 		trimEnd: 0,
 		volume: 75,
-		volumeDb: volumeToDb(75),
+		volumeDb: volume.volumeToDb(75),
 		muted: false,
 		soloed: false,
 		color: "#3b82f6",

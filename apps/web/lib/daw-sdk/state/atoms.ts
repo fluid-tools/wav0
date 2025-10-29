@@ -5,9 +5,9 @@
 
 "use client";
 
+import { volume } from "@wav0/daw-sdk";
 import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
-import { volumeToDb } from "../utils/volume-utils";
 import type {
 	AutomationType,
 	ClipInspectorTarget,
@@ -45,7 +45,7 @@ function getInitialTracks(): Track[] {
 			trimStart: 0,
 			trimEnd: 0,
 			volume: 75,
-			volumeDb: volumeToDb(75),
+			volumeDb: volume.volumeToDb(75),
 			muted: false,
 			soloed: false,
 			color: "#3b82f6",

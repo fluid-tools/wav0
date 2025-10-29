@@ -4,9 +4,9 @@
 
 "use client";
 
+import { time } from "@wav0/daw-sdk";
 import { atom } from "jotai";
 import { DAW_PIXELS_PER_SECOND_AT_ZOOM_1 } from "@/lib/constants";
-import { generateTimeGrid, type TimeGrid } from "../utils/time-grid";
 import { horizontalScrollAtom, playbackAtom, timelineAtom } from "./atoms";
 import { gridAtom } from "./index";
 import { totalDurationAtom } from "./tracks";
@@ -113,11 +113,14 @@ export const timeGridCacheKeyAtom = atom((get) => {
 // Bars grid code removed - time-only grid mode active
 
 // Cached time grid atom with memoization
-const timeGridCache = new Map<string, TimeGrid>();
+const timeGridCache = new Map<
+	string,
+	ReturnType<typeof time.generateTimeGrid>
+>();
 
 export const cachedTimeGridAtom = atom((get) => {
 	const grid = get(gridAtom);
-	
+
 	// Only generate time grid if mode is "time"
 	if (grid.mode !== "time") {
 		return { majors: [], minors: [] };
@@ -136,7 +139,7 @@ export const cachedTimeGridAtom = atom((get) => {
 	const viewEndMs = get(viewEndMsAtom);
 	const pxPerMs = get(timelinePxPerMsAtom);
 
-	const result = generateTimeGrid({
+	const result = time.generateTimeGrid({
 		viewStartMs,
 		viewEndMs,
 		pxPerMs,

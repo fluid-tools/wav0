@@ -1,5 +1,6 @@
 "use client";
 
+import { curves, volume } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AutomationContextMenu } from "@/components/daw/context-menus/automation-context-menu";
@@ -7,10 +8,7 @@ import type { Track, TrackEnvelopePoint } from "@/lib/daw-sdk";
 import {
 	addAutomationPoint,
 	automationViewEnabledAtom,
-	evaluateSegmentCurve,
-	getEffectiveDb,
 	migrateAutomationToSegments,
-	multiplierToDb,
 	playbackAtom,
 	resolveClipRelativePoint,
 	timelinePxPerMsAtom,
@@ -206,8 +204,10 @@ export function AutomationLane({
 		.map((point) => {
 			// If point is clip-bound, resolve its absolute time
 			const clip = track.clips?.find((c) => c.id === point.clipId);
-			const absoluteTime = resolveClipRelativePoint(point, clip);
-			return { ...point, time: absoluteTime };
+			const resolved = clip
+				? resolveClipRelativePoint(point, clip.startTime)
+				: point;
+			return resolved;
 		})
 		.sort((a, b) => a.time - b.time);
 
@@ -256,7 +256,7 @@ export function AutomationLane({
 				for (let s = 1; s <= samples; s++) {
 					const t = s / samples;
 					// Evaluate curve for value between prev and curr
-					const curveValue = evaluateSegmentCurve(
+					const curveValue = curves.evaluateSegmentCurve(
 						prev.point.value,
 						curr.point.value,
 						t,
@@ -393,8 +393,11 @@ export function AutomationLane({
 					const x = point.time * pxPerMs;
 					const normalizedValue = Math.max(0, Math.min(4, point.value)) / 4;
 					const y = trackHeight - padding - normalizedValue * usableHeight;
-					const envelopeDb = multiplierToDb(point.value);
-					const effectiveDb = getEffectiveDb(track.volume ?? 75, point.value);
+					const envelopeDb = volume.multiplierToDb(point.value);
+					const effectiveDb = volume.getEffectiveDb(
+						track.volume ?? 75,
+						point.value,
+					);
 
 					return (
 						<g

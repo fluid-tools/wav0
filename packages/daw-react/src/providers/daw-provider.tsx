@@ -88,7 +88,7 @@ export function DAWProvider({
 
 	return (
 		<DAWContext.Provider value={contextValue}>
-			<JotaiProvider>{children}</JotaiProvider>
+			{children}
 		</DAWContext.Provider>
 	);
 }

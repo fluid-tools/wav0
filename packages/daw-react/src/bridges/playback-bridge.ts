@@ -126,7 +126,7 @@ export class PlaybackServiceBridge {
 	 * Get master meter level in dB
 	 */
 	getMasterMeterDb(): number {
-		return this.legacyService.getMasterMeterDb();
+		return this.legacyService.getMasterDb();
 	}
 
 	/**

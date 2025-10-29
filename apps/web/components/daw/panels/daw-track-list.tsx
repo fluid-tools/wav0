@@ -1,5 +1,6 @@
 "use client";
 
+import { volume } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
 import { GripHorizontal, MoreVertical, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -34,8 +35,6 @@ import {
 import type { AutomationType } from "@/lib/daw-sdk";
 import {
 	automationViewEnabledAtom,
-	dbToVolume,
-	formatDb,
 	playbackAtom,
 	playbackService,
 	removeTrackAtom,
@@ -45,7 +44,6 @@ import {
 	trackHeightZoomAtom,
 	tracksAtom,
 	updateTrackAtom,
-	volumeToDb,
 } from "@/lib/daw-sdk";
 import { cn } from "@/lib/utils";
 
@@ -81,16 +79,16 @@ export function DAWTrackList() {
 		setEditingTrackName("");
 	};
 
-	const handleVolumeChange = (trackId: string, volume: number) => {
+	const handleVolumeChange = (trackId: string, volumePercent: number) => {
 		// Convert volume percentage to dB
-		const volumeDb = volumeToDb(volume);
+		const volumeDb = volume.volumeToDb(volumePercent);
 
 		// Check if track exists
 		const track = tracks.find((t) => t.id === trackId);
 		if (!track) return;
 
 		// Update state
-		updateTrack(trackId, { volume, volumeDb });
+		updateTrack(trackId, { volume: volumePercent, volumeDb });
 
 		// If playing, use realtime update to avoid disrupting automation
 		if (playback.isPlaying) {
@@ -160,11 +158,13 @@ export function DAWTrackList() {
 						DAW_HEIGHTS.TRACK_ROW * trackHeightZoom,
 					);
 					const trackVolume = track.volume ?? 75;
-					const dbValue = volumeToDb(trackVolume);
+					const dbValue = volume.volumeToDb(trackVolume);
 					const volumeLabel =
-						trackVolume <= 0 || track.muted ? "Muted" : formatDb(dbValue);
+						trackVolume <= 0 || track.muted
+							? "Muted"
+							: volume.formatDb(dbValue);
 					const setVolumeFromDb = (db: number) => {
-						const volumeValue = dbToVolume(db);
+						const volumeValue = volume.dbToVolume(db);
 						updateTrack(track.id, {
 							volume: volumeValue,
 							muted: volumeValue <= 0 ? true : track.muted && volumeValue === 0,
