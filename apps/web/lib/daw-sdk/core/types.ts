@@ -12,7 +12,7 @@ import type {
 	PlaybackOptions,
 	Track,
 } from "../types/schemas";
-import type { TimeGrid } from "../utils/time-grid";
+// TimeGrid type removed - use ReturnType<typeof time.generateTimeGrid> instead
 
 // ===== Audio Provider Interface =====
 
@@ -107,8 +107,9 @@ export interface TimelineCalculations {
 	 * Generate time grid markers for a viewport
 	 * @param params - Viewport and zoom parameters
 	 * @returns Grid data with major and minor markers
+	 * @deprecated Use time.generateTimeGrid from @wav0/daw-sdk instead
 	 */
-	generateTimeGrid(params: TimeGridParams): TimeGrid;
+	// generateTimeGrid(params: TimeGridParams): any;
 
 	/**
 	 * Format milliseconds as human-readable duration

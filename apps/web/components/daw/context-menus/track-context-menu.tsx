@@ -10,7 +10,11 @@ import {
 	ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { Input } from "@/components/ui/input";
-import { clampDb, formatDb, VOLUME_MAX_DB, VOLUME_MIN_DB } from "@/lib/daw-sdk";
+import { volume } from "@wav0/daw-sdk";
+
+const VOLUME_MIN_DB = -60;
+const VOLUME_MAX_DB = 12;
+const clampDb = (db: number) => Math.max(VOLUME_MIN_DB, Math.min(VOLUME_MAX_DB, db));
 
 type TrackMenuHandlers = {
 	onRequestRename?: () => void;
@@ -100,8 +104,8 @@ export function TrackMenuOptions({
 					<span>Volume (dB)</span>
 					<span className="font-medium text-foreground">
 						{isMuted || !Number.isFinite(currentDb)
-							? "Muted"
-							: formatDb(currentDb)}
+						? "Muted"
+						: volume.formatDb(currentDb)}
 					</span>
 				</div>
 				<div className="mt-2 flex items-center gap-2">

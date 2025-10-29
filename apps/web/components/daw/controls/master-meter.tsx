@@ -1,8 +1,8 @@
 "use client";
 
+import { volume } from "@wav0/daw-sdk";
 import { useEffect, useState } from "react";
 import { playbackService } from "@/lib/daw-sdk";
-import { formatDb } from "@/lib/daw-sdk/utils/volume-utils";
 import { cn } from "@/lib/utils";
 
 export function MasterMeter() {
@@ -65,7 +65,7 @@ export function MasterMeter() {
 			</div>
 
 			<span className="text-xs font-mono tabular-nums min-w-[50px] text-right">
-				{Number.isFinite(db) ? formatDb(db) : "-∞ dB"}
+				{Number.isFinite(db) ? volume.formatDb(db) : "-∞ dB"}
 			</span>
 		</div>
 	);

@@ -1,8 +1,8 @@
 "use client";
 
+import { curves } from "@wav0/daw-sdk";
 import { memo } from "react";
 import type { CurveType } from "@/lib/daw-sdk";
-import { evaluateCurve } from "@/lib/daw-sdk";
 import { cn } from "@/lib/utils";
 
 type CurvePreviewProps = {
@@ -37,7 +37,9 @@ export const CurvePreview = memo(function CurvePreview({
 
 	for (let i = 0; i < numPoints; i++) {
 		const t = i / (numPoints - 1);
-		const value = evaluateCurve(type, t, safeShape);
+		// Convert safeShape from 0-1 range to -99 to +99 range for curve evaluation
+		const curveValue = (safeShape - 0.5) * 198;
+		const value = curves.evaluateSegmentCurve(0, 1, t, curveValue);
 
 		// Guard against NaN/Infinity
 		if (!Number.isFinite(value)) {

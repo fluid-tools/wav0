@@ -1,28 +1,31 @@
 "use client";
 
+import type {
+	Clip,
+	TrackEnvelopePoint,
+	TrackEnvelopeSegment,
+} from "@wav0/daw-sdk";
+import { time as timeUtils } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ClipContextMenu } from "@/components/daw/context-menus/clip-context-menu";
 import { ClipFadeHandles } from "@/components/daw/controls/clip-fade-handles";
 import { AutomationLane } from "@/components/daw/panels/automation-lane";
 import { DAW_HEIGHTS } from "@/lib/constants/daw-design";
-import type {
-	Clip,
-	TrackEnvelopePoint,
-	TrackEnvelopeSegment,
-} from "@/lib/daw-sdk";
 import {
 	activeToolAtom,
 	clipMoveHistoryAtom,
+	computeAutomationTransfer,
 	dragMachineAtom,
 	dragPreviewAtom,
-	formatDuration,
 	loadAudioFileAtom,
+	mergeAutomationPoints,
 	playbackAtom,
 	playbackService,
 	projectEndPositionAtom,
 	selectedClipIdAtom,
 	selectedTrackIdAtom,
+	shiftTrackAutomationInRange,
 	timelineAtom,
 	timelinePxPerMsAtom,
 	totalDurationAtom,
@@ -31,12 +34,6 @@ import {
 	updateClipAtom,
 	updateTrackAtom,
 } from "@/lib/daw-sdk";
-import {
-	countAutomationPointsInRange,
-	removeTrackAutomationPointsInRange,
-	shiftTrackAutomationInRange,
-	transferAutomationEnvelope,
-} from "@/lib/daw-sdk/utils/automation-utils";
 import { cn } from "@/lib/utils";
 
 export function DAWTrackContent() {
@@ -106,19 +103,19 @@ export function DAWTrackContent() {
 			}
 		};
 		update();
-		
+
 		// Debounce window resize to avoid excessive updates during resize
 		let resizeTimeout: NodeJS.Timeout;
 		const debouncedUpdate = () => {
 			clearTimeout(resizeTimeout);
 			resizeTimeout = setTimeout(update, 100);
 		};
-		
+
 		const ro =
 			typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
 		if (ro && containerRef.current) ro.observe(containerRef.current);
 		window.addEventListener("resize", debouncedUpdate);
-		
+
 		return () => {
 			clearTimeout(resizeTimeout);
 			window.removeEventListener("resize", debouncedUpdate);
@@ -400,13 +397,20 @@ export function DAWTrackContent() {
 											return shiftTrackAutomationInRange(
 												updatedTrack,
 												clip.startTime,
-												clipEndTime,
 												deltaMs,
 											);
 										}
 										return t;
 									});
-									playbackService.synchronizeTracks(updated);
+									// Sync affected track with playback
+									const affectedTrack = updated.find(
+										(t) => t.id === originalTrack.id,
+									);
+									if (affectedTrack) {
+										playbackService
+											.rescheduleTrack(affectedTrack)
+											.catch(console.error);
+									}
 									return updated;
 								});
 
@@ -431,35 +435,43 @@ export function DAWTrackContent() {
 									];
 								});
 							} else {
-								// Cross-track: transfer automation
+								// Cross-track: transfer automation with proper timestamp adjustment
 								const hasAutomation =
 									originalTrack.volumeEnvelope?.enabled ?? false;
-								const automationCount = hasAutomation
-									? countAutomationPointsInRange(
-											originalTrack,
-											clip.startTime,
-											clipEndTime,
-										)
-									: 0;
 
 								let automationData: {
 									points: TrackEnvelopePoint[];
 									segments: TrackEnvelopeSegment[];
+									pointIdsToRemove: string[];
 								} | null = null;
-								if (automationCount > 0) {
-									const { pointsToTransfer, segmentsToTransfer } =
-										transferAutomationEnvelope(
-											originalTrack,
-											targetTrack,
-											clip.startTime,
-											clipEndTime,
-											dragPreview.previewStartTime,
-											clip.id,
-										);
-									automationData = {
-										points: pointsToTransfer,
-										segments: segmentsToTransfer,
-									};
+
+								if (hasAutomation && originalTrack.volumeEnvelope) {
+									// Get project end for time clamping
+									const projectEnd = projectEndPosition || 300000; // 5 min default
+									// Normalize final drop time
+									const finalDropTime = Math.max(
+										0,
+										Math.round(dragPreview.previewStartTime),
+									);
+
+									const transferResult = computeAutomationTransfer(
+										originalTrack.volumeEnvelope,
+										clip.id,
+										clip.startTime,
+										clipEndTime,
+										finalDropTime,
+										clip.id,
+										projectEnd,
+										{ mode: "clip-attached", includeEndBoundary: true },
+									);
+
+									if (transferResult.pointsToAdd.length > 0) {
+										automationData = {
+											points: transferResult.pointsToAdd,
+											segments: transferResult.segmentsToAdd,
+											pointIdsToRemove: transferResult.pointIdsToRemove,
+										};
+									}
 								}
 
 								if (playback.isPlaying) {
@@ -476,12 +488,27 @@ export function DAWTrackContent() {
 												clips: t.clips?.filter((c) => c.id !== clip.id) ?? [],
 											};
 											if (automationData) {
-												// Use track wrapper to remove automation
-												return removeTrackAutomationPointsInRange(
-													updatedTrack,
-													clip.startTime,
-													clipEndTime,
-												);
+												// Remove transferred points from source track
+												const currentEnv = updatedTrack.volumeEnvelope;
+												if (currentEnv) {
+													const remainingPointIds = new Set(
+														automationData.pointIdsToRemove,
+													);
+													return {
+														...updatedTrack,
+														volumeEnvelope: {
+															...currentEnv,
+															points: currentEnv.points.filter(
+																(p) => !remainingPointIds.has(p.id),
+															),
+															segments: (currentEnv.segments || []).filter(
+																(s) =>
+																	!remainingPointIds.has(s.fromPointId) &&
+																	!remainingPointIds.has(s.toPointId),
+															),
+														},
+													};
+												}
 											}
 											return updatedTrack;
 										}
@@ -505,10 +532,10 @@ export function DAWTrackContent() {
 													volumeEnvelope: {
 														...currentEnv,
 														enabled: true,
-														points: [
-															...(currentEnv.points || []),
-															...automationData.points,
-														].sort((a, b) => a.time - b.time),
+														points: mergeAutomationPoints(
+															currentEnv.points || [],
+															automationData.points,
+														),
 														segments: [
 															...(currentEnv.segments || []),
 															...automationData.segments,
@@ -520,7 +547,23 @@ export function DAWTrackContent() {
 										}
 										return t;
 									});
-									playbackService.synchronizeTracks(updated);
+									// Sync affected tracks with playback
+									const sourceTrack = updated.find(
+										(t) => t.id === originalTrack.id,
+									);
+									const targetTrackUpdated = updated.find(
+										(t) => t.id === targetTrack.id,
+									);
+									if (sourceTrack) {
+										playbackService
+											.rescheduleTrack(sourceTrack)
+											.catch(console.error);
+									}
+									if (targetTrackUpdated) {
+										playbackService
+											.rescheduleTrack(targetTrackUpdated)
+											.catch(console.error);
+									}
 									return updated;
 								});
 
@@ -849,9 +892,12 @@ export function DAWTrackContent() {
 														{clip.name}
 													</div>
 													<div className="text-[11px] text-muted-foreground tabular-nums">
-														{formatDuration(clip.trimEnd - clip.trimStart, {
-															pxPerMs: pixelsPerMs,
-														})}
+														{timeUtils.formatDuration(
+															clip.trimEnd - clip.trimStart,
+															{
+																pxPerMs: pixelsPerMs,
+															},
+														)}
 													</div>
 												</div>
 

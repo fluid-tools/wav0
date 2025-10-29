@@ -215,12 +215,12 @@ export const ClipFadeHandles = memo(function ClipFadeHandles({
 								const samples = 40;
 								const coords: Array<[number, number]> = [];
 								for (let i = 0; i <= samples; i++) {
-								const t = i / samples;
-								const y = isLeft
+									const t = i / samples;
+									const y = isLeft
 									? 1 - curves.evaluateSegmentCurve(0, 1, t, clip.fadeInCurve ?? 0)
 									: curves.evaluateSegmentCurve(1, 0, t, clip.fadeOutCurve ?? 0);
-								const x = t;
-								coords.push([x * 100, y * 100]);
+									const x = t;
+									coords.push([x * 100, y * 100]);
 								}
 								const d = coords
 									.map((c, i) => `${i === 0 ? "M" : "L"} ${c[0]},${c[1]}`)
@@ -264,8 +264,8 @@ export const ClipFadeHandles = memo(function ClipFadeHandles({
 					onPointerDown={(e) => handleFadePointerDown(fade, e)}
 					onPointerMove={handleFadePointerMove}
 					onPointerUp={handleFadePointerUp}
-				onDoubleClick={(e) => handleFadeDoubleClick(fade, e)}
-				aria-label={`Adjust ${fade === "fadeIn" ? "fade in" : "fade out"} duration: ${fadeValue}ms`}
+					onDoubleClick={(e) => handleFadeDoubleClick(fade, e)}
+					aria-label={`Adjust ${fade === "fadeIn" ? "fade in" : "fade out"} duration: ${fadeValue}ms`}
 				title={`${fade === "fadeIn" ? "Fade in" : "Fade out"}: ${time.formatDuration(fadeValue)}\nDouble-click to ${fadeValue > 0 ? "remove" : "add"}\nShift+drag for precision`}
 				>
 					{/* Handle grip visual */}
