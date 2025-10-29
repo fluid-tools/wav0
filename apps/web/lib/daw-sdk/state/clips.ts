@@ -18,7 +18,7 @@ export const updateClipAtom = atom(
 		trackId: string,
 		clipId: string,
 		updates: Partial<Clip>,
-		options?: { moveAutomation?: boolean },
+		_options?: { moveAutomation?: boolean },
 	) => {
 		const tracks = get(tracksAtom);
 		const playback = get(playbackAtom);
@@ -26,23 +26,6 @@ export const updateClipAtom = atom(
 		// Find original clip and track to detect automation movement
 		const originalTrack = tracks.find((t) => t.id === trackId);
 		const originalClip = originalTrack?.clips?.find((c) => c.id === clipId);
-
-		// Detect if we need to move automation
-		const shouldMoveAutomation =
-			options?.moveAutomation &&
-			updates.startTime !== undefined &&
-			originalClip &&
-			originalClip.startTime !== updates.startTime &&
-			originalTrack?.volumeEnvelope?.enabled;
-
-		let automationDelta = 0;
-		if (
-			shouldMoveAutomation &&
-			originalClip &&
-			updates.startTime !== undefined
-		) {
-			automationDelta = updates.startTime - originalClip.startTime;
-		}
 
 		// Detect clip movement for clip-bound automation (even without moveAutomation flag)
 		const clipMoved =
@@ -53,7 +36,6 @@ export const updateClipAtom = atom(
 			clipMoved && updates.startTime !== undefined
 				? updates.startTime - originalClip.startTime
 				: 0;
-
 		const updatedTracks = tracks.map((track) => {
 			if (track.id !== trackId || !track.clips) return track;
 
@@ -61,6 +43,12 @@ export const updateClipAtom = atom(
 			const updatedClips = track.clips.map((clip) =>
 				clip.id === clipId ? { ...clip, ...updates } : clip,
 			);
+			const nextClip = updatedClips.find((clip) => clip.id === clipId);
+			const nextStartTime =
+				nextClip?.startTime ??
+				updates.startTime ??
+				originalClip?.startTime ??
+				0;
 
 			// Handle automation movement
 			if (track.volumeEnvelope && originalClip && clipMoved) {
@@ -74,17 +62,25 @@ export const updateClipAtom = atom(
 				const shiftedPoints = track.volumeEnvelope.points.map((point) => {
 					// Clip-bound automation: always move with clip
 					if (point.clipId === clipId) {
-						return { ...point, time: point.time + clipTimeDelta };
+						const derivedRelative =
+							point.clipRelativeTime !== undefined
+								? point.clipRelativeTime
+								: point.time - originalClip.startTime;
+						const relativeTime = Math.max(0, derivedRelative);
+						return {
+							...point,
+							time: nextStartTime + relativeTime,
+							clipRelativeTime: relativeTime,
+						};
 					}
 
-					// Range-based automation: only if moveAutomation flag is set
+					// Track-level points inside the clip window follow the clip delta
 					if (
-						shouldMoveAutomation &&
+						!point.clipId &&
 						point.time >= originalClip.startTime &&
-						point.time <= clipEndTime &&
-						!point.clipId // Don't double-move clip-bound points
+						point.time <= clipEndTime
 					) {
-						return { ...point, time: point.time + automationDelta };
+						return { ...point, time: point.time + clipTimeDelta };
 					}
 
 					return point;

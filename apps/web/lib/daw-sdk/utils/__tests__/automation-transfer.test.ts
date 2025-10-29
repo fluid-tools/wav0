@@ -14,9 +14,7 @@ describe("computeAutomationTransfer", () => {
 			{ id: "p3", time: 200, value: 0.3, clipId: undefined },
 			{ id: "p4", time: 250, value: 0.9, clipId: "clip2" },
 		],
-		segments: [
-			{ id: "s1", fromPointId: "p1", toPointId: "p2", curve: 0 },
-		],
+		segments: [{ id: "s1", fromPointId: "p1", toPointId: "p2", curve: 0 }],
 	};
 
 	it("transfers clip-attached points with correct offset", () => {
@@ -31,14 +29,22 @@ describe("computeAutomationTransfer", () => {
 			{ mode: "clip-attached" },
 		);
 
-		expect(result.pointsToAdd).toHaveLength(2); // p1, p2
-		expect(result.pointsToAdd[0].time).toBe(300); // 100 + 200
-		expect(result.pointsToAdd[1].time).toBe(350); // 150 + 200
+		expect(result.pointsToAdd).toHaveLength(3); // p1, p2, p3 (range)
+		const [firstPoint, secondPoint, thirdPoint] = result.pointsToAdd;
+		expect(firstPoint.clipId).toBe("clip1");
+		expect(firstPoint.time).toBe(300);
+		expect(firstPoint.clipRelativeTime).toBe(0);
+		expect(secondPoint.clipId).toBe("clip1");
+		expect(secondPoint.time).toBe(350); // 300 + 50ms relative
+		expect(secondPoint.clipRelativeTime).toBe(50);
+		expect(thirdPoint.clipId).toBe("clip1");
+		expect(thirdPoint.time).toBe(400);
+		expect(thirdPoint.clipRelativeTime).toBe(100);
 		expect(result.segmentsToAdd).toHaveLength(1);
-		expect(result.pointIdsToRemove).toHaveLength(2);
+		expect(result.pointIdsToRemove).toHaveLength(3);
 	});
 
-	it("includes unattached points in range", () => {
+	it("includes track-level points in range when moving clip", () => {
 		const result = computeAutomationTransfer(
 			mockEnvelope,
 			"clip1",
@@ -50,9 +56,9 @@ describe("computeAutomationTransfer", () => {
 			{ mode: "clip-attached" },
 		);
 
-		// Should get p1, p2 (clip-attached) and p3 (in range, unattached)
 		expect(result.pointsToAdd).toHaveLength(3);
-		expect(result.pointsToAdd[2].time).toBe(100); // 200 - 100
+		expect(result.pointsToAdd.every((p) => p.clipId === "clip1")).toBe(true);
+		expect(result.pointsToAdd.map((p) => p.time)).toEqual([0, 50, 100]);
 	});
 
 	it("clamps points to valid range", () => {
@@ -67,8 +73,7 @@ describe("computeAutomationTransfer", () => {
 			{ mode: "clip-attached" },
 		);
 
-		expect(result.pointsToAdd[0].time).toBe(0); // Clamped to 0
-		expect(result.pointsToAdd[1].time).toBe(0); // 150 - 150 = 0, clamped
+		expect(result.pointsToAdd.map((p) => p.time)).toEqual([0, 0, 0]);
 	});
 
 	it("excludes points at end boundary when includeEndBoundary is false", () => {
@@ -120,6 +125,8 @@ describe("computeAutomationTransfer", () => {
 
 		// Both p1 and p2 should be included
 		expect(result.pointsToAdd).toHaveLength(2);
+		expect(result.pointsToAdd.map((p) => p.time)).toEqual([300, 400]);
+		expect(result.pointsToAdd.map((p) => p.clipRelativeTime)).toEqual([0, 100]);
 	});
 
 	it("only transfers segments when both endpoints are included", () => {
@@ -149,6 +156,7 @@ describe("computeAutomationTransfer", () => {
 		);
 
 		expect(result.pointsToAdd).toHaveLength(2); // p1, p2
+		expect(result.pointsToAdd.map((p) => p.time)).toEqual([300, 350]);
 		// Only s1 should transfer (both endpoints included)
 		expect(result.segmentsToAdd).toHaveLength(1);
 	});
@@ -180,6 +188,39 @@ describe("computeAutomationTransfer", () => {
 			expect(newIds).toContain(newSegment.fromPointId);
 			expect(newIds).toContain(newSegment.toPointId);
 		}
+	});
+
+	it("transfers automation in time-range mode with absolute offsets", () => {
+		const rangeEnvelope: TrackEnvelope = {
+			enabled: true,
+			points: [
+				{ id: "p1", time: 400, value: 0.4 },
+				{ id: "p2", time: 450, value: 0.6 },
+			],
+			segments: [{ id: "s1", fromPointId: "p1", toPointId: "p2", curve: 0 }],
+		};
+
+		const result = computeAutomationTransfer(
+			rangeEnvelope,
+			"clip1",
+			400,
+			500,
+			200,
+			"clip1",
+			800,
+			{ mode: "time-range" },
+		);
+
+		expect(result.pointsToAdd.map((p) => p.time)).toEqual([200, 250]);
+		expect(
+			result.pointsToAdd.every(
+				(p) => p.clipId === "clip1" || p.clipId === undefined,
+			),
+		).toBe(true);
+		expect(
+			result.pointsToAdd.every((p) => p.clipRelativeTime === undefined),
+		).toBe(true);
+		expect(result.segmentsToAdd).toHaveLength(1);
 	});
 });
 
@@ -236,11 +277,11 @@ describe("mergeAutomationPoints", () => {
 
 	it("uses custom epsilon value", () => {
 		const existing = [{ id: "e1", time: 100, value: 0.5, clipId: "c1" }];
-		const newPoints = [{ id: "n1", time: 101, value: 0.6, clipId: "c1" }]; // 1ms apart
+		const newPoints = [{ id: "n1", time: 100.4, value: 0.6, clipId: "c1" }]; // 0.4ms apart
 
-		// With epsilon 0.5ms, should be considered duplicate
+		// With epsilon 0.5ms, values land in separate buckets
 		const merged1 = mergeAutomationPoints(existing, newPoints, 0.5);
-		expect(merged1).toHaveLength(1);
+		expect(merged1).toHaveLength(2);
 
 		// With epsilon 2ms, should be considered duplicate
 		const merged2 = mergeAutomationPoints(existing, newPoints, 2);
@@ -251,5 +292,3 @@ describe("mergeAutomationPoints", () => {
 		expect(merged3).toHaveLength(2);
 	});
 });
-
-

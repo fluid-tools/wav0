@@ -70,6 +70,8 @@ export class PlaybackService {
 	>();
 	// Serialization mutex for all sync operations
 	private syncLock: Promise<void> = Promise.resolve();
+	private lastScheduleLeadMs = 0;
+	private static readonly START_GRACE_SEC = 0.0125;
 
 	private constructor() {}
 
@@ -490,6 +492,10 @@ export class PlaybackService {
 		return this.currentMasterDb;
 	}
 
+	getLastScheduleLeadMs(): number {
+		return this.lastScheduleLeadMs;
+	}
+
 	private applySnapshot(tracks: Track[]): void {
 		if (!this.audioContext || !this.masterGainNode) return;
 		const soloEngaged = tracks.some((track) => track.soloed);
@@ -737,6 +743,13 @@ export class PlaybackService {
 			timeIntoClip = Math.max(0, timelineSec - clipStartSec);
 		}
 
+		if (
+			timeIntoClip > 0 &&
+			timeIntoClip < PlaybackService.START_GRACE_SEC
+		) {
+			timeIntoClip = 0;
+		}
+
 		const audioFileReadStart = clipTrimStartSec + timeIntoClip;
 		if (audioFileReadStart >= clipTrimEndSec) return;
 
@@ -826,7 +839,12 @@ export class PlaybackService {
 				// Anchor to current timeline
 				const now = this.audioContext.currentTime;
 				const currentTl = this.getPlaybackTime();
-				const startAt = now + (timelinePos - currentTl);
+				let leadSec = timelinePos - currentTl;
+				this.lastScheduleLeadMs = leadSec * 1000;
+				if (Math.abs(leadSec) < PlaybackService.START_GRACE_SEC) {
+					leadSec = 0;
+				}
+				const startAt = now + leadSec;
 
 				if (startAt >= now) {
 					node.start(startAt);
