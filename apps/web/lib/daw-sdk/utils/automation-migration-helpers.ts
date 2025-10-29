@@ -87,16 +87,9 @@ export function computeAutomationTransfer(
 	// Select points to transfer
 	const pointsToTransfer = sourceEnvelope.points.filter((p) => {
 		if (mode === "clip-attached") {
-			// Transfer clip-attached points OR unattached points in range
-			if (p.clipId === clipId) return true;
-			if (
-				!p.clipId &&
-				p.time >= sourceStartMs &&
-				(includeEndBoundary ? p.time <= sourceEndMs : p.time < sourceEndMs)
-			) {
-				return true;
-			}
-			return false;
+			// ONLY transfer points that belong to this clip
+			// Track-level points (p.clipId === undefined) should stay on the track
+			return p.clipId === clipId;
 		}
 		// Time-range mode: only consider time
 		return (
