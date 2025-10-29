@@ -620,6 +620,7 @@ export function DAWTrackContent() {
 		timeline.snapToGrid,
 		timeline.gridSize,
 		trackHeightZoom,
+		projectEndPosition,
 		playback.isPlaying,
 		setTracks,
 		dragPreview,
