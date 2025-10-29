@@ -5,7 +5,6 @@
 
 import { automation } from "@wav0/daw-sdk";
 import type {
-	Clip,
 	Track,
 	TrackEnvelope,
 	TrackEnvelopePoint,
@@ -25,9 +24,11 @@ export function makePointClipRelative(
 	clipId: string,
 	clipStartTime: number,
 ): TrackEnvelopePoint {
+	const relativeTime = point.time - clipStartTime;
 	return {
 		...point,
-		time: point.time - clipStartTime,
+		time: relativeTime,
+		clipRelativeTime: relativeTime,
 		clipId,
 	};
 }
@@ -39,9 +40,10 @@ export function resolveClipRelativePoint(
 	point: TrackEnvelopePoint,
 	clipStartTime: number,
 ): TrackEnvelopePoint {
+	const relativeTime = point.clipRelativeTime ?? point.time;
 	return {
 		...point,
-		time: point.time + clipStartTime,
+		time: relativeTime + clipStartTime,
 		clipId: undefined,
 	};
 }
@@ -81,47 +83,90 @@ export function computeAutomationTransfer(
 	const {
 		mode = "clip-attached",
 		includeEndBoundary = true,
-		epsilonMs = 0.5,
+		epsilonMs: _epsilonMs = 0.5,
 	} = options;
 
+	const isClipAttached = mode === "clip-attached";
+	const clipDuration = Math.max(0, sourceEndMs - sourceStartMs);
+
 	// Select points to transfer
-	const pointsToTransfer = sourceEnvelope.points.filter((p) => {
-		if (mode === "clip-attached") {
-			// ONLY transfer points that belong to this clip
-			// Track-level points (p.clipId === undefined) should stay on the track
-			return p.clipId === clipId;
+	const pointsToTransfer = sourceEnvelope.points.filter((point) => {
+		const absoluteTime =
+			point.clipRelativeTime !== undefined
+				? point.clipRelativeTime + sourceStartMs
+				: point.time;
+		const withinRange =
+			absoluteTime >= sourceStartMs &&
+			(includeEndBoundary
+				? absoluteTime <= sourceEndMs
+				: absoluteTime < sourceEndMs);
+
+		if (isClipAttached) {
+			if (point.clipId && point.clipId !== clipId) return false;
+			return withinRange;
 		}
-		// Time-range mode: only consider time
-		return (
-			p.time >= sourceStartMs &&
-			(includeEndBoundary ? p.time <= sourceEndMs : p.time < sourceEndMs)
-		);
+		return withinRange;
 	});
 
-	// Calculate time offset
-	const timeOffset = targetStartMs - sourceStartMs;
+	if (pointsToTransfer.length === 0) {
+		return {
+			pointsToAdd: [],
+			segmentsToAdd: [],
+			pointIdsToRemove: [],
+		};
+	}
 
-	// Map old IDs to new IDs
 	const oldToNewId = new Map<string, string>();
 	const pointIdsToRemove = pointsToTransfer.map((p) => p.id);
+	const maxRelativeByProject = Number.isFinite(projectEndMs)
+		? Math.max(0, projectEndMs - Math.max(0, targetStartMs))
+		: Number.POSITIVE_INFINITY;
 
-	// Create new points with adjusted times
 	const pointsToAdd = pointsToTransfer
-		.map((p) => {
+		.map((point) => {
 			const newId = crypto.randomUUID();
-			oldToNewId.set(p.id, newId);
+			oldToNewId.set(point.id, newId);
 
-			// Clamp time to valid range
-			const newTime = Math.max(0, Math.min(projectEndMs, p.time + timeOffset));
+			if (isClipAttached) {
+				const rawRelative =
+					point.clipRelativeTime ?? point.time - sourceStartMs;
+				const relativeCap = Math.min(
+					clipDuration || Number.POSITIVE_INFINITY,
+					maxRelativeByProject,
+				);
+				const relativeTime = Number.isFinite(rawRelative)
+					? Math.max(0, Math.min(relativeCap, rawRelative))
+					: 0;
+				const absoluteTime = Math.max(
+					0,
+					Math.min(projectEndMs, targetStartMs + relativeTime),
+				);
+
+				return {
+					...point,
+					id: newId,
+					time: absoluteTime,
+					clipRelativeTime: relativeTime,
+					clipId: targetClipId,
+				};
+			}
+
+			const timeOffset = targetStartMs - sourceStartMs;
+			const absoluteTime = Math.max(
+				0,
+				Math.min(projectEndMs, point.time + timeOffset),
+			);
+
+			const { clipRelativeTime: _relative, ...rest } = point;
 
 			return {
-				...p,
+				...rest,
 				id: newId,
-				time: newTime,
-				clipId: targetClipId,
+				time: absoluteTime,
+				clipId: point.clipId,
 			};
 		})
-		.sort((a, b) => a.time - b.time); // Keep sorted
+		.sort((a, b) => a.time - b.time);
 
 	// Handle segments - only include if both endpoints transfer
 	const pointIdSet = new Set(pointIdsToRemove);
@@ -129,12 +174,25 @@ export function computeAutomationTransfer(
 		(s) => pointIdSet.has(s.fromPointId) && pointIdSet.has(s.toPointId),
 	);
 
-	const segmentsToAdd = segmentsToTransfer.map((s) => ({
-		...s,
-		id: crypto.randomUUID(),
-		fromPointId: oldToNewId.get(s.fromPointId)!,
-		toPointId: oldToNewId.get(s.toPointId)!,
-	}));
+	const seenSegmentKeys = new Set<string>();
+	const segmentsToAdd = segmentsToTransfer.reduce<TrackEnvelopeSegment[]>(
+		(acc, segment) => {
+			const newFrom = oldToNewId.get(segment.fromPointId);
+			const newTo = oldToNewId.get(segment.toPointId);
+			if (!newFrom || !newTo) return acc;
+			const key = `${newFrom}-${newTo}`;
+			if (seenSegmentKeys.has(key)) return acc;
+			seenSegmentKeys.add(key);
+			acc.push({
+				...segment,
+				id: crypto.randomUUID(),
+				fromPointId: newFrom,
+				toPointId: newTo,
+			});
+			return acc;
+		},
+		[],
+	);
 
 	return {
 		pointsToAdd,
@@ -255,7 +313,9 @@ export function removeTrackAutomationPointsInRange(
 		...track,
 		volumeEnvelope: {
 			...envelope,
-			points: envelope.points.filter((p) => p.time < startMs || p.time >= endMs),
+			points: envelope.points.filter(
+				(p) => p.time < startMs || p.time >= endMs,
+			),
 			segments: envelope.segments?.filter((s) => {
 				const fromPoint = envelope.points.find((p) => p.id === s.fromPointId);
 				const toPoint = envelope.points.find((p) => p.id === s.toPointId);
@@ -290,4 +350,3 @@ export function shiftTrackAutomationInRange(
 		},
 	};
 }
-

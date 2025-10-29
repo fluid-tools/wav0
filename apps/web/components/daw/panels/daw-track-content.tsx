@@ -25,7 +25,6 @@ import {
 	projectEndPositionAtom,
 	selectedClipIdAtom,
 	selectedTrackIdAtom,
-	shiftTrackAutomationInRange,
 	timelineAtom,
 	timelinePxPerMsAtom,
 	totalDurationAtom,
@@ -49,7 +48,7 @@ export function DAWTrackContent() {
 	const [pxPerMs] = useAtom(timelinePxPerMsAtom);
 	const [trackHeightZoom] = useAtom(trackHeightZoomAtom);
 	const [projectEndPosition] = useAtom(projectEndPositionAtom);
-	const [_totalDuration] = useAtom(totalDurationAtom);
+	const [totalDuration] = useAtom(totalDurationAtom);
 	const [_dragMachineSnapshot, sendDragEvent] = useAtom(dragMachineAtom);
 	const dragPreview = useAtom(dragPreviewAtom)[0];
 	const [resizingClip, setResizingClip] = useState<{
@@ -345,7 +344,7 @@ export function DAWTrackContent() {
 			});
 		};
 
-		const onUp = () => {
+		const onUp = async () => {
 			try {
 				// Commit drag if preview exists
 				if (dragPreview && draggingClip) {
@@ -369,55 +368,20 @@ export function DAWTrackContent() {
 						if (moved) {
 							const clipDurationMs = clip.trimEnd - clip.trimStart;
 							const clipEndTime = clip.startTime + clipDurationMs;
-							const deltaMs =
-								dragPreview.previewStartTime - dragPreview.originalStartTime;
 
 							if (isSameTrack) {
-								// Same track: in-place update with automation shift
+								// Same track: update clip start; clip-bound automation stays relative
 								if (playback.isPlaying) {
-									playbackService
-										.stopClip(originalTrack.id, clip.id)
-										.catch(console.error);
+									await playbackService.stopClip(originalTrack.id, clip.id);
 								}
 
-								setTracks((prev) => {
-									const updated = prev.map((t) => {
-										if (t.id === originalTrack.id) {
-											const updatedClip = {
-												...clip,
-												startTime: dragPreview.previewStartTime,
-											};
-											const updatedTrack = {
-												...t,
-												clips: (t.clips ?? []).map((c) =>
-													c.id === clip.id ? updatedClip : c,
-												),
-											};
-											// Shift automation points by delta using track wrapper
-											return shiftTrackAutomationInRange(
-												updatedTrack,
-												clip.startTime,
-												deltaMs,
-											);
-										}
-										return t;
-									});
-									// Sync affected track with playback
-									const affectedTrack = updated.find(
-										(t) => t.id === originalTrack.id,
-									);
-									if (affectedTrack) {
-										playbackService
-											.rescheduleTrack(affectedTrack)
-											.catch(console.error);
-									}
-									return updated;
+								await updateClip(originalTrack.id, clip.id, {
+									startTime: dragPreview.previewStartTime,
 								});
 
 								setMoveHistory((prev) => {
 									const now = Date.now();
 									const recent = prev[0];
-									// Coalesce undo toasts within 100ms
 									if (recent && now - recent.timestamp < 100) {
 										return prev;
 									}
@@ -446,12 +410,16 @@ export function DAWTrackContent() {
 								} | null = null;
 
 								if (hasAutomation && originalTrack.volumeEnvelope) {
-									// Get project end for time clamping
-									const projectEnd = projectEndPosition || 300000; // 5 min default
+									// Get project end for time clamping (ms)
+									const projectEndMs =
+										totalDuration && totalDuration > 0 ? totalDuration : 300000;
 									// Normalize final drop time
 									const finalDropTime = Math.max(
 										0,
-										Math.round(dragPreview.previewStartTime),
+										Math.min(
+											projectEndMs,
+											Math.round(dragPreview.previewStartTime),
+										),
 									);
 
 									const transferResult = computeAutomationTransfer(
@@ -461,7 +429,7 @@ export function DAWTrackContent() {
 										clipEndTime,
 										finalDropTime,
 										clip.id,
-										projectEnd,
+										projectEndMs,
 										{ mode: "clip-attached", includeEndBoundary: true },
 									);
 
@@ -475,9 +443,7 @@ export function DAWTrackContent() {
 								}
 
 								if (playback.isPlaying) {
-									playbackService
-										.stopClip(originalTrack.id, clip.id)
-										.catch(console.error);
+									await playbackService.stopClip(originalTrack.id, clip.id);
 								}
 
 								setTracks((prev) => {
@@ -620,7 +586,7 @@ export function DAWTrackContent() {
 		timeline.snapToGrid,
 		timeline.gridSize,
 		trackHeightZoom,
-		projectEndPosition,
+		totalDuration,
 		playback.isPlaying,
 		setTracks,
 		dragPreview,
