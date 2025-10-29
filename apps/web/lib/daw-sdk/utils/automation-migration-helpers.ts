@@ -102,7 +102,7 @@ export function computeAutomationTransfer(
 				: absoluteTime < sourceEndMs);
 
 		if (isClipAttached) {
-			if (point.clipId && point.clipId !== clipId) return false;
+			if (point.clipId !== clipId) return false;
 			return withinRange;
 		}
 		return withinRange;
