@@ -146,4 +146,3 @@ export class PlaybackServiceBridge {
 		this.cleanupFns = [];
 	}
 }
-

@@ -71,5 +71,3 @@ export function migrateAutomationToSegments(
 
 	return { ...envelope, points: cleanedPoints, segments };
 }
-
-

@@ -217,8 +217,19 @@ export const ClipFadeHandles = memo(function ClipFadeHandles({
 								for (let i = 0; i <= samples; i++) {
 									const t = i / samples;
 									const y = isLeft
-									? 1 - curves.evaluateSegmentCurve(0, 1, t, clip.fadeInCurve ?? 0)
-									: curves.evaluateSegmentCurve(1, 0, t, clip.fadeOutCurve ?? 0);
+										? 1 -
+											curves.evaluateSegmentCurve(
+												0,
+												1,
+												t,
+												clip.fadeInCurve ?? 0,
+											)
+										: curves.evaluateSegmentCurve(
+												1,
+												0,
+												t,
+												clip.fadeOutCurve ?? 0,
+											);
 									const x = t;
 									coords.push([x * 100, y * 100]);
 								}
@@ -266,7 +277,7 @@ export const ClipFadeHandles = memo(function ClipFadeHandles({
 					onPointerUp={handleFadePointerUp}
 					onDoubleClick={(e) => handleFadeDoubleClick(fade, e)}
 					aria-label={`Adjust ${fade === "fadeIn" ? "fade in" : "fade out"} duration: ${fadeValue}ms`}
-				title={`${fade === "fadeIn" ? "Fade in" : "Fade out"}: ${time.formatDuration(fadeValue)}\nDouble-click to ${fadeValue > 0 ? "remove" : "add"}\nShift+drag for precision`}
+					title={`${fade === "fadeIn" ? "Fade in" : "Fade out"}: ${time.formatDuration(fadeValue)}\nDouble-click to ${fadeValue > 0 ? "remove" : "add"}\nShift+drag for precision`}
 				>
 					{/* Handle grip visual */}
 					<div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -281,7 +292,9 @@ export const ClipFadeHandles = memo(function ClipFadeHandles({
 						                rounded-md text-xs font-medium whitespace-nowrap shadow-lg 
 						                border border-border pointer-events-none z-50"
 						>
-							{time.formatDuration(fadeValue === 0 ? VISUAL_MIN_FADE_MS : fadeValue)}
+							{time.formatDuration(
+								fadeValue === 0 ? VISUAL_MIN_FADE_MS : fadeValue,
+							)}
 						</div>
 					)}
 				</button>

@@ -1,7 +1,7 @@
 /**
  * Atom Sync Hooks
  * Synchronize Jotai atoms with SDK events using useEffectEvent
- * 
+ *
  * These hooks bridge the gap between the new event-driven SDK
  * and existing Jotai atom-based state management, enabling
  * gradual migration without breaking components.
@@ -27,26 +27,34 @@ export function usePlaybackAtomSync(
 	const daw = useDAWContext();
 
 	// Non-reactive event handler - always reads latest playback state
-	const handleTransportEvent = useEffectEvent((event: CustomEvent<TransportEvent>) => {
-		const { state, currentTime } = event.detail;
-		
-		// Preserve other properties while updating from Transport
-		setPlayback({
-			...playback,
-			isPlaying: state === "playing",
-			currentTime,
-		});
-	});
+	const handleTransportEvent = useEffectEvent(
+		(event: CustomEvent<TransportEvent>) => {
+			const { state, currentTime } = event.detail;
+
+			// Preserve other properties while updating from Transport
+			setPlayback({
+				...playback,
+				isPlaying: state === "playing",
+				currentTime,
+			});
+		},
+	);
 
 	useEffect(() => {
 		if (!daw) return;
 
 		const transport = daw.getTransport();
 
-		transport.addEventListener("transport", handleTransportEvent as EventListener);
+		transport.addEventListener(
+			"transport",
+			handleTransportEvent as EventListener,
+		);
 
 		return () => {
-			transport.removeEventListener("transport", handleTransportEvent as EventListener);
+			transport.removeEventListener(
+				"transport",
+				handleTransportEvent as EventListener,
+			);
 		};
 	}, [daw, handleTransportEvent]);
 }
@@ -55,9 +63,7 @@ export function usePlaybackAtomSync(
  * Sync tracks atom with AudioEngine events
  * Updates track metadata when audio is loaded
  */
-export function useTrackAtomSync(
-	tracksAtom: WritableAtom<any, [any], void>,
-) {
+export function useTrackAtomSync(tracksAtom: WritableAtom<any, [any], void>) {
 	const [tracks, setTracks] = useAtom(tracksAtom);
 	const daw = useDAWContext();
 
@@ -76,7 +82,7 @@ export function useTrackAtomSync(
 					}
 				: track,
 		);
-		
+
 		setTracks(updatedTracks);
 	});
 
@@ -85,10 +91,16 @@ export function useTrackAtomSync(
 
 		const audioEngine = daw.getAudioEngine();
 
-		audioEngine.addEventListener("trackloaded", handleTrackLoaded as EventListener);
+		audioEngine.addEventListener(
+			"trackloaded",
+			handleTrackLoaded as EventListener,
+		);
 
 		return () => {
-			audioEngine.removeEventListener("trackloaded", handleTrackLoaded as EventListener);
+			audioEngine.removeEventListener(
+				"trackloaded",
+				handleTrackLoaded as EventListener,
+			);
 		};
 	}, [daw, handleTrackLoaded]);
 }
@@ -104,4 +116,3 @@ export function useDAWAtomSync(
 	usePlaybackAtomSync(playbackAtom);
 	useTrackAtomSync(tracksAtom);
 }
-

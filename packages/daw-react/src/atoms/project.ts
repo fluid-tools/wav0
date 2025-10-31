@@ -80,4 +80,3 @@ export const removeMarkerAtom = atom(null, (get, set, id: string) => {
 		current.filter((m) => m.id !== id),
 	);
 });
-

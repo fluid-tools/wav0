@@ -59,4 +59,3 @@ export function setStorageAdapter(adapter: StorageAdapter): void {
 export function getStorageAdapter(): StorageAdapter {
 	return currentAdapter;
 }
-

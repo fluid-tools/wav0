@@ -54,7 +54,9 @@ const DEFAULT_TRACK_1: Track = {
 
 // atomWithStorage handles loading from storage in onMount
 // No module-time localStorage access - prevents race conditions
-export const tracksAtom = atomWithStorage<Track[]>("daw-tracks", [DEFAULT_TRACK_1]);
+export const tracksAtom = atomWithStorage<Track[]>("daw-tracks", [
+	DEFAULT_TRACK_1,
+]);
 
 export const playbackAtom = atom<PlaybackState>({
 	isPlaying: false,
@@ -106,4 +108,3 @@ export const zoomLimitsAtom = atom<{ min: number; max: number }>({
 export const playheadDraggingAtom = atom<boolean>(false);
 export const userIsManuallyScrollingAtom = atom<boolean>(false);
 export const playheadAutoFollowEnabledAtom = atom<boolean>(true);
-

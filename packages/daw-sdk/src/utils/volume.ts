@@ -123,4 +123,3 @@ export namespace volume {
 		return formatDb(effectiveDb, precision);
 	}
 }
-

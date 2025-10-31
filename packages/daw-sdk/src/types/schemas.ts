@@ -169,4 +169,3 @@ export const ClipInspectorTargetSchema = z
 	})
 	.nullable();
 export type ClipInspectorTarget = z.infer<typeof ClipInspectorTargetSchema>;
-

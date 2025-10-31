@@ -6,7 +6,10 @@ export type { UseAudioEventsOptions } from "./use-audio-events";
 export { useAudioEvents } from "./use-audio-events";
 export { useDAW } from "./use-daw";
 export { usePlaybackSync } from "./use-playback-sync";
-export { useBridgeMutations, type BridgeMutations } from "./use-bridge-mutations";
+export {
+	useBridgeMutations,
+	type BridgeMutations,
+} from "./use-bridge-mutations";
 export {
 	usePlaybackAtomSync,
 	useTrackAtomSync,

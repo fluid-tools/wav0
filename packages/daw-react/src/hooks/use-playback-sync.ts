@@ -34,15 +34,17 @@ export function usePlaybackSync<T extends PlaybackStateAtom>({
 	const [playbackState, setPlaybackState] = useAtom<T, [T], void>(playbackAtom);
 
 	// Non-reactive state change handler - always reads latest playbackState
-	const handleStateChange = useEffectEvent((state: string, currentTime: number) => {
-		if (!enabled) return;
+	const handleStateChange = useEffectEvent(
+		(state: string, currentTime: number) => {
+			if (!enabled) return;
 
-		setPlaybackState({
-			...playbackState,
-			isPlaying: state === "playing",
-			currentTime,
-		} as T);
-	});
+			setPlaybackState({
+				...playbackState,
+				isPlaying: state === "playing",
+				currentTime,
+			} as T);
+		},
+	);
 
 	// Non-reactive time updater - always reads latest values
 	const updateTime = useEffectEvent(() => {

@@ -76,4 +76,3 @@ export namespace audioBuffer {
 		for (let i = 0; i < text.length; i++) arr[offset + i] = text.charCodeAt(i);
 	}
 }
-

@@ -161,7 +161,9 @@ export namespace automation {
 			const prevPoint = sortedPoints[sortedIndex - 1];
 			const nextPoint = sortedPoints[sortedIndex + 1];
 
-			const prevSegment = envelope.segments.find((s) => s.toPointId === pointId);
+			const prevSegment = envelope.segments.find(
+				(s) => s.toPointId === pointId,
+			);
 			const nextSegment = envelope.segments.find(
 				(s) => s.fromPointId === pointId,
 			);
@@ -276,4 +278,3 @@ export namespace automation {
 		};
 	}
 }
-

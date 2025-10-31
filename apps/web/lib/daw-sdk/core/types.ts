@@ -1,24 +1,20 @@
 /**
  * Core DAW SDK Types and Interfaces
- * 
+ *
  * Defines the fundamental contracts for audio processing, timeline calculations,
  * and playback management. These interfaces establish clear boundaries between
  * core logic, provider implementations, and UI layers.
  */
 
 import type { AudioBufferSink } from "mediabunny";
-import type {
-	AudioFileInfo,
-	PlaybackOptions,
-	Track,
-} from "../types/schemas";
+import type { AudioFileInfo, PlaybackOptions, Track } from "../types/schemas";
 // TimeGrid type removed - use ReturnType<typeof time.generateTimeGrid> instead
 
 // ===== Audio Provider Interface =====
 
 /**
  * AudioProvider - Interface for audio file loading and management
- * 
+ *
  * Implementations handle:
  * - Audio file decoding and buffering
  * - Persistent storage (e.g., OPFS)
@@ -90,7 +86,7 @@ export interface FormatOptions {
 
 /**
  * TimelineCalculations - Pure functions for timeline computations
- * 
+ *
  * All methods are stateless and deterministic - same input always
  * produces the same output. No side effects.
  */
@@ -140,7 +136,7 @@ export interface TimelineCalculations {
 
 /**
  * PlaybackEngine - Interface for audio playback control
- * 
+ *
  * Implementations handle:
  * - Multi-track playback scheduling
  * - Real-time volume/mute control
@@ -202,4 +198,3 @@ export interface PlaybackEngine {
 	 */
 	cleanup(): Promise<void>;
 }
-

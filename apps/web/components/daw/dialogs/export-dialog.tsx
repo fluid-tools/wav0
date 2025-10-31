@@ -127,7 +127,7 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 				{ tracks },
 				{ startMs, endMs, sampleRate: sr, channels: ch },
 			);
-		const wavBytes: Uint8Array = audioBuffer.toWav(buffer, { bitDepth: 16 });
+			const wavBytes: Uint8Array = audioBuffer.toWav(buffer, { bitDepth: 16 });
 			let bytes = wavBytes;
 			let ext = "wav";
 			if (fmt !== "wav") {

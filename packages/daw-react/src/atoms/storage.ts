@@ -56,4 +56,3 @@ export function atomWithStorage<T>(
 
 	return derivedAtom as WritableAtom<T, [T], void>;
 }
-
