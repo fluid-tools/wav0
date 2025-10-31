@@ -9,8 +9,8 @@
 	}
 
 	/* Disable automation lane overlay pointer events during drag for accurate track detection */
-	[data-dragging="true"] svg.pointer-events-auto.pointer-events-auto {
-		pointer-events: none;
+	[data-dragging="true"] svg.pointer-events-auto {
+		pointer-events: none !important;
 	}
 }
 
