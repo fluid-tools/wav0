@@ -1,5 +1,6 @@
 "use client";
 
+import { useDAWAtomSync } from "@wav0/daw-react";
 import { useAtom } from "jotai";
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
@@ -45,6 +46,10 @@ import { ClipMoveToastManager } from "./toast/clip-move-toast";
 import { UnifiedOverlay } from "./unified-overlay";
 
 export function DAWContainer() {
+	// Enable event-driven atom synchronization with new SDK
+	// This keeps old atoms in sync with Transport/AudioEngine events
+	useDAWAtomSync(playbackAtom, tracksAtom);
+
 	const [timelineWidth] = useAtom(timelineWidthAtom);
 	const [tracks] = useAtom(tracksAtom);
 	const [trackHeightZoom] = useAtom(trackHeightZoomAtom);

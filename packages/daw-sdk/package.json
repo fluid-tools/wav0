@@ -1,0 +1,34 @@
+{
+	"name": "@wav0/daw-sdk",
+	"version": "0.1.0",
+	"type": "module",
+	"main": "./dist/index.js",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./utils": {
+			"types": "./dist/utils/index.d.ts",
+			"import": "./dist/utils/index.js"
+		}
+	},
+	"scripts": {
+		"build": "tsc",
+		"dev": "tsc --watch",
+		"test": "vitest"
+	},
+	"dependencies": {
+		"zod": "^4.1.11"
+	},
+	"peerDependencies": {
+		"mediabunny": "^1.24.0"
+	},
+	"devDependencies": {
+		"@types/node": "^22.18.8",
+		"typescript": "^5.9.3",
+		"vitest": "^2.0.0"
+	}
+}

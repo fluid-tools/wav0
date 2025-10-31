@@ -1,7 +1,7 @@
 "use client";
 import { useAtom } from "jotai";
 import { useMemo } from "react";
-import { cachedGridSubdivisionsAtom } from "@/lib/daw-sdk/state/view";
+import { cachedTimeGridAtom } from "@/lib/daw-sdk/state/view";
 
 type Props = {
 	width: number;
@@ -16,24 +16,24 @@ export function TimelineGridHeader({
 	pxPerMs,
 	scrollLeft,
 }: Props) {
-	const [grid] = useAtom(cachedGridSubdivisionsAtom);
+	const [timeGrid] = useAtom(cachedTimeGridAtom);
 
 	// Memoize SVG elements for performance
 	const svgElements = useMemo(() => {
-		if (!grid.measures.length) return null;
+		if (!timeGrid.majors.length) return null;
 
 		const elements: React.ReactElement[] = [];
 		let lastLabelX = -1e9;
 		const minLabelSpacing = 28; // px
 
-		for (const measure of grid.measures) {
-			const x = measure.ms * pxPerMs - scrollLeft;
+		for (const marker of timeGrid.majors) {
+			const x = marker.ms * pxPerMs - scrollLeft;
 
 			// Only render labels that are visible and have enough spacing
 			if (x - lastLabelX >= minLabelSpacing && x >= 0 && x <= width) {
 				elements.push(
 					<text
-						key={`label-${measure.bar}`}
+						key={`label-${marker.ms}`}
 						x={x + 4}
 						y={12}
 						fontSize="10"
@@ -41,7 +41,7 @@ export function TimelineGridHeader({
 						fill="var(--timeline-grid-label)"
 						className="select-none"
 					>
-						{measure.bar}
+						{marker.label}
 					</text>,
 				);
 				lastLabelX = x;
@@ -49,7 +49,7 @@ export function TimelineGridHeader({
 		}
 
 		return elements;
-	}, [grid.measures, pxPerMs, scrollLeft, width]);
+	}, [timeGrid.majors, pxPerMs, scrollLeft, width]);
 
 	return (
 		<svg

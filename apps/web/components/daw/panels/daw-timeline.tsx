@@ -1,5 +1,6 @@
 "use client";
 
+import { time } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MarkerTrack } from "@/components/daw/panels/marker-track";
@@ -19,8 +20,6 @@ import {
 	timelineWidthAtom,
 } from "@/lib/daw-sdk";
 import { useTimebase } from "@/lib/daw-sdk/hooks/use-timebase";
-import { snapTimeMs } from "@/lib/daw-sdk/utils/time-utils";
-import { formatDuration } from "@/lib/storage/opfs";
 
 export function DAWTimeline() {
 	const [timeline] = useAtom(timelineAtom);
@@ -74,15 +73,15 @@ export function DAWTimeline() {
 			timeline.zoom < 0.5 ? 10 : timeline.zoom < 1 ? 5 : 1;
 
 		for (
-			let time = 0;
-			time * pixelsPerSecond < timelineWidth;
-			time += secondsPerMarker
+			let timeInSeconds = 0;
+			timeInSeconds * pixelsPerSecond < timelineWidth;
+			timeInSeconds += secondsPerMarker
 		) {
-			const timestampMs = time * 1000;
+			const timestampMs = timeInSeconds * 1000;
 			markers.push({
 				time: timestampMs,
-				position: time * pixelsPerSecond,
-				label: formatDuration(timestampMs),
+				position: timeInSeconds * pixelsPerSecond,
+				label: time.formatDuration(timestampMs),
 			});
 		}
 
@@ -128,7 +127,7 @@ export function DAWTimeline() {
 			}
 			if (e.key.toLowerCase() !== "m") return;
 			const timeMs = Math.max(0, Math.round(playback.currentTime));
-			const snapped = snapTimeMs(
+			const snapped = time.snapTimeMs(
 				timeMs,
 				grid,
 				music.tempoBpm,
@@ -204,7 +203,7 @@ export function DAWTimeline() {
 						e.preventDefault();
 						const at = Math.max(0, Math.round(playback.currentTime));
 						const snapped = timeline.snapToGrid
-							? snapTimeMs(at, grid, music.tempoBpm, music.timeSignature)
+							? time.snapTimeMs(at, grid, music.tempoBpm, music.timeSignature)
 							: at;
 						setCurrentTime(snapped);
 					}

@@ -1,6 +1,6 @@
 "use client";
 
-import { evaluateSegmentCurve } from "@/lib/daw-sdk";
+import { curves } from "@wav0/daw-sdk";
 
 type SegmentCurvePreviewProps = {
 	curve: number; // -99 to +99
@@ -28,7 +28,7 @@ export function SegmentCurvePreview({
 
 	for (let i = 0; i <= samples; i++) {
 		const t = i / samples;
-		const value = evaluateSegmentCurve(0, 1, t, curve);
+		const value = curves.evaluateSegmentCurve(0, 1, t, curve);
 		const x = (t * 100).toFixed(2);
 		const y = ((1 - value) * 100).toFixed(2);
 		points.push(`${x},${y}`);

@@ -1,6 +1,7 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { browserAdapter, DAWProvider } from "@wav0/daw-react";
 import { Provider as JotaiProvider } from "jotai";
 import { ThemeProvider } from "next-themes";
 import NextTopLoader from "nextjs-toploader";
@@ -69,15 +70,21 @@ export function BaseProviders({ children }: { children: ReactNode }) {
 				disableTransitionOnChange
 			>
 				<JotaiProvider store={store}>
-					<DAWInitializer>
-						<NextTopLoader
-							color="hsl(var(--primary))"
-							showSpinner={false}
-							height={2}
-						/>
-						<Toaster />
-						{children}
-					</DAWInitializer>
+					<DAWProvider
+						storageAdapter={browserAdapter}
+						legacyAudioService={audioService}
+						legacyPlaybackService={playbackService}
+					>
+						<DAWInitializer>
+							<NextTopLoader
+								color="hsl(var(--primary))"
+								showSpinner={false}
+								height={2}
+							/>
+							<Toaster />
+							{children}
+						</DAWInitializer>
+					</DAWProvider>
 				</JotaiProvider>
 			</ThemeProvider>
 		</QueryClientProvider>

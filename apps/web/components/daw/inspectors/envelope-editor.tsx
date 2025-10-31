@@ -1,22 +1,10 @@
 "use client";
 
+import { automation, curves, time, volume } from "@wav0/daw-sdk";
 import { MoveVertical, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { TrackEnvelope } from "@/lib/daw-sdk";
-import {
-	addAutomationPoint,
-	clampAutomationDb,
-	dbToMultiplier,
-	formatDb,
-	getEffectiveDb,
-	getSegmentCurveDescription,
-	multiplierToDb,
-	removeAutomationPoint,
-	updateSegmentCurve,
-	volumeToDb,
-} from "@/lib/daw-sdk";
-import { formatDuration } from "@/lib/storage/opfs";
 import { SegmentCurvePreview } from "../controls/segment-curve-preview";
 
 type EnvelopeEditorProps = {
@@ -64,7 +52,7 @@ export function EnvelopeEditor({
 	};
 
 	const handlePointRemove = (pointId: string) => {
-		const updatedEnvelope = removeAutomationPoint(envelope, pointId);
+		const updatedEnvelope = automation.removeAutomationPoint(envelope, pointId);
 		onChange(updatedEnvelope);
 	};
 
@@ -79,12 +67,16 @@ export function EnvelopeEditor({
 			value: 1.0, // 100% = no change from base volume
 		};
 
-		const updatedEnvelope = addAutomationPoint(envelope, newPoint);
+		const updatedEnvelope = automation.addAutomationPoint(envelope, newPoint);
 		onChange(updatedEnvelope);
 	};
 
 	const handleSegmentCurveChange = (segmentId: string, curve: number) => {
-		const updatedEnvelope = updateSegmentCurve(envelope, segmentId, curve);
+		const updatedEnvelope = automation.updateSegmentCurve(
+			envelope,
+			segmentId,
+			curve,
+		);
 		onChange(updatedEnvelope);
 	};
 
@@ -119,7 +111,7 @@ export function EnvelopeEditor({
 					);
 
 					// Calculate effective dB for this point
-					const effectiveDb = getEffectiveDb(point.value, trackVolume);
+					const effectiveDb = volume.getEffectiveDb(trackVolume, point.value);
 
 					return (
 						<div key={point.id} className="space-y-3">
@@ -154,7 +146,7 @@ export function EnvelopeEditor({
 											<Input
 												id={`point-time-${point.id}`}
 												type="text"
-												value={formatDuration(point.time)}
+												value={time.formatDuration(point.time)}
 												onChange={(e) => {
 													const ms = parseDuration(e.target.value);
 													if (ms !== null) {
@@ -176,12 +168,14 @@ export function EnvelopeEditor({
 											<Input
 												id={`point-value-${point.id}`}
 												type="text"
-												value={formatDb(multiplierToDb(point.value))}
+												value={volume.formatDb(
+													volume.multiplierToDb(point.value),
+												)}
 												onChange={(e) => {
 													const db = parseFloat(e.target.value);
 													if (Number.isFinite(db)) {
-														const clampedDb = clampAutomationDb(db);
-														const multiplier = dbToMultiplier(clampedDb);
+														const clampedDb = volume.clampAutomationDb(db);
+														const multiplier = volume.dbToMultiplier(clampedDb);
 														handlePointChange(point.id, undefined, multiplier);
 													}
 												}}
@@ -192,9 +186,10 @@ export function EnvelopeEditor({
 									</div>
 
 									<div className="text-[10px] text-muted-foreground">
-										Effective: {formatDb(effectiveDb)} (
-										{volumeToDb(trackVolume)} track +{" "}
-										{formatDb(multiplierToDb(point.value))} automation)
+										Effective: {volume.formatDb(effectiveDb)} (
+										{volume.volumeToDb(trackVolume)} track +{" "}
+										{volume.formatDb(volume.multiplierToDb(point.value))}{" "}
+										automation)
 									</div>
 								</div>
 							</div>
@@ -245,7 +240,7 @@ export function EnvelopeEditor({
 											</div>
 
 											<div className="text-[10px] text-muted-foreground">
-												{getSegmentCurveDescription(segment.curve)}
+												{curves.getSegmentCurveDescription(segment.curve)}
 											</div>
 										</div>
 

@@ -1,11 +1,10 @@
+import { automation, curves } from "@wav0/daw-sdk";
 import type {
 	Clip,
 	TrackEnvelope,
 	TrackEnvelopePoint,
 	TrackEnvelopeSegment,
 } from "@/lib/daw-sdk";
-import { evaluateEnvelopeGainAt } from "@/lib/daw-sdk/utils/automation-utils";
-import { evaluateSegmentCurve } from "@/lib/daw-sdk/utils/curve-functions";
 
 export function scheduleTrackEnvelope(
 	ac: BaseAudioContext,
@@ -28,7 +27,7 @@ export function scheduleTrackEnvelope(
 		const curve = new Float32Array(64);
 		for (let s = 0; s < curve.length; s++) {
 			const t = s / (curve.length - 1);
-			curve[s] = evaluateSegmentCurve(a.value, b.value, t, 0);
+			curve[s] = curves.evaluateSegmentCurve(a.value, b.value, t, 0);
 		}
 		param.setValueCurveAtTime(curve, segStart, segDur);
 	}
@@ -49,7 +48,7 @@ export function scheduleTrackEnvelopeInRange(
 	param.cancelScheduledValues(0);
 	if (!envelope || !envelope.enabled) return;
 	// Anchor at range start
-	const v0 = evaluateEnvelopeGainAt(envelope, rangeStartMs);
+	const v0 = automation.evaluateEnvelopeGainAt(envelope, rangeStartMs);
 	param.setValueAtTime(v0, 0);
 
 	const points: TrackEnvelopePoint[] = envelope.points || [];
@@ -68,8 +67,8 @@ export function scheduleTrackEnvelopeInRange(
 			(s) => s.fromPointId === a.id && s.toPointId === b.id,
 		);
 		const curve = seg?.curve ?? 0;
-		const startVal = evaluateEnvelopeGainAt(envelope, segStartMs);
-		const endVal = evaluateEnvelopeGainAt(envelope, segEndMs);
+		const startVal = automation.evaluateEnvelopeGainAt(envelope, segStartMs);
+		const endVal = automation.evaluateEnvelopeGainAt(envelope, segEndMs);
 		const relStartSec = (segStartMs - rangeStartMs) / 1000;
 		const relDurSec = (segEndMs - segStartMs) / 1000;
 		// Use value curve for better WYSIWYG
@@ -77,7 +76,7 @@ export function scheduleTrackEnvelopeInRange(
 		const arr = new Float32Array(samples);
 		for (let s = 0; s < samples; s++) {
 			const t = s / (samples - 1);
-			arr[s] = evaluateSegmentCurve(startVal, endVal, t, curve);
+			arr[s] = curves.evaluateSegmentCurve(startVal, endVal, t, curve);
 		}
 		param.setValueCurveAtTime(arr, relStartSec, relDurSec);
 	}

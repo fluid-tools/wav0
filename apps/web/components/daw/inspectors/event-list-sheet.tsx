@@ -1,5 +1,6 @@
 "use client";
 
+import { time } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -28,7 +29,6 @@ import {
 	eventListOpenAtom,
 	tracksAtom,
 } from "@/lib/daw-sdk";
-import { formatDuration } from "@/lib/storage/opfs";
 
 type EventRow = {
 	trackId: string;
@@ -175,7 +175,7 @@ export function EventListSheet() {
 											className="grid w-full grid-cols-[140px_160px_1fr_100px_100px_80px] gap-3 rounded-md border border-transparent px-3 py-2.5 text-left text-sm transition-colors hover:border-primary/40 hover:bg-accent/30"
 										>
 											<div className="font-mono text-foreground">
-												{formatDuration(event.clip.startTime)}
+												{time.formatDuration(event.clip.startTime)}
 											</div>
 											<div className="truncate text-muted-foreground">
 												{event.trackName}
@@ -184,10 +184,10 @@ export function EventListSheet() {
 												{event.clip.name || "Untitled"}
 											</div>
 											<div className="font-mono text-right text-muted-foreground">
-												{formatDuration(event.clip.trimStart)}
+												{time.formatDuration(event.clip.trimStart)}
 											</div>
 											<div className="font-mono text-right text-muted-foreground">
-												{formatDuration(length)}
+												{time.formatDuration(length)}
 											</div>
 											<div className="text-right">
 												<Badge variant="secondary" className="text-xs">
@@ -210,7 +210,7 @@ export function EventListSheet() {
 							<span>·</span>
 							<span>{allEvents.length} total events</span>
 							<span>·</span>
-							<span>Duration: {formatDuration(totalDuration)}</span>
+							<span>Duration: {time.formatDuration(totalDuration)}</span>
 						</div>
 						<SheetClose asChild>
 							<Button variant="outline" size="sm">

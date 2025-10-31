@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * Playback State Atoms - Legacy Layer
+ *
+ * NOTE: These write atoms use the old playbackService directly.
+ * For new code, prefer using `useBridgeMutations()` from @wav0/daw-react
+ * which provides bridge-based mutations with event-driven sync.
+ *
+ * These atoms remain for backward compatibility during migration.
+ */
+
 import { atom, type Getter, type Setter } from "jotai";
 import { playbackService } from "../index";
 import { playbackAtom, tracksAtom } from "./atoms";
@@ -9,22 +19,40 @@ import type { PlaybackState, Track } from "./types";
 // Guarded onTimeUpdate callback to prevent recursion
 let lastUpdateTime = 0;
 let lastUpdateMs = 0;
+let isFirstUpdate = true;
 
 function createGuardedTimeUpdateCallback(get: Getter, set: Setter) {
 	return (timeSeconds: number) => {
 		const currentMs = Math.max(0, Math.round(timeSeconds * 1000));
 		const now = performance.now();
 
-		// Prevent updates if time hasn't changed
-		if (currentMs === lastUpdateMs) return;
+		// Note: isFirstUpdate is now reset at playback start/stop boundaries
+		// This check remains as a safety net for edge cases
+		if (currentMs < lastUpdateMs - 100) {
+			isFirstUpdate = true;
+		}
 
-		// Limit update frequency to ~60Hz (16ms intervals)
-		if (now - lastUpdateTime < 16) return;
+		// Prevent updates if time hasn't changed, but allow first update
+		// even if time matches (e.g., starting from position 0)
+		// This ensures the initial synchronous update is always processed
+		if (!isFirstUpdate && currentMs === lastUpdateMs) return;
 
+		// Allow immediate first update without throttling for instant visual sync
+		// After first update, throttle to ~60Hz (16ms intervals)
+		if (!isFirstUpdate && now - lastUpdateTime < 16) return;
+
+		isFirstUpdate = false;
 		lastUpdateTime = now;
 		lastUpdateMs = currentMs;
 
 		const newPlayback = get(playbackAtom) as PlaybackState;
+
+		// Critical: Check if playback is still active before updating
+		// This prevents infinite loops when playback has been stopped but callback still fires
+		if (!newPlayback.isPlaying) {
+			return;
+		}
+
 		const total = get(totalDurationAtom) as number;
 
 		if (currentMs >= total) {
@@ -46,10 +74,15 @@ export const togglePlaybackAtom = atom(null, async (get, set) => {
 	if (playback.isPlaying) {
 		await playbackService.pause();
 		set(playbackAtom, { ...playback, isPlaying: false });
+		// Reset first update flag when playback stops for next session
+		isFirstUpdate = true;
 		return;
 	}
 
 	const currentTimeSeconds = playback.currentTime / 1000;
+
+	// Reset first update flag at start of new playback session
+	isFirstUpdate = true;
 
 	await playbackService.initializeWithTracks(tracks);
 
@@ -59,6 +92,8 @@ export const togglePlaybackAtom = atom(null, async (get, set) => {
 		onPlaybackEnd: () => {
 			const endState = get(playbackAtom);
 			set(playbackAtom, { ...endState, isPlaying: false });
+			// Reset first update flag when playback ends
+			isFirstUpdate = true;
 		},
 	});
 
@@ -69,6 +104,8 @@ export const stopPlaybackAtom = atom(null, async (get, set) => {
 	await playbackService.stop();
 	const playback = get(playbackAtom);
 	set(playbackAtom, { ...playback, isPlaying: false });
+	// Reset first update flag when playback stops
+	isFirstUpdate = true;
 });
 
 export const setCurrentTimeAtom = atom(
@@ -83,12 +120,17 @@ export const setCurrentTimeAtom = atom(
 
 		await playbackService.pause();
 
+		// Reset first update flag when restarting playback for seek
+		isFirstUpdate = true;
+
 		await playbackService.play(tracks, {
 			startTime: timeMs / 1000,
 			onTimeUpdate: createGuardedTimeUpdateCallback(get, set),
 			onPlaybackEnd: () => {
 				const endState = get(playbackAtom);
 				set(playbackAtom, { ...endState, isPlaying: false });
+				// Reset first update flag when playback ends
+				isFirstUpdate = true;
 			},
 		});
 	},
