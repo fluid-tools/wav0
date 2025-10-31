@@ -1,3 +1,4 @@
+import type { Getter, Setter } from "jotai";
 import { describe, expect, it } from "vitest";
 import { playbackAtom, tracksAtom } from "../../state/atoms";
 import { updateClipAtom } from "../../state/clips";
@@ -375,19 +376,19 @@ describe("updateClipAtom same-track automation", () => {
 			looping: false,
 		};
 
-		const mockGet = (atomRef: unknown) => {
+		const mockGet = ((atomRef: unknown) => {
 			if (atomRef === tracksAtom) return tracksState;
 			if (atomRef === playbackAtom) return playbackState;
 			throw new Error("Unexpected atom read");
-		};
+		}) as Getter;
 
-		const mockSet = (atomRef: unknown, value: unknown) => {
+		const mockSet = ((atomRef: unknown, ...args: unknown[]) => {
 			if (atomRef === tracksAtom) {
-				tracksState = value as Track[];
+				tracksState = args[0] as Track[];
 				return;
 			}
 			throw new Error("Unexpected atom write");
-		};
+		}) as Setter;
 
 		await updateClipAtom.write(mockGet, mockSet, "track1", "clip1", {
 			startTime: 400,
