@@ -118,7 +118,7 @@ export const updateClipAtom = atom(
 
 		// Synchronize via global path (no direct reschedule)
 		if (playback.isPlaying) {
-			playbackService.synchronizeTracks(updatedTracks);
+			playbackService.synchronizeTracks(updatedTracks).catch(console.error);
 		}
 	},
 );
@@ -155,7 +155,7 @@ export const removeClipAtom = atom(
 
 		// Synchronize via global path (no direct stop/reschedule)
 		if (playback.isPlaying) {
-			playbackService.synchronizeTracks(updatedTracks);
+			playbackService.synchronizeTracks(updatedTracks).catch(console.error);
 		}
 	},
 );
@@ -212,7 +212,8 @@ export const splitClipAtPlayheadAtom = atom(null, async (get, set) => {
 
 	if (playback.isPlaying) {
 		try {
-			await playbackService.rescheduleTrack(updatedTrack);
+			// Synchronize all tracks to ensure original clip stops and both split clips start correctly
+			await playbackService.synchronizeTracks(updatedTracks);
 		} catch (error) {
 			console.error("Failed to reschedule after split", track.id, error);
 		}

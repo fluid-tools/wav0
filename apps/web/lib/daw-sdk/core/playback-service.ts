@@ -557,10 +557,10 @@ export class PlaybackService {
 		this.applySnapshot(tracks);
 	}
 
-	synchronizeTracks(tracks: Track[]): void {
+	async synchronizeTracks(tracks: Track[]): Promise<void> {
 		if (this.isPlaying && this.audioContext) {
 			// Atomic: snapshot + clip sync under mutex to avoid gaps
-			this.queueSync(async () => {
+			await this.queueSync(async () => {
 				this.applySnapshot(tracks);
 				await this.synchronizeClipsGlobal(tracks);
 			}).catch((err) => {
@@ -594,6 +594,10 @@ export class PlaybackService {
 		}
 
 		// Phase 1: Stop clips that shouldn't be playing, are on wrong track, or have changed params
+		// This handles:
+		// - Clips that were removed (!desired) - including original clips that were split
+		// - Clips that moved tracks (desired.trackId !== active.trackId)
+		// - Clips that changed position/trim/loop (desired.desc !== active.desc)
 		const stopsNeeded: string[] = [];
 		for (const [clipId, active] of this.activeClips) {
 			const desired = desiredState.get(clipId);
@@ -990,12 +994,16 @@ export class PlaybackService {
 		this.options.onTimeUpdate?.(0);
 	}
 
-	async rescheduleTrack(updatedTrack: Track): Promise<void> {
+	async rescheduleTrack(updatedTrack: Track, allTracks?: Track[]): Promise<void> {
 		// Alias to global synchronization path
-		const tracks = Array.from(this.currentTracks.values()).map((t) =>
-			t.id === updatedTrack.id ? updatedTrack : t,
-		);
-		this.synchronizeTracks(tracks);
+		// If allTracks is provided, use it for complete state synchronization
+		// Otherwise, build from currentTracks (backward compatibility)
+		const tracks = allTracks
+			? allTracks.map((t) => (t.id === updatedTrack.id ? updatedTrack : t))
+			: Array.from(this.currentTracks.values()).map((t) =>
+					t.id === updatedTrack.id ? updatedTrack : t,
+				);
+		await this.synchronizeTracks(tracks);
 	}
 
 	getCurrentTime(): number {
