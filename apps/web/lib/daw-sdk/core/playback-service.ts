@@ -127,6 +127,11 @@ export class PlaybackService {
 		return this.audioContext;
 	}
 
+	/**
+	 * Get current playback time with high precision
+	 * Uses AudioContext.currentTime which provides sub-millisecond accuracy
+	 * and is synchronized with the audio hardware clock
+	 */
 	private getPlaybackTime(): number {
 		if (this.isPlaying && this.audioContext) {
 			return (
@@ -665,6 +670,10 @@ export class PlaybackService {
 		this.startTime = this.audioContext.currentTime;
 		this.isPlaying = true;
 
+		// Immediate synchronous update before audio scheduling to ensure visual sync
+		const initialTime = this.getPlaybackTime();
+		this.options.onTimeUpdate?.(initialTime);
+
 		this.startMeterUpdates();
 		this.applySnapshot(tracks);
 
@@ -686,10 +695,12 @@ export class PlaybackService {
 			}
 		}
 
+		// Start visual update loop immediately, before audio scheduling
+		// This ensures visual updates begin synchronously with playback start
+		this.startTimeUpdateLoop();
+
 		// Schedule all clips via mutex
 		await this.queueSync(() => this.synchronizeClipsGlobal(tracks));
-
-		this.startTimeUpdateLoop();
 	}
 
 	private async scheduleClipWithState(
@@ -996,12 +1007,20 @@ export class PlaybackService {
 	}
 
 	private startTimeUpdateLoop(): void {
+		// Stop any existing loop first
+		this.stopTimeUpdateLoop();
+
 		const updateTime = () => {
-			if (!this.isPlaying) return;
+			if (!this.isPlaying) {
+				this.animationFrameId = null;
+				return;
+			}
+			// Use high-precision AudioContext time for accurate sync
 			const currentTime = this.getPlaybackTime();
 			this.options.onTimeUpdate?.(currentTime);
 			this.animationFrameId = requestAnimationFrame(updateTime);
 		};
+		// Immediate synchronous call for instant visual update
 		updateTime();
 	}
 
