@@ -1,5 +1,6 @@
 "use client";
 
+import { volume } from "@wav0/daw-sdk";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,7 +11,6 @@ import {
 	ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { Input } from "@/components/ui/input";
-import { volume } from "@wav0/daw-sdk";
 
 const VOLUME_MIN_DB = -60;
 const VOLUME_MAX_DB = 12;
