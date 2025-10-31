@@ -1,7 +1,7 @@
 "use client";
 
 import { useAtom } from "jotai";
-import { memo, useCallback, useEffect, useMemo, useRef } from "react";
+import { memo, useCallback, useEffect, useRef } from "react";
 import {
 	horizontalScrollAtom,
 	playbackAtom,
@@ -12,6 +12,7 @@ import {
 	timelineAtom,
 	timelinePxPerMsAtom,
 } from "@/lib/daw-sdk";
+import { useTimebase } from "@/lib/daw-sdk/hooks/use-timebase";
 
 export const UnifiedOverlay = memo(function UnifiedOverlay() {
 	const [playheadViewport] = useAtom(playheadViewportAtom);
@@ -32,14 +33,8 @@ export const UnifiedOverlay = memo(function UnifiedOverlay() {
 		raf: number;
 	} | null>(null);
 
-	// Remove unnecessary ResizeObserver - layout handles height automatically
-
-	const snapConfig = useMemo(() => {
-		if (!timeline.snapToGrid) return null;
-		const bpm = Math.max(30, Math.min(300, playback.bpm || 120));
-		const secondsPerBeat = 60 / bpm;
-		return secondsPerBeat / 4;
-	}, [playback.bpm, timeline.snapToGrid]);
+	// Use unified snap logic from useTimebase
+	const { snap } = useTimebase();
 
 	const updateTime = useCallback(
 		(clientX: number, timeStamp?: number) => {
@@ -50,13 +45,7 @@ export const UnifiedOverlay = memo(function UnifiedOverlay() {
 			if (!Number.isFinite(absoluteX)) return;
 
 			const rawMs = Math.max(0, absoluteX / pxPerMs);
-			let nextMs = rawMs;
-
-			if (snapConfig) {
-				const snappedSeconds =
-					Math.round(rawMs / 1000 / snapConfig) * snapConfig;
-				nextMs = Math.max(0, snappedSeconds * 1000);
-			}
+			const nextMs = timeline.snapToGrid ? snap(rawMs) : rawMs;
 
 			const state = dragRef.current;
 			if (!state?.active) {
@@ -77,7 +66,7 @@ export const UnifiedOverlay = memo(function UnifiedOverlay() {
 				});
 			}
 		},
-		[horizontalScroll, pxPerMs, setCurrentTime, snapConfig],
+		[horizontalScroll, pxPerMs, setCurrentTime, timeline.snapToGrid, snap],
 	);
 
 	const stopDrag = useCallback(() => {

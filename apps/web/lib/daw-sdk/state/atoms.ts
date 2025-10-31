@@ -73,6 +73,8 @@ export const timelineAtom = atom<TimelineState>({
 	scrollPosition: 0,
 	snapToGrid: true,
 	gridSize: 500,
+	snapGranularity: "medium",
+	customSnapIntervalMs: undefined,
 });
 
 export const timelineSectionsAtom = atom<TimelineSection[]>([]);

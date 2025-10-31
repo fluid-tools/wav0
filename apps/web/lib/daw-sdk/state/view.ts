@@ -8,7 +8,7 @@ import { time } from "@wav0/daw-sdk";
 import { atom } from "jotai";
 import { DAW_PIXELS_PER_SECOND_AT_ZOOM_1 } from "@/lib/constants";
 import { horizontalScrollAtom, playbackAtom, timelineAtom } from "./atoms";
-import { gridAtom } from "./index";
+import { gridAtom, musicalMetadataAtom } from "./index";
 import { totalDurationAtom } from "./tracks";
 
 export type TimelineViewportMetrics = {
@@ -97,16 +97,72 @@ export const viewSpanMsAtom = atom((get) => {
 	return end - start;
 });
 
+// Snap interval atom - derives snap interval from grid mode, BPM, and granularity
+export const snapIntervalMsAtom = atom((get) => {
+	const grid = get(gridAtom);
+	const timeline = get(timelineAtom);
+	const music = get(musicalMetadataAtom);
+	const { snapGranularity, customSnapIntervalMs } = timeline;
+
+	if (snapGranularity === "custom" && customSnapIntervalMs !== undefined) {
+		return customSnapIntervalMs;
+	}
+
+	if (grid.mode === "time") {
+		// For time mode, derive from granularity
+		switch (snapGranularity) {
+			case "coarse":
+				return 1000; // 1 second
+			case "fine":
+				return 100; // 100ms
+			case "medium":
+			default:
+				return 500; // 500ms
+		}
+	}
+
+	// For bars mode, derive from grid resolution and granularity
+	const den = music.timeSignature.den;
+	const secondsPerBeat = (60 / music.tempoBpm) * (4 / den);
+	const baseDivisionBeats = time.getDivisionBeats(
+		grid.resolution,
+		music.timeSignature,
+	);
+	const subdivBeats = grid.triplet ? baseDivisionBeats / 3 : baseDivisionBeats;
+
+	switch (snapGranularity) {
+		case "coarse":
+			// Coarse: 1/4 notes (or division if larger)
+			return Math.max(
+				baseDivisionBeats * secondsPerBeat * 1000,
+				secondsPerBeat * 1000,
+			);
+		case "fine": {
+			// Fine: 1/16 of subdivision (or minimum 1/32 note)
+			const fineBeats = subdivBeats / 4;
+			return Math.max(fineBeats * secondsPerBeat * 1000, 50);
+		}
+		case "medium":
+		default:
+			// Medium: use current subdivision
+			return subdivBeats * secondsPerBeat * 1000;
+	}
+});
+
 // Cache key for time grid
 export const timeGridCacheKeyAtom = atom((get) => {
 	const pxPerMs = get(timelinePxPerMsAtom);
 	const viewSpan = get(viewSpanMsAtom);
 	const viewStart = get(viewStartMsAtom);
+	const timeline = get(timelineAtom);
+	const snapInterval = timeline.snapToGrid ? get(snapIntervalMsAtom) : null;
 
 	return JSON.stringify({
 		pxPerMs: Math.round(pxPerMs * 1000) / 1000, // Round to 3 decimal places
 		viewSpan: Math.round(viewSpan * 10) / 10, // Round to 0.1ms precision
 		viewStart: Math.round(viewStart * 10) / 10, // Round to 0.1ms precision
+		snapInterval,
+		snapToGrid: timeline.snapToGrid,
 	});
 });
 
@@ -120,6 +176,7 @@ const timeGridCache = new Map<
 
 export const cachedTimeGridAtom = atom((get) => {
 	const grid = get(gridAtom);
+	const timeline = get(timelineAtom);
 
 	// Only generate time grid if mode is "time"
 	if (grid.mode !== "time") {
@@ -139,10 +196,15 @@ export const cachedTimeGridAtom = atom((get) => {
 	const viewEndMs = get(viewEndMsAtom);
 	const pxPerMs = get(timelinePxPerMsAtom);
 
+	// Pass snap interval when snap is enabled to align visual grid with snap points
+	const snapIntervalMs =
+		timeline.snapToGrid ? get(snapIntervalMsAtom) : undefined;
+
 	const result = time.generateTimeGrid({
 		viewStartMs,
 		viewEndMs,
 		pxPerMs,
+		snapIntervalMs,
 	});
 
 	// Cache the result

@@ -7,9 +7,7 @@ import { MarkerTrack } from "@/components/daw/panels/marker-track";
 import { TimelineGridCanvas } from "@/components/daw/panels/timeline-grid-canvas";
 import {
 	addMarkerAtom,
-	gridAtom,
 	horizontalScrollAtom,
-	musicalMetadataAtom,
 	playbackAtom,
 	playheadViewportPxAtom,
 	projectEndOverrideAtom,
@@ -35,9 +33,7 @@ export function DAWTimeline() {
 	const [playheadViewportPx] = useAtom(playheadViewportPxAtom);
 	const [pxPerMs] = useAtom(timelinePxPerMsAtom);
 	const [, addMarker] = useAtom(addMarkerAtom);
-	const [grid] = useAtom(gridAtom);
-	const [music] = useAtom(musicalMetadataAtom);
-	const { grid: tGrid } = useTimebase();
+	const { grid: tGrid, snap } = useTimebase();
 
 	// legacy marker drag removed in favor of dedicated MarkerTrack
 
@@ -96,16 +92,9 @@ export function DAWTimeline() {
 		if (pxPerMs <= 0) return;
 
 		// Allow clicking past project end; snap playhead and move if needed
-
-		// Snap-to-grid (quarter note)
-		const secondsPerBeat = 60 / playback.bpm;
-		const snapSeconds = secondsPerBeat / 4; // 16th grid
-		const rawSeconds = x / (pxPerMs * 1000);
-		const snappedSeconds = timeline.snapToGrid
-			? Math.round(rawSeconds / snapSeconds) * snapSeconds
-			: rawSeconds;
-		const time = snappedSeconds * 1000; // ms
-		setCurrentTime(Math.max(0, time));
+		const rawMs = Math.max(0, x / pxPerMs);
+		const timeMs = timeline.snapToGrid ? snap(rawMs) : rawMs;
+		setCurrentTime(timeMs);
 	};
 
 	// Add marker at playhead on key "m"
@@ -126,24 +115,13 @@ export function DAWTimeline() {
 				return;
 			}
 			if (e.key.toLowerCase() !== "m") return;
-			const timeMs = Math.max(0, Math.round(playback.currentTime));
-			const snapped = time.snapTimeMs(
-				timeMs,
-				grid,
-				music.tempoBpm,
-				music.timeSignature,
-			);
+			const timeMs = Math.max(0, playback.currentTime);
+			const snapped = snap(timeMs);
 			addMarker({ timeMs: snapped, name: "", color: "#ffffff" });
 		};
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
-	}, [
-		addMarker,
-		grid,
-		music.tempoBpm,
-		music.timeSignature,
-		playback.currentTime,
-	]);
+	}, [addMarker, snap, playback.currentTime]);
 
 	const onTimelinePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
 		if (event.button !== 0) return;
@@ -201,10 +179,8 @@ export function DAWTimeline() {
 					if (isDraggingEnd) return;
 					if (e.key === "Enter" || e.key === " ") {
 						e.preventDefault();
-						const at = Math.max(0, Math.round(playback.currentTime));
-						const snapped = timeline.snapToGrid
-							? time.snapTimeMs(at, grid, music.tempoBpm, music.timeSignature)
-							: at;
+						const at = Math.max(0, playback.currentTime);
+						const snapped = timeline.snapToGrid ? snap(at) : at;
 						setCurrentTime(snapped);
 					}
 				}}

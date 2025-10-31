@@ -88,6 +88,8 @@ export const TimelineStateSchema = z.object({
 	scrollPosition: z.number().min(0),
 	snapToGrid: z.boolean(),
 	gridSize: z.number().min(0),
+	snapGranularity: z.enum(["coarse", "medium", "fine", "custom"]).default("medium"),
+	customSnapIntervalMs: z.number().min(0).optional(),
 });
 
 export const TimelineSectionSchema = z.object({

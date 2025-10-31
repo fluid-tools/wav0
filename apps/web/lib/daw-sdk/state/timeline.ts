@@ -83,6 +83,26 @@ export const toggleSnapToGridAtom = atom(null, (get, set) => {
 	set(timelineAtom, { ...timeline, snapToGrid: !timeline.snapToGrid });
 });
 
+export const setSnapGranularityAtom = atom(
+	null,
+	(get, set, granularity: "coarse" | "medium" | "fine" | "custom") => {
+		const timeline = get(timelineAtom);
+		set(timelineAtom, { ...timeline, snapGranularity: granularity });
+	},
+);
+
+export const setCustomSnapIntervalAtom = atom(
+	null,
+	(get, set, intervalMs: number) => {
+		const timeline = get(timelineAtom);
+		set(timelineAtom, {
+			...timeline,
+			customSnapIntervalMs: intervalMs,
+			snapGranularity: "custom",
+		});
+	},
+);
+
 export const setHorizontalScrollAtom = atom(
 	null,
 	(_get, set, scroll: number) => {

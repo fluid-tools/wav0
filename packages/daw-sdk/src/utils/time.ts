@@ -308,18 +308,54 @@ export namespace time {
 
 	/**
 	 * Generate time grid markers for viewport
+	 * @param params.viewStartMs - Start of viewport in milliseconds
+	 * @param params.viewEndMs - End of viewport in milliseconds
+	 * @param params.pxPerMs - Pixels per millisecond (zoom level)
+	 * @param params.snapIntervalMs - Optional snap interval in milliseconds. When provided, generates grid markers at exact snap intervals.
 	 */
 	export function generateTimeGrid(params: {
 		viewStartMs: number;
 		viewEndMs: number;
 		pxPerMs: number;
+		snapIntervalMs?: number;
 	}): TimeGrid {
-		const { viewStartMs, viewEndMs, pxPerMs } = params;
+		const { viewStartMs, viewEndMs, pxPerMs, snapIntervalMs } = params;
 
 		if (pxPerMs <= 0 || viewEndMs <= viewStartMs) {
 			return { majors: [], minors: [] };
 		}
 
+		// If snap interval is provided and snap is enabled, use snap-based grid
+		if (snapIntervalMs !== undefined && snapIntervalMs > 0) {
+			const majors: TimeMarker[] = [];
+			const minors: number[] = [];
+
+			// Determine major and minor intervals based on snap interval
+			// Major: 4x snap interval, Minor: snap interval
+			const minorMs = snapIntervalMs;
+			const majorMs = snapIntervalMs * 4;
+			const labelFormat = majorMs >= 1000 ? "mm:ss" : "ss.ms";
+
+			const firstMajor = Math.floor(viewStartMs / majorMs) * majorMs;
+			for (let ms = firstMajor; ms <= viewEndMs; ms += majorMs) {
+				if (ms >= viewStartMs) {
+					majors.push({ ms, label: formatTimeMs(ms, labelFormat) });
+				}
+			}
+
+			// Generate minors at snap intervals
+			const firstMinor = Math.floor(viewStartMs / minorMs) * minorMs;
+			for (let ms = firstMinor; ms <= viewEndMs; ms += minorMs) {
+				if (ms % majorMs === 0) continue; // Skip majors
+				if (ms >= viewStartMs) {
+					minors.push(ms);
+				}
+			}
+
+			return { majors, minors };
+		}
+
+		// Fall back to adaptive steps when snap interval not provided
 		const { majorMs, minorMs, labelFormat } = chooseTimeSteps(pxPerMs);
 
 		const majors: TimeMarker[] = [];
