@@ -118,7 +118,11 @@ export const updateClipAtom = atom(
 
 		// Synchronize via global path (no direct reschedule)
 		if (playback.isPlaying) {
-			playbackService.synchronizeTracks(updatedTracks).catch(console.error);
+			try {
+				await playbackService.synchronizeTracks(updatedTracks);
+			} catch (error) {
+				console.error("Failed to synchronize tracks after clip update", error);
+			}
 		}
 	},
 );
