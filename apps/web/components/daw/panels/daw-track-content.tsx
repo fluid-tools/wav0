@@ -34,6 +34,7 @@ import {
 	updateClipAtom,
 	updateTrackAtom,
 } from "@/lib/daw-sdk";
+import { useTimebase } from "@/lib/daw-sdk/hooks/use-timebase";
 import { cn } from "@/lib/utils";
 
 export function DAWTrackContent() {
@@ -52,6 +53,7 @@ export function DAWTrackContent() {
 	const [totalDuration] = useAtom(totalDurationAtom);
 	const [_dragMachineSnapshot, sendDragEvent] = useAtom(dragMachineAtom);
 	const dragPreview = useAtom(dragPreviewAtom)[0];
+	const { snap } = useTimebase();
 	const [resizingClip, setResizingClip] = useState<{
 		trackId: string;
 		clipId: string;
@@ -289,10 +291,8 @@ export function DAWTrackContent() {
 						0,
 						draggingClip.startTime + deltaTime,
 					);
-					if (timeline.snapToGrid && timeline.gridSize > 0) {
-						previewStartTime =
-							Math.round(previewStartTime / timeline.gridSize) *
-							timeline.gridSize;
+					if (timeline.snapToGrid) {
+						previewStartTime = snap(previewStartTime);
 					}
 
 					const trackHeight = Math.round(
@@ -333,9 +333,8 @@ export function DAWTrackContent() {
 								? oneShotEnd
 								: loopDragging.startLoopEnd;
 						let newLoopEnd = Math.max(oneShotEnd, baseLoopEnd + deltaTime);
-						if (timeline.snapToGrid && timeline.gridSize > 0) {
-							newLoopEnd =
-								Math.round(newLoopEnd / timeline.gridSize) * timeline.gridSize;
+						if (timeline.snapToGrid) {
+							newLoopEnd = snap(newLoopEnd);
 						}
 						updateClip(loopDragging.trackId, loopDragging.clipId, {
 							loopEnd: newLoopEnd,
@@ -636,7 +635,6 @@ export function DAWTrackContent() {
 		updateClip,
 		tracks,
 		timeline.snapToGrid,
-		timeline.gridSize,
 		trackHeightZoom,
 		totalDuration,
 		playback.isPlaying,
@@ -644,6 +642,7 @@ export function DAWTrackContent() {
 		dragPreview,
 		sendDragEvent,
 		setMoveHistory,
+		snap,
 	]);
 
 	return (

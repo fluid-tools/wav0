@@ -31,13 +31,95 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import { Toggle } from "@/components/ui/toggle";
 import { DAW_HEIGHTS, DAW_ICONS, DAW_TEXT } from "@/lib/constants/daw-design";
 import {
 	automationViewEnabledAtom,
 	eventListOpenAtom,
 	musicalMetadataAtom,
 	projectNameAtom,
+	setCustomSnapIntervalAtom,
+	setSnapGranularityAtom,
+	snapIntervalMsAtom,
+	timelineAtom,
+	toggleSnapToGridAtom,
 } from "@/lib/daw-sdk";
+
+function SnapGranularityControls() {
+	const [timeline] = useAtom(timelineAtom);
+	const [snapInterval] = useAtom(snapIntervalMsAtom);
+	const [, setSnapGranularity] = useAtom(setSnapGranularityAtom);
+	const [, setCustomInterval] = useAtom(setCustomSnapIntervalAtom);
+	const [, toggleSnap] = useAtom(toggleSnapToGridAtom);
+
+	const formatInterval = (ms: number) => {
+		if (ms >= 1000) return `${(ms / 1000).toFixed(1)}s`;
+		return `${Math.round(ms)}ms`;
+	};
+
+	return (
+		<div className="flex items-center gap-2">
+			<span className="text-xs text-muted-foreground">Snap:</span>
+			<Toggle
+				pressed={timeline.snapToGrid}
+				onPressedChange={() => toggleSnap()}
+				aria-label="Toggle snap to grid"
+				size="sm"
+				className="h-7 px-2 text-xs"
+			>
+				{timeline.snapToGrid ? "On" : "Off"}
+			</Toggle>
+			{timeline.snapToGrid && (
+				<>
+					<Select
+						value={timeline.snapGranularity}
+						onValueChange={(value) =>
+							setSnapGranularity(
+								value as "coarse" | "medium" | "fine" | "custom",
+							)
+						}
+					>
+						<SelectTrigger className="h-7 w-20 text-xs">
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent>
+							<SelectItem value="coarse">Coarse</SelectItem>
+							<SelectItem value="medium">Medium</SelectItem>
+							<SelectItem value="fine">Fine</SelectItem>
+							<SelectItem value="custom">Custom</SelectItem>
+						</SelectContent>
+					</Select>
+					{timeline.snapGranularity === "custom" && (
+						<Input
+							type="number"
+							min={1}
+							step={1}
+							value={timeline.customSnapIntervalMs ?? 100}
+							onChange={(e) => {
+								const val = Number(e.target.value);
+								if (!Number.isNaN(val) && val > 0) {
+									setCustomInterval(val);
+								}
+							}}
+							className="w-16 h-7 text-xs"
+							placeholder="ms"
+						/>
+					)}
+					<span className="text-xs text-muted-foreground">
+						({formatInterval(snapInterval)})
+					</span>
+				</>
+			)}
+		</div>
+	);
+}
 
 export function DAWToolbar() {
 	const [music, setMusic] = useAtom(musicalMetadataAtom);
@@ -241,6 +323,9 @@ export function DAWToolbar() {
 						</span>
 						{/* Bars mode temporarily disabled - controls hidden */}
 					</div>
+
+					{/* Snap Controls */}
+					<SnapGranularityControls />
 				</div>
 
 				<div className="flex items-center gap-4">

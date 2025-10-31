@@ -1,11 +1,12 @@
 "use client";
 import { time } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
-import { gridAtom, musicalMetadataAtom } from "@/lib/daw-sdk";
+import { gridAtom, musicalMetadataAtom, timelineAtom } from "@/lib/daw-sdk";
 
 export function useTimebase() {
 	const [grid, setGrid] = useAtom(gridAtom);
 	const [music] = useAtom(musicalMetadataAtom);
+	const [timeline] = useAtom(timelineAtom);
 
 	function snap(ms: number): number {
 		return time.snapTimeMs(ms, grid, music.tempoBpm, music.timeSignature);
@@ -142,6 +143,59 @@ export function useTimebase() {
 		return subdivBeats * secondsPerBeat * 1000;
 	}
 
+	function getSnapIntervalMs(
+		granularity?: "coarse" | "medium" | "fine" | "custom",
+		customIntervalMs?: number,
+	): number {
+		// Use timeline state if parameters not provided
+		const effectiveGranularity = granularity ?? timeline.snapGranularity;
+		const effectiveCustom = customIntervalMs ?? timeline.customSnapIntervalMs;
+
+		if (effectiveGranularity === "custom" && effectiveCustom !== undefined) {
+			return effectiveCustom;
+		}
+
+		if (grid.mode === "time") {
+			// For time mode, derive from granularity
+			switch (effectiveGranularity) {
+				case "coarse":
+					return 1000; // 1 second
+				case "fine":
+					return 100; // 100ms
+				case "medium":
+				default:
+					return 500; // 500ms
+			}
+		}
+
+		// For bars mode, derive from grid resolution and granularity
+		const den = music.timeSignature.den;
+		const secondsPerBeat = (60 / music.tempoBpm) * (4 / den);
+		const baseDivisionBeats = time.getDivisionBeats(
+			grid.resolution,
+			music.timeSignature,
+		);
+		const subdivBeats = grid.triplet ? baseDivisionBeats / 3 : baseDivisionBeats;
+
+		switch (effectiveGranularity) {
+			case "coarse":
+				// Coarse: 1/4 notes (or division if larger)
+				return Math.max(
+					baseDivisionBeats * secondsPerBeat * 1000,
+					secondsPerBeat * 1000,
+				);
+			case "fine": {
+				// Fine: 1/16 of subdivision (or minimum 1/32 note)
+				const fineBeats = subdivBeats / 4;
+				return Math.max(fineBeats * secondsPerBeat * 1000, 50);
+			}
+			case "medium":
+			default:
+				// Medium: use current subdivision
+				return subdivBeats * secondsPerBeat * 1000;
+		}
+	}
+
 	return {
 		grid,
 		setGrid,
@@ -152,6 +206,7 @@ export function useTimebase() {
 		getGridSubdivisions,
 		getGridSubdivisionsInView,
 		stepMs: getStepMs(),
+		getSnapIntervalMs,
 		msToBeats: (ms: number) =>
 			time.msToBeats(ms, music.tempoBpm, music.timeSignature),
 		msToBarsBeats: (ms: number) =>

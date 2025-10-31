@@ -23,7 +23,9 @@ let isFirstUpdate = true;
 
 function createGuardedTimeUpdateCallback(get: Getter, set: Setter) {
 	return (timeSeconds: number) => {
-		const currentMs = Math.max(0, Math.round(timeSeconds * 1000));
+		// Preserve sub-millisecond precision for accurate visual sync
+		// Store as milliseconds but don't round to preserve precision
+		const currentMs = Math.max(0, timeSeconds * 1000);
 		const now = performance.now();
 
 		// Note: isFirstUpdate is now reset at playback start/stop boundaries
@@ -32,21 +34,24 @@ function createGuardedTimeUpdateCallback(get: Getter, set: Setter) {
 			isFirstUpdate = true;
 		}
 
-		// Prevent updates if time hasn't changed, but allow first update
+		// Prevent updates if time hasn't changed meaningfully, but allow first update
 		// even if time matches (e.g., starting from position 0)
 		// This ensures the initial synchronous update is always processed
-		if (!isFirstUpdate && currentMs === lastUpdateMs) return;
+		// Use small epsilon (0.01ms) to allow for floating point precision differences
+		if (!isFirstUpdate && Math.abs(currentMs - lastUpdateMs) < 0.01) return;
 
 		// Allow immediate first update without throttling for instant visual sync
-		// After first update, throttle to ~60Hz (16ms intervals)
-		if (!isFirstUpdate && now - lastUpdateTime < 16) return;
+		// After first update, use smart batching: update at display refresh rate (60Hz = ~16ms)
+		// but allow more frequent updates if time changed significantly (>10ms)
+		const timeDelta = Math.abs(currentMs - lastUpdateMs);
+		if (!isFirstUpdate && now - lastUpdateTime < 8 && timeDelta < 10) return;
 
 		isFirstUpdate = false;
 		lastUpdateTime = now;
 		lastUpdateMs = currentMs;
 
 		const newPlayback = get(playbackAtom) as PlaybackState;
-
+		
 		// Critical: Check if playback is still active before updating
 		// This prevents infinite loops when playback has been stopped but callback still fires
 		if (!newPlayback.isPlaying) {
@@ -60,8 +65,8 @@ function createGuardedTimeUpdateCallback(get: Getter, set: Setter) {
 			return;
 		}
 
-		// Only update if the value actually changed
-		if (newPlayback.currentTime !== currentMs) {
+		// Only update if the value actually changed (with small epsilon for floating point)
+		if (Math.abs(newPlayback.currentTime - currentMs) >= 0.01) {
 			set(playbackAtom, { ...newPlayback, currentTime: currentMs });
 		}
 	};
