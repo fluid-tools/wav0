@@ -1,7 +1,13 @@
 "use client";
 import { audioBuffer } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
-import { useCallback, useEffect, useEffectEvent,useRef, useState } from "react";
+import {
+	useCallback,
+	useEffect,
+	useEffectEvent,
+	useRef,
+	useState,
+} from "react";
 import { ExportPreviewLanes } from "@/components/daw/export/export-preview-lanes";
 import { Button } from "@/components/ui/button";
 import {

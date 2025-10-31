@@ -9,14 +9,14 @@
  */
 
 import {
-	actionGeneric,
-	httpActionGeneric,
-	queryGeneric,
-	mutationGeneric,
-	internalActionGeneric,
-	internalMutationGeneric,
-	internalQueryGeneric,
-	componentsGeneric,
+  actionGeneric,
+  httpActionGeneric,
+  queryGeneric,
+  mutationGeneric,
+  internalActionGeneric,
+  internalMutationGeneric,
+  internalQueryGeneric,
+  componentsGeneric,
 } from "convex/server";
 
 /**
