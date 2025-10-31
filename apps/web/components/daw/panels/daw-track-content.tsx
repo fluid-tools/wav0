@@ -513,22 +513,10 @@ export function DAWTrackContent() {
 										}
 										return t;
 									});
-									// Sync affected tracks with playback
-									const sourceTrack = updated.find(
-										(t) => t.id === originalTrack.id,
-									);
-									const targetTrackUpdated = updated.find(
-										(t) => t.id === targetTrack.id,
-									);
-									if (sourceTrack) {
-										playbackService
-											.rescheduleTrack(sourceTrack)
-											.catch(console.error);
-									}
-									if (targetTrackUpdated) {
-										playbackService
-											.rescheduleTrack(targetTrackUpdated)
-											.catch(console.error);
+									// Sync all tracks atomically with complete updated state
+									// This ensures moved clips are properly stopped on old track and started on new track
+									if (playback.isPlaying) {
+										playbackService.synchronizeTracks(updated).catch(console.error);
 									}
 									return updated;
 								});

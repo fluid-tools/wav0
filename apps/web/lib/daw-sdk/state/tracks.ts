@@ -88,7 +88,7 @@ export const updateTrackAtom = atom(
 
 		const updatedTrack = updatedTracks.find((t) => t.id === trackId);
 		if (!updatedTrack) return;
-		playbackService.synchronizeTracks(updatedTracks);
+		playbackService.synchronizeTracks(updatedTracks).catch(console.error);
 
 		if (typeof updates.volume === "number") {
 			playbackService.updateTrackVolume(trackId, updates.volume);
