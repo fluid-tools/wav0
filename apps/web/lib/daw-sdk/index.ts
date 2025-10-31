@@ -13,6 +13,8 @@ export { AudioService, audioService } from "./core/audio-service";
 export { PlaybackService, playbackService } from "./core/playback-service";
 // ===== Core Types =====
 export * from "./core/types";
+// ===== Core Constants =====
+export * from "./core/audio-scheduling-constants";
 
 // ===== React Hooks =====
 export * from "./hooks/use-clip-inspector";
