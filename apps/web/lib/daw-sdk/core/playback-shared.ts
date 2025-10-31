@@ -5,6 +5,7 @@ import type {
 	TrackEnvelopePoint,
 	TrackEnvelopeSegment,
 } from "@/lib/daw-sdk";
+import { MIN_AUTOMATION_SEGMENT_DURATION_SEC } from "./audio-scheduling-constants";
 
 export function scheduleTrackEnvelope(
 	ac: BaseAudioContext,
@@ -22,7 +23,7 @@ export function scheduleTrackEnvelope(
 	for (let i = 0; i < points.length - 1; i++) {
 		const a = points[i];
 		const b = points[i + 1];
-		const segDur = Math.max(0.001, (b.time - a.time) / 1000);
+		const segDur = Math.max(MIN_AUTOMATION_SEGMENT_DURATION_SEC, (b.time - a.time) / 1000);
 		const segStart = startSec + a.time / 1000;
 		const curve = new Float32Array(64);
 		for (let s = 0; s < curve.length; s++) {
