@@ -291,7 +291,9 @@ export class PlaybackService {
 		const now = this.audioContext.currentTime;
 
 		// Step 1: Cancel all existing scheduled values
-		envelopeGain.gain.cancelScheduledValues(now);
+		// Use a small lookahead to catch curves that just started (prevents overlaps during rapid reschedules)
+		const cancelLookahead = 0.001; // 1ms lookahead
+		envelopeGain.gain.cancelScheduledValues(Math.max(0, now - cancelLookahead));
 
 		// Step 2: Anchor to instantaneous effective gain at current transport time
 		const currentTimeMs = this.getPlaybackTime() * 1000;
@@ -373,7 +375,9 @@ export class PlaybackService {
 		let lastTime = currentTimeMs;
 
 		// Schedule future segments without overlaps
-		const schedulingEpsilon = 0.0001;
+		// Increased epsilon to 1ms for better safety margin during rapid reschedules
+		const schedulingEpsilon = 0.001;
+		// Initialize to now to ensure first segment starts after anchor point
 		let lastScheduledEnd = now;
 		for (const point of futurePoints) {
 			const segmentStart = lastTime;
@@ -419,11 +423,13 @@ export class PlaybackService {
 			// Calculate absolute AudioContext time for this segment
 			const acStart = now + (segmentStart - currentTimeMs) / 1000;
 			let adjustedStart = acStart;
-			if (adjustedStart < lastScheduledEnd) {
+			// Ensure no overlap with previously scheduled curves
+			if (adjustedStart < lastScheduledEnd + schedulingEpsilon) {
 				adjustedStart = lastScheduledEnd + schedulingEpsilon;
 			}
 			const adjustedDuration = durationSec - (adjustedStart - acStart);
-			if (adjustedDuration <= 0) {
+			// Skip segment if duration becomes too short after adjustment
+			if (adjustedDuration <= schedulingEpsilon) {
 				lastTime = point.time;
 				lastMultiplier = point.value;
 				continue;
