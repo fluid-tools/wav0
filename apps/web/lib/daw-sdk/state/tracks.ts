@@ -8,10 +8,11 @@
  * These atoms remain for backward compatibility during migration.
  */
 
-import { automation, volume } from "@wav0/daw-sdk";
+import { volume } from "@wav0/daw-sdk";
 import { atom } from "jotai";
 import { generateTrackId } from "@/lib/storage/opfs";
 import { audioService, playbackService } from "../index";
+import { bindEnvelopeToClips } from "../utils/automation-migration-helpers";
 import {
 	playbackAtom,
 	projectEndOverrideAtom,
@@ -62,8 +63,11 @@ export const updateTrackAtom = atom(
 		const updatedTracks = tracks.map((track) => {
 			if (track.id !== trackId) return track;
 			if (updates.volumeEnvelope) {
+				// Bind points to clips before migrating/clamping
+				const clips = updates.clips ?? track.clips;
+				const bound = bindEnvelopeToClips(updates.volumeEnvelope, clips);
 				// Auto-migrate envelope if needed
-				const migrated = migrateAutomationToSegments(updates.volumeEnvelope);
+				const migrated = migrateAutomationToSegments(bound);
 
 				const normalizedEnvelope: TrackEnvelope = {
 					...migrated,

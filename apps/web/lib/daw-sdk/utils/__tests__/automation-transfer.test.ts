@@ -4,6 +4,7 @@ import { updateClipAtom } from "../../state/clips";
 import type { Clip, Track } from "../../state/types";
 import type { TrackEnvelope } from "../../types/schemas";
 import {
+	bindEnvelopeToClips,
 	computeAutomationTransfer,
 	mergeAutomationPoints,
 } from "../automation-migration-helpers";
@@ -224,8 +225,111 @@ describe("computeAutomationTransfer", () => {
 	});
 });
 
+describe("bindEnvelopeToClips", () => {
+	it("binds track-level points to clips when they fall within clip window", () => {
+		const envelope: TrackEnvelope = {
+			enabled: true,
+			points: [
+				{ id: "p1", time: 150, value: 0.5 }, // Inside clip1
+				{ id: "p2", time: 350, value: 0.7 }, // Inside clip1
+				{ id: "p3", time: 600, value: 0.9 }, // Outside any clip
+			],
+			segments: [],
+		};
+
+		const clips: Clip[] = [
+			{
+				id: "clip1",
+				name: "Clip 1",
+				opfsFileId: "file-1",
+				startTime: 100,
+				trimStart: 0,
+				trimEnd: 400,
+				sourceDurationMs: 400,
+				fadeInCurve: 0,
+				fadeOutCurve: 0,
+			},
+		];
+
+		const bound = bindEnvelopeToClips(envelope, clips);
+
+		const p1 = bound.points.find((p) => p.id === "p1");
+		expect(p1?.clipId).toBe("clip1");
+		expect(p1?.clipRelativeTime).toBe(50); // 150 - 100
+
+		const p2 = bound.points.find((p) => p.id === "p2");
+		expect(p2?.clipId).toBe("clip1");
+		expect(p2?.clipRelativeTime).toBe(250); // 350 - 100
+
+		const p3 = bound.points.find((p) => p.id === "p3");
+		expect(p3?.clipId).toBeUndefined();
+		expect(p3?.clipRelativeTime).toBeUndefined();
+		expect(p3?.time).toBe(600);
+	});
+
+	it("updates bindings when clips move", () => {
+		const envelope: TrackEnvelope = {
+			enabled: true,
+			points: [
+				{
+					id: "p1",
+					time: 150,
+					value: 0.5,
+					clipId: "clip1",
+					clipRelativeTime: 50,
+				},
+			],
+			segments: [],
+		};
+
+		const clips: Clip[] = [
+			{
+				id: "clip1",
+				name: "Clip 1",
+				opfsFileId: "file-1",
+				startTime: 200, // Moved from 100
+				trimStart: 0,
+				trimEnd: 400,
+				sourceDurationMs: 400,
+				fadeInCurve: 0,
+				fadeOutCurve: 0,
+			},
+		];
+
+		const bound = bindEnvelopeToClips(envelope, clips);
+
+		const p1 = bound.points.find((p) => p.id === "p1");
+		expect(p1?.time).toBe(250); // 200 + 50 (relative)
+		expect(p1?.clipId).toBe("clip1");
+		expect(p1?.clipRelativeTime).toBe(50);
+	});
+
+	it("removes bindings when clips are deleted", () => {
+		const envelope: TrackEnvelope = {
+			enabled: true,
+			points: [
+				{
+					id: "p1",
+					time: 150,
+					value: 0.5,
+					clipId: "clip1",
+					clipRelativeTime: 50,
+				},
+			],
+			segments: [],
+		};
+
+		const bound = bindEnvelopeToClips(envelope, []);
+
+		const p1 = bound.points.find((p) => p.id === "p1");
+		expect(p1?.clipId).toBeUndefined();
+		expect(p1?.clipRelativeTime).toBeUndefined();
+		expect(p1?.time).toBe(150); // Absolute time preserved
+	});
+});
+
 describe("updateClipAtom same-track automation", () => {
-	it("keeps track-level automation stationary while moving clip-bound points", async () => {
+	it("binds track-level points to clips and moves them with clip", async () => {
 		const clip: Clip = {
 			id: "clip1",
 			name: "Test Clip",
@@ -252,14 +356,11 @@ describe("updateClipAtom same-track automation", () => {
 			volumeEnvelope: {
 				enabled: true,
 				points: [
-					{
-						id: "clip-point",
-						time: 120,
-						value: 0.8,
-						clipId: "clip1",
-						clipRelativeTime: 20,
-					},
-					{ id: "track-point", time: 300, value: 1.2 },
+					// Track-level point inside clip window (should bind and move)
+					{ id: "point-in-clip", time: 200, value: 0.8 },
+					// Track-level point outside clip window (should stay put)
+					// Clip goes from 100 to 500 (100 + 400), so 600 is clearly outside
+					{ id: "point-outside", time: 600, value: 1.2 },
 				],
 				segments: [],
 			},
@@ -296,16 +397,23 @@ describe("updateClipAtom same-track automation", () => {
 		const updatedClip = updatedTrack.clips?.[0];
 		expect(updatedClip?.startTime).toBe(400);
 
-		const clipPoint = updatedTrack.volumeEnvelope?.points.find(
-			(point) => point.id === "clip-point",
+		// Point inside clip should be bound and moved
+		const pointInClip = updatedTrack.volumeEnvelope?.points.find(
+			(point) => point.id === "point-in-clip",
 		);
-		expect(clipPoint?.time).toBe(420);
-		expect(clipPoint?.clipRelativeTime).toBe(20);
+		expect(pointInClip?.clipId).toBe("clip1");
+		expect(pointInClip?.clipRelativeTime).toBe(100); // 200 - 100 (original clip start)
+		expect(pointInClip?.time).toBe(500); // 400 (new start) + 100 (relative)
 
-		const trackPoint = updatedTrack.volumeEnvelope?.points.find(
-			(point) => point.id === "track-point",
+		// Point originally outside clip - after clip moves to 400-800, point at 600 is now inside
+		// So it should be bound to the moved clip
+		const pointOutside = updatedTrack.volumeEnvelope?.points.find(
+			(point) => point.id === "point-outside",
 		);
-		expect(trackPoint?.time).toBe(300);
+		// After rebinding with moved clip (400-800), point at 600 is now inside and gets bound
+		expect(pointOutside?.clipId).toBe("clip1");
+		expect(pointOutside?.clipRelativeTime).toBe(200); // 600 - 400 (new clip start)
+		expect(pointOutside?.time).toBe(600);
 	});
 });
 
