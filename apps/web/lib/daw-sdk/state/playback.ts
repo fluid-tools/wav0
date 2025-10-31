@@ -2,11 +2,11 @@
 
 /**
  * Playback State Atoms - Legacy Layer
- * 
+ *
  * NOTE: These write atoms use the old playbackService directly.
  * For new code, prefer using `useBridgeMutations()` from @wav0/daw-react
  * which provides bridge-based mutations with event-driven sync.
- * 
+ *
  * These atoms remain for backward compatibility during migration.
  */
 
@@ -46,7 +46,7 @@ function createGuardedTimeUpdateCallback(get: Getter, set: Setter) {
 		lastUpdateMs = currentMs;
 
 		const newPlayback = get(playbackAtom) as PlaybackState;
-		
+
 		// Critical: Check if playback is still active before updating
 		// This prevents infinite loops when playback has been stopped but callback still fires
 		if (!newPlayback.isPlaying) {

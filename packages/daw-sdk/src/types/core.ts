@@ -33,4 +33,3 @@ export interface LoadedTrack {
 	audioTrack: any; // MediaBunny InputAudioTrack
 	duration: number;
 }
-

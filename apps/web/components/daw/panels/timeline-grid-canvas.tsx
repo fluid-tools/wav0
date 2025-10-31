@@ -77,7 +77,14 @@ export const TimelineGridCanvas = memo(function TimelineGridCanvas({
 			}
 		}
 		ctx.stroke();
-	}, [width, height, deferredPxPerMs, deferredScrollLeft, timeGrid, themeColors]);
+	}, [
+		width,
+		height,
+		deferredPxPerMs,
+		deferredScrollLeft,
+		timeGrid,
+		themeColors,
+	]);
 
 	return (
 		<div className="relative" style={{ width, height }}>

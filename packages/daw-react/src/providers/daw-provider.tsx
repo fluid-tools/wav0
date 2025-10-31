@@ -87,9 +87,7 @@ export function DAWProvider({
 		: null;
 
 	return (
-		<DAWContext.Provider value={contextValue}>
-			{children}
-		</DAWContext.Provider>
+		<DAWContext.Provider value={contextValue}>{children}</DAWContext.Provider>
 	);
 }
 

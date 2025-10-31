@@ -342,4 +342,3 @@ export namespace time {
 		return { majors, minors };
 	}
 }
-

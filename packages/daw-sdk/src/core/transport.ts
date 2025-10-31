@@ -49,10 +49,7 @@ export class Transport extends EventTarget {
 		);
 	}
 
-	private async scheduleClip(
-		clip: Clip,
-		playbackStart: number,
-	): Promise<void> {
+	private async scheduleClip(clip: Clip, playbackStart: number): Promise<void> {
 		// Calculate when this clip should start relative to playback
 		const clipStartInPlayback = clip.startTime - playbackStart;
 		if (clipStartInPlayback < 0) return; // Clip starts before playback position
@@ -81,7 +78,8 @@ export class Transport extends EventTarget {
 			// Calculate precise start time
 			const bufferStartInClip = timestamp * 1000 - clip.trimStart;
 			const startTime =
-				this.contextStartTime + (clipStartInPlayback + bufferStartInClip) / 1000;
+				this.contextStartTime +
+				(clipStartInPlayback + bufferStartInClip) / 1000;
 
 			if (startTime >= this.audioContext.currentTime) {
 				node.start(startTime);
@@ -172,4 +170,3 @@ export class Transport extends EventTarget {
 		return this.state;
 	}
 }
-

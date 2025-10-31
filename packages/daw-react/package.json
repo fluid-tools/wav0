@@ -1,45 +1,44 @@
 {
-  "name": "@wav0/daw-react",
-  "version": "0.1.0",
-  "type": "module",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    },
-    "./atoms": {
-      "types": "./dist/atoms/index.d.ts",
-      "import": "./dist/atoms/index.js"
-    },
-    "./hooks": {
-      "types": "./dist/hooks/index.d.ts",
-      "import": "./dist/hooks/index.js"
-    }
-  },
-  "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
-    "test": "vitest"
-  },
-  "dependencies": {
-    "@wav0/daw-sdk": "workspace:*",
-    "jotai": "^2.15.0",
-    "xstate": "^5.23.0",
-    "idb-keyval": "^6.2.2"
-  },
-  "peerDependencies": {
-    "react": "^18.0.0 || ^19.0.0",
-    "react-dom": "^18.0.0 || ^19.0.0"
-  },
-  "devDependencies": {
-    "@types/react": "19.2.2",
-    "@types/react-dom": "19.2.2",
-    "typescript": "^5.9.3",
-    "vitest": "^2.0.0",
-    "@testing-library/react": "^16.0.0"
-  }
+	"name": "@wav0/daw-react",
+	"version": "0.1.0",
+	"type": "module",
+	"main": "./dist/index.js",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./atoms": {
+			"types": "./dist/atoms/index.d.ts",
+			"import": "./dist/atoms/index.js"
+		},
+		"./hooks": {
+			"types": "./dist/hooks/index.d.ts",
+			"import": "./dist/hooks/index.js"
+		}
+	},
+	"scripts": {
+		"build": "tsc",
+		"dev": "tsc --watch",
+		"test": "vitest"
+	},
+	"dependencies": {
+		"@wav0/daw-sdk": "workspace:*",
+		"jotai": "^2.15.0",
+		"xstate": "^5.23.0",
+		"idb-keyval": "^6.2.2"
+	},
+	"peerDependencies": {
+		"react": "^18.0.0 || ^19.0.0",
+		"react-dom": "^18.0.0 || ^19.0.0"
+	},
+	"devDependencies": {
+		"@types/react": "19.2.2",
+		"@types/react-dom": "19.2.2",
+		"typescript": "^5.9.3",
+		"vitest": "^2.0.0",
+		"@testing-library/react": "^16.0.0"
+	}
 }
-

@@ -98,8 +98,8 @@ export function ClipInspectorSheet() {
 											Trim window
 										</dt>
 										<dd className="font-medium text-foreground">
-										{time.formatDuration(clip.trimStart)} –{" "}
-										{time.formatDuration(clip.trimEnd)}
+											{time.formatDuration(clip.trimStart)} –{" "}
+											{time.formatDuration(clip.trimEnd)}
 										</dd>
 									</div>
 									<div className="space-y-1">

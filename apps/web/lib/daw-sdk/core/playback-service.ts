@@ -1000,7 +1000,10 @@ export class PlaybackService {
 		this.options.onTimeUpdate?.(0);
 	}
 
-	async rescheduleTrack(updatedTrack: Track, allTracks?: Track[]): Promise<void> {
+	async rescheduleTrack(
+		updatedTrack: Track,
+		allTracks?: Track[],
+	): Promise<void> {
 		// Alias to global synchronization path
 		// If allTracks is provided, use it for complete state synchronization
 		// Otherwise, build from currentTracks (backward compatibility)
