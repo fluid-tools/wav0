@@ -2,6 +2,7 @@
 
 import type {
 	Clip,
+	Track,
 	TrackEnvelopePoint,
 	TrackEnvelopeSegment,
 } from "@wav0/daw-sdk";
@@ -346,108 +347,105 @@ export function DAWTrackContent() {
 
 		const onUp = async () => {
 			try {
-				// Commit drag if preview exists
-				if (dragPreview && draggingClip) {
-					const originalTrack = tracks.find(
+			// Commit drag if preview exists
+			if (dragPreview && draggingClip) {
+				// Use updater function to always get latest tracks state, avoiding stale closure issues
+				let computedUpdated: Track[] | null = null;
+				let computedClip: Clip | null = null;
+				let computedOriginalTrack: Track | null = null;
+				let computedTargetTrack: Track | null = null;
+				let computedAutomationData: {
+					points: TrackEnvelopePoint[];
+					segments: TrackEnvelopeSegment[];
+					pointIdsToRemove: string[];
+				} | null = null;
+
+				setTracks((prev) => {
+					// Use prev (latest state) instead of closure-captured tracks
+					const originalTrack = prev.find(
 						(t) => t.id === dragPreview.originalTrackId,
 					);
-					const targetTrack = tracks.find(
+					const targetTrack = prev.find(
 						(t) => t.id === dragPreview.previewTrackId,
 					);
 					const clip = originalTrack?.clips?.find(
 						(c) => c.id === dragPreview.clipId,
 					);
 
-					if (originalTrack && targetTrack && clip) {
-						const isSameTrack =
-							dragPreview.originalTrackId === dragPreview.previewTrackId;
-						const moved =
-							!isSameTrack ||
-							dragPreview.originalStartTime !== dragPreview.previewStartTime;
+					if (!originalTrack || !targetTrack || !clip) {
+						return prev; // No changes if track/clip not found
+					}
 
-						if (moved) {
-							const clipDurationMs = clip.trimEnd - clip.trimStart;
-							const clipEndTime = clip.startTime + clipDurationMs;
+					// Store for use outside callback
+					computedClip = clip;
+					computedOriginalTrack = originalTrack;
+					computedTargetTrack = targetTrack;
 
-							if (isSameTrack) {
-								// Same track: update clip start; clip-bound automation stays relative
-								if (playback.isPlaying) {
-									await playbackService.stopClip(originalTrack.id, clip.id);
-								}
+					const isSameTrack =
+						dragPreview.originalTrackId === dragPreview.previewTrackId;
+					const moved =
+						!isSameTrack ||
+						dragPreview.originalStartTime !== dragPreview.previewStartTime;
 
-								await updateClip(originalTrack.id, clip.id, {
-									startTime: dragPreview.previewStartTime,
-								});
+					if (!moved) {
+						return prev; // No changes needed
+					}
 
-								setMoveHistory((prev) => {
-									const now = Date.now();
-									const recent = prev[0];
-									if (recent && now - recent.timestamp < 100) {
-										return prev;
-									}
-									return [
-										{
-											clipId: clip.id,
-											fromTrackId: originalTrack.id,
-											toTrackId: targetTrack.id,
-											fromStartTime: dragPreview.originalStartTime,
-											toStartTime: dragPreview.previewStartTime,
-											automationData: null,
-											timestamp: now,
-										},
-										...prev.slice(0, 9),
-									];
-								});
-							} else {
-								// Cross-track: transfer automation with proper timestamp adjustment
-								const hasAutomation =
-									originalTrack.volumeEnvelope?.enabled ?? false;
+					const clipDurationMs = clip.trimEnd - clip.trimStart;
+					const clipEndTime = clip.startTime + clipDurationMs;
 
-								let automationData: {
-									points: TrackEnvelopePoint[];
-									segments: TrackEnvelopeSegment[];
-									pointIdsToRemove: string[];
-								} | null = null;
+					if (isSameTrack) {
+						// Same track: update clip start; clip-bound automation stays relative
+						// For same-track moves, use updateClip which handles synchronization
+						return prev; // updateClip will handle state update
+					}
 
-								if (hasAutomation && originalTrack.volumeEnvelope) {
-									// Get project end for time clamping (ms)
-									const projectEndMs =
-										totalDuration && totalDuration > 0 ? totalDuration : 300000;
-									// Normalize final drop time
-									const finalDropTime = Math.max(
-										0,
-										Math.min(
-											projectEndMs,
-											Math.round(dragPreview.previewStartTime),
-										),
-									);
+					// Cross-track: transfer automation with proper timestamp adjustment
+					const hasAutomation =
+						originalTrack.volumeEnvelope?.enabled ?? false;
 
-									const transferResult = computeAutomationTransfer(
-										originalTrack.volumeEnvelope,
-										clip.id,
-										clip.startTime,
-										clipEndTime,
-										finalDropTime,
-										clip.id,
-										projectEndMs,
-										{ mode: "clip-attached", includeEndBoundary: true },
-									);
+					let automationData: {
+						points: TrackEnvelopePoint[];
+						segments: TrackEnvelopeSegment[];
+						pointIdsToRemove: string[];
+					} | null = null;
 
-									if (transferResult.pointsToAdd.length > 0) {
-										automationData = {
-											points: transferResult.pointsToAdd,
-											segments: transferResult.segmentsToAdd,
-											pointIdsToRemove: transferResult.pointIdsToRemove,
-										};
-									}
-								}
+					if (hasAutomation && originalTrack.volumeEnvelope) {
+						// Get project end for time clamping (ms)
+						const projectEndMs =
+							totalDuration && totalDuration > 0 ? totalDuration : 300000;
+						// Normalize final drop time
+						const finalDropTime = Math.max(
+							0,
+							Math.min(
+								projectEndMs,
+								Math.round(dragPreview.previewStartTime),
+							),
+						);
 
-								if (playback.isPlaying) {
-									await playbackService.stopClip(originalTrack.id, clip.id);
-								}
+						const transferResult = computeAutomationTransfer(
+							originalTrack.volumeEnvelope,
+							clip.id,
+							clip.startTime,
+							clipEndTime,
+							finalDropTime,
+							clip.id,
+							projectEndMs,
+							{ mode: "clip-attached", includeEndBoundary: true },
+						);
 
-								// Compute updated tracks first
-								const updated = tracks.map((t) => {
+						if (transferResult.pointsToAdd.length > 0) {
+							automationData = {
+								points: transferResult.pointsToAdd,
+								segments: transferResult.segmentsToAdd,
+								pointIdsToRemove: transferResult.pointIdsToRemove,
+							};
+							computedAutomationData = automationData;
+						}
+					}
+
+					// Compute updated tracks from latest state (prev)
+					const updated = prev.map((t) => {
 									if (t.id === originalTrack.id) {
 										const updatedTrack = {
 											...t,
@@ -514,35 +512,87 @@ export function DAWTrackContent() {
 									return t;
 								});
 
-								// Update state synchronously
-								setTracks(updated);
+					computedUpdated = updated;
+					return updated;
+				});
 
-								// Sync all tracks atomically with complete updated state
-								// This ensures moved clips are properly stopped on old track and started on new track
-								if (playback.isPlaying) {
-									try {
-										await playbackService.synchronizeTracks(updated);
-									} catch (error) {
-										console.error("Failed to synchronize tracks after clip move", error);
-									}
-								}
+				// Handle same-track moves and cross-track moves separately
+				if (computedUpdated && computedClip && computedOriginalTrack && computedTargetTrack) {
+					// Cross-track move: computedUpdated is set
+					// TypeScript doesn't narrow correctly here due to closure assignment, use assertions
+					const clip = computedClip as Clip;
+					const originalTrack = computedOriginalTrack as Track;
+					const targetTrack = computedTargetTrack as Track;
+					const updated = computedUpdated;
 
-								setMoveHistory((prev) => [
-									{
-										clipId: clip.id,
-										fromTrackId: originalTrack.id,
-										toTrackId: targetTrack.id,
-										fromStartTime: dragPreview.originalStartTime,
-										toStartTime: dragPreview.previewStartTime,
-										automationData,
-										timestamp: Date.now(),
-									},
-									...prev.slice(0, 9),
-								]);
-							}
+					if (playback.isPlaying) {
+						await playbackService.stopClip(originalTrack.id, clip.id);
+					}
+
+					// Sync all tracks atomically with complete updated state
+					// This ensures moved clips are properly stopped on old track and started on new track
+					if (playback.isPlaying) {
+						try {
+							await playbackService.synchronizeTracks(updated);
+						} catch (error) {
+							console.error("Failed to synchronize tracks after clip move", error);
 						}
 					}
+
+					setMoveHistory((prev) => [
+						{
+							clipId: clip.id,
+							fromTrackId: originalTrack.id,
+							toTrackId: targetTrack.id,
+							fromStartTime: dragPreview.originalStartTime,
+							toStartTime: dragPreview.previewStartTime,
+							automationData: computedAutomationData,
+							timestamp: Date.now(),
+						},
+						...prev.slice(0, 9),
+					]);
+				} else if (computedClip && computedOriginalTrack) {
+					// Same-track move: use updateClip which handles synchronization
+					// TypeScript doesn't narrow correctly here due to closure assignment, use assertions
+					const clip = computedClip as Clip;
+					const originalTrack = computedOriginalTrack as Track;
+					const isSameTrack =
+						dragPreview.originalTrackId === dragPreview.previewTrackId;
+					const moved =
+						!isSameTrack ||
+						dragPreview.originalStartTime !== dragPreview.previewStartTime;
+
+					if (moved && isSameTrack) {
+						if (playback.isPlaying) {
+							await playbackService.stopClip(originalTrack.id, clip.id);
+						}
+
+						await updateClip(originalTrack.id, clip.id, {
+							startTime: dragPreview.previewStartTime,
+						});
+
+						setMoveHistory((prev) => {
+							const now = Date.now();
+							const recent = prev[0];
+							if (recent && now - recent.timestamp < 100) {
+								return prev;
+							}
+							return [
+								{
+									clipId: clip.id,
+									fromTrackId: originalTrack.id,
+									toTrackId: originalTrack.id,
+									fromStartTime: dragPreview.originalStartTime,
+									toStartTime: dragPreview.previewStartTime,
+									automationData: null,
+									timestamp: now,
+								},
+								...prev.slice(0, 9),
+							];
+						});
+					}
 				}
+			}
 			} catch (error) {
 				console.error("Error committing drag:", error);
 			} finally {
