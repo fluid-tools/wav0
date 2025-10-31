@@ -46,6 +46,13 @@ function createGuardedTimeUpdateCallback(get: Getter, set: Setter) {
 		lastUpdateMs = currentMs;
 
 		const newPlayback = get(playbackAtom) as PlaybackState;
+		
+		// Critical: Check if playback is still active before updating
+		// This prevents infinite loops when playback has been stopped but callback still fires
+		if (!newPlayback.isPlaying) {
+			return;
+		}
+
 		const total = get(totalDurationAtom) as number;
 
 		if (currentMs >= total) {

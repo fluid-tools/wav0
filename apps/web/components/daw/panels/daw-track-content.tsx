@@ -446,80 +446,86 @@ export function DAWTrackContent() {
 									await playbackService.stopClip(originalTrack.id, clip.id);
 								}
 
-								setTracks((prev) => {
-									const updated = prev.map((t) => {
-										if (t.id === originalTrack.id) {
-											const updatedTrack = {
-												...t,
-												clips: t.clips?.filter((c) => c.id !== clip.id) ?? [],
-											};
-											if (automationData) {
-												// Remove transferred points from source track
-												const currentEnv = updatedTrack.volumeEnvelope;
-												if (currentEnv) {
-													const remainingPointIds = new Set(
-														automationData.pointIdsToRemove,
-													);
-													return {
-														...updatedTrack,
-														volumeEnvelope: {
-															...currentEnv,
-															points: currentEnv.points.filter(
-																(p) => !remainingPointIds.has(p.id),
-															),
-															segments: (currentEnv.segments || []).filter(
-																(s) =>
-																	!remainingPointIds.has(s.fromPointId) &&
-																	!remainingPointIds.has(s.toPointId),
-															),
-														},
-													};
-												}
-											}
-											return updatedTrack;
-										}
-										if (t.id === targetTrack.id) {
-											const movedClip = {
-												...clip,
-												startTime: dragPreview.previewStartTime,
-											};
-											let updatedTrack: typeof t = {
-												...t,
-												clips: [...(t.clips ?? []), movedClip],
-											};
-											if (automationData) {
-												const currentEnv = updatedTrack.volumeEnvelope || {
-													enabled: true,
-													points: [],
-													segments: [],
-												};
-												updatedTrack = {
+								// Compute updated tracks first
+								const updated = tracks.map((t) => {
+									if (t.id === originalTrack.id) {
+										const updatedTrack = {
+											...t,
+											clips: t.clips?.filter((c) => c.id !== clip.id) ?? [],
+										};
+										if (automationData) {
+											// Remove transferred points from source track
+											const currentEnv = updatedTrack.volumeEnvelope;
+											if (currentEnv) {
+												const remainingPointIds = new Set(
+													automationData.pointIdsToRemove,
+												);
+												return {
 													...updatedTrack,
 													volumeEnvelope: {
 														...currentEnv,
-														enabled: true,
-														points: mergeAutomationPoints(
-															currentEnv.points || [],
-															automationData.points,
+														points: currentEnv.points.filter(
+															(p) => !remainingPointIds.has(p.id),
 														),
-														segments: [
-															...(currentEnv.segments || []),
-															...automationData.segments,
-														],
+														segments: (currentEnv.segments || []).filter(
+															(s) =>
+																!remainingPointIds.has(s.fromPointId) &&
+																!remainingPointIds.has(s.toPointId),
+														),
 													},
 												};
 											}
-											return updatedTrack;
 										}
-										return t;
-									});
-									// Sync all tracks atomically with complete updated state
-									// This ensures moved clips are properly stopped on old track and started on new track
-									if (playback.isPlaying) {
-										playbackService.synchronizeTracks(updated).catch(console.error);
+										return updatedTrack;
 									}
-									return updated;
+									if (t.id === targetTrack.id) {
+										const movedClip = {
+											...clip,
+											startTime: dragPreview.previewStartTime,
+										};
+										let updatedTrack: typeof t = {
+											...t,
+											clips: [...(t.clips ?? []), movedClip],
+										};
+										if (automationData) {
+											const currentEnv = updatedTrack.volumeEnvelope || {
+												enabled: true,
+												points: [],
+												segments: [],
+											};
+											updatedTrack = {
+												...updatedTrack,
+												volumeEnvelope: {
+													...currentEnv,
+													enabled: true,
+													points: mergeAutomationPoints(
+														currentEnv.points || [],
+														automationData.points,
+													),
+													segments: [
+														...(currentEnv.segments || []),
+														...automationData.segments,
+													],
+												},
+											};
+										}
+										return updatedTrack;
+									}
+									return t;
 								});
+
+								// Update state synchronously
+								setTracks(updated);
+
+								// Sync all tracks atomically with complete updated state
+								// This ensures moved clips are properly stopped on old track and started on new track
+								if (playback.isPlaying) {
+									try {
+										await playbackService.synchronizeTracks(updated);
+									} catch (error) {
+										console.error("Failed to synchronize tracks after clip move", error);
+									}
+								}
 
 								setMoveHistory((prev) => [
 									{

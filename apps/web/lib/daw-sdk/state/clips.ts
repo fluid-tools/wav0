@@ -159,7 +159,11 @@ export const removeClipAtom = atom(
 
 		// Synchronize via global path (no direct stop/reschedule)
 		if (playback.isPlaying) {
-			playbackService.synchronizeTracks(updatedTracks).catch(console.error);
+			try {
+				await playbackService.synchronizeTracks(updatedTracks);
+			} catch (error) {
+				console.error("Failed to synchronize tracks after clip removal", error);
+			}
 		}
 	},
 );
