@@ -32,8 +32,10 @@ function createGuardedTimeUpdateCallback(get: Getter, set: Setter) {
 			isFirstUpdate = true;
 		}
 
-		// Prevent updates if time hasn't changed
-		if (currentMs === lastUpdateMs) return;
+		// Prevent updates if time hasn't changed, but allow first update
+		// even if time matches (e.g., starting from position 0)
+		// This ensures the initial synchronous update is always processed
+		if (!isFirstUpdate && currentMs === lastUpdateMs) return;
 
 		// Allow immediate first update without throttling for instant visual sync
 		// After first update, throttle to ~60Hz (16ms intervals)
