@@ -2,56 +2,58 @@
  * Performance profiling utilities for DAW components
  */
 
-export class PerformanceProfiler {
-	private static marks = new Map<string, number>();
+const marks = new Map<string, number>();
 
-	static mark(name: string) {
-		if (typeof performance === "undefined") return;
-		performance.mark(name);
-		PerformanceProfiler.marks.set(name, performance.now());
-	}
+export function markPerformance(name: string) {
+	if (typeof performance === "undefined") return;
+	performance.mark(name);
+	marks.set(name, performance.now());
+}
 
-	static measure(name: string, startMark: string, endMark?: string) {
-		if (typeof performance === "undefined") return;
+export function measurePerformance(
+	name: string,
+	startMark: string,
+	endMark?: string,
+) {
+	if (typeof performance === "undefined") return;
 
-		try {
-			if (endMark) {
-				performance.measure(name, startMark, endMark);
-			} else {
-				performance.mark(`${name}-end`);
-				performance.measure(name, startMark, `${name}-end`);
-			}
-
-			const measure = performance.getEntriesByName(name, "measure")[0];
-			if (measure && measure.duration > 16) {
-				// Log if > 1 frame
-				console.warn(`[Performance] ${name}: ${measure.duration.toFixed(2)}ms`);
-			}
-		} catch (e) {
-			// Marks might not exist
+	try {
+		if (endMark) {
+			performance.measure(name, startMark, endMark);
+		} else {
+			performance.mark(`${name}-end`);
+			performance.measure(name, startMark, `${name}-end`);
 		}
-	}
 
-	static logRenderTime(componentName: string, duration: number) {
-		if (duration > 16) {
-			console.warn(
-				`[Performance] ${componentName} render: ${duration.toFixed(2)}ms`,
-			);
+		const measure = performance.getEntriesByName(name, "measure")[0];
+		if (measure && measure.duration > 16) {
+			// Log if > 1 frame
+			console.warn(`[Performance] ${name}: ${measure.duration.toFixed(2)}ms`);
 		}
+	} catch (_e) {
+		// Marks might not exist
 	}
+}
 
-	static clear() {
-		if (typeof performance === "undefined") return;
-		performance.clearMarks();
-		performance.clearMeasures();
-		PerformanceProfiler.marks.clear();
+export function logRenderTime(componentName: string, duration: number) {
+	if (duration > 16) {
+		console.warn(
+			`[Performance] ${componentName} render: ${duration.toFixed(2)}ms`,
+		);
 	}
+}
+
+export function clearPerformanceMarks() {
+	if (typeof performance === "undefined") return;
+	performance.clearMarks();
+	performance.clearMeasures();
+	marks.clear();
 }
 
 /**
  * Debounce function for window resize handlers
  */
-export function debounce<T extends (...args: any[]) => any>(
+export function debounce<T extends (...args: unknown[]) => unknown>(
 	func: T,
 	wait: number,
 ): (...args: Parameters<T>) => void {
@@ -73,7 +75,7 @@ export function debounce<T extends (...args: any[]) => any>(
 /**
  * Throttle function for high-frequency updates
  */
-export function throttle<T extends (...args: any[]) => any>(
+export function throttle<T extends (...args: unknown[]) => unknown>(
 	func: T,
 	limit: number,
 ): (...args: Parameters<T>) => void {
@@ -91,5 +93,6 @@ export function throttle<T extends (...args: any[]) => any>(
 			lastResult = func(...args);
 			return lastResult;
 		}
+		return lastResult;
 	};
 }

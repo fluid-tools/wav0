@@ -1,5 +1,6 @@
 "use client";
 
+import { time } from "@wav0/daw-sdk";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,7 +15,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { time } from "@wav0/daw-sdk";
 import { useClipInspector } from "@/lib/daw-sdk";
 import { SegmentCurvePreview } from "../controls/segment-curve-preview";
 import { EnvelopeEditor } from "./envelope-editor";

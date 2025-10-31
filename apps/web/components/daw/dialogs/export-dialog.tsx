@@ -1,4 +1,5 @@
 "use client";
+import { audioBuffer } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ExportPreviewLanes } from "@/components/daw/export/export-preview-lanes";
@@ -16,7 +17,6 @@ import {
 } from "@/components/ui/dialog";
 import { projectNameAtom, tracksAtom } from "@/lib/daw-sdk";
 import { createPreviewPlayer } from "@/lib/daw-sdk/core/preview-player";
-import { audioBuffer } from "@wav0/daw-sdk";
 import { renderProjectToAudioBuffer } from "@/lib/daw-sdk/core/render-service";
 import { loopRegionAtom } from "@/lib/daw-sdk/state/timeline";
 import { useEffectEvent } from "@/lib/react/use-effect-event";

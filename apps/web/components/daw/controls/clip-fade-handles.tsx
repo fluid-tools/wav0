@@ -1,7 +1,7 @@
 "use client";
 
+import { curves, time } from "@wav0/daw-sdk";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { time, curves } from "@wav0/daw-sdk";
 import type { Clip } from "@/lib/daw-sdk";
 import { cn } from "@/lib/utils";
 

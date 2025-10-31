@@ -45,7 +45,11 @@ export function migrateAutomationToSegments(
 
 	// Migrate from old format
 	const cleanedPoints: TrackEnvelopePoint[] = envelope.points.map((p) => {
-		const { curve, curveShape, ...rest } = p as LegacyEnvelopePoint;
+		const {
+			curve: _curve,
+			curveShape: _curveShape,
+			...rest
+		} = p as LegacyEnvelopePoint;
 		return rest;
 	});
 
