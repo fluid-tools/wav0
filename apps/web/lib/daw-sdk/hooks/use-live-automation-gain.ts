@@ -1,14 +1,10 @@
 "use client";
 
+import { volume } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
 import { useEffect, useState } from "react";
 import type { TrackEnvelopePoint, TrackEnvelopeSegment } from "@/lib/daw-sdk";
-import {
-	getEffectiveDb,
-	multiplierToDb,
-	playbackAtom,
-	tracksAtom,
-} from "@/lib/daw-sdk";
+import { playbackAtom, tracksAtom } from "@/lib/daw-sdk";
 
 /**
  * Hook to get the current automated gain value for a track during playback
@@ -49,8 +45,8 @@ export function useLiveAutomationGain(trackId: string): {
 			envelope.segments || [],
 			currentTimeMs,
 		);
-		const effectiveDb = getEffectiveDb(track.volume ?? 75, multiplier);
-		const envelopeDbValue = multiplierToDb(multiplier);
+		const effectiveDb = volume.getEffectiveDb(track.volume ?? 75, multiplier);
+		const envelopeDbValue = volume.multiplierToDb(multiplier);
 
 		setCurrentDb(effectiveDb);
 		setEnvelopeDb(envelopeDbValue);

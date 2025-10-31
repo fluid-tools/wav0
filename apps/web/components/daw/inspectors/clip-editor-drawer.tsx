@@ -1,5 +1,6 @@
 "use client";
 
+import { time } from "@wav0/daw-sdk";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +16,6 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useClipInspector } from "@/lib/daw-sdk";
-import { formatDuration } from "@/lib/storage/opfs";
 import { SegmentCurvePreview } from "../controls/segment-curve-preview";
 import { EnvelopeEditor } from "./envelope-editor";
 import { InspectorCard, InspectorSection } from "./inspector-section";
@@ -83,7 +83,7 @@ export function ClipEditorDrawer() {
 												Start
 											</dt>
 											<dd className="font-medium text-foreground">
-												{formatDuration(clip.startTime)}
+												{time.formatDuration(clip.startTime)}
 											</dd>
 										</div>
 										<div className="space-y-1">
@@ -91,7 +91,7 @@ export function ClipEditorDrawer() {
 												Trim Start
 											</dt>
 											<dd className="font-medium text-foreground">
-												{formatDuration(clip.trimStart)}
+												{time.formatDuration(clip.trimStart)}
 											</dd>
 										</div>
 										<div className="space-y-1">
@@ -99,7 +99,7 @@ export function ClipEditorDrawer() {
 												Trim End
 											</dt>
 											<dd className="font-medium text-foreground">
-												{formatDuration(clip.trimEnd)}
+												{time.formatDuration(clip.trimEnd)}
 											</dd>
 										</div>
 										<div className="space-y-1">
@@ -107,7 +107,7 @@ export function ClipEditorDrawer() {
 												Length
 											</dt>
 											<dd className="font-medium text-foreground">
-												{formatDuration(clip.trimEnd - clip.trimStart)}
+												{time.formatDuration(clip.trimEnd - clip.trimStart)}
 											</dd>
 										</div>
 									</dl>

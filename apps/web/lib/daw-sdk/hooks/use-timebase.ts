@@ -1,27 +1,19 @@
 "use client";
+import { time } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
 import { gridAtom, musicalMetadataAtom } from "@/lib/daw-sdk";
-import {
-	barsBeatsToMs,
-	formatBarsBeatsTicks,
-	generateBarsGrid,
-	getDivisionBeats,
-	msToBarsBeats,
-	msToBeats,
-	snapTimeMs,
-} from "@/lib/daw-sdk/utils/time-utils";
 
 export function useTimebase() {
 	const [grid, setGrid] = useAtom(gridAtom);
 	const [music] = useAtom(musicalMetadataAtom);
 
 	function snap(ms: number): number {
-		return snapTimeMs(ms, grid, music.tempoBpm, music.timeSignature);
+		return time.snapTimeMs(ms, grid, music.tempoBpm, music.timeSignature);
 	}
 
 	function format(ms: number): string {
 		if (grid.mode === "time") return `${ms.toFixed(0)} ms`;
-		return formatBarsBeatsTicks(ms, music.tempoBpm, music.timeSignature);
+		return time.formatBarsBeatsTicks(ms, music.tempoBpm, music.timeSignature);
 	}
 
 	function getGridSubdivisions(widthPx: number, pxPerMs: number) {
@@ -31,7 +23,7 @@ export function useTimebase() {
 				posPx: number;
 				emphasis: "measure" | "beat" | "sub";
 			}>;
-		return generateBarsGrid(
+		return time.generateBarsGrid(
 			widthPx,
 			pxPerMs,
 			music.tempoBpm,
@@ -71,7 +63,7 @@ export function useTimebase() {
 		const groupBeats = isCompound ? 3 : 1;
 
 		// Get subdivision info
-		const divisionBeats = getDivisionBeats(
+		const divisionBeats = time.getDivisionBeats(
 			grid.resolution,
 			music.timeSignature,
 		);
@@ -161,10 +153,10 @@ export function useTimebase() {
 		getGridSubdivisionsInView,
 		stepMs: getStepMs(),
 		msToBeats: (ms: number) =>
-			msToBeats(ms, music.tempoBpm, music.timeSignature),
+			time.msToBeats(ms, music.tempoBpm, music.timeSignature),
 		msToBarsBeats: (ms: number) =>
-			msToBarsBeats(ms, music.tempoBpm, music.timeSignature),
+			time.msToBarsBeats(ms, music.tempoBpm, music.timeSignature),
 		barsBeatsToMs: (pos: { bar: number; beat: number; tick?: number }) =>
-			barsBeatsToMs(pos, music.tempoBpm, music.timeSignature),
+			time.barsBeatsToMs(pos, music.tempoBpm, music.timeSignature),
 	};
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { time } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
 import {
 	ChevronsUpDown,
@@ -37,7 +38,6 @@ import {
 	updateClipAtom,
 } from "@/lib/daw-sdk";
 import { computeLoopEndMs } from "@/lib/daw-sdk/config/looping";
-import { formatDuration } from "@/lib/storage/opfs";
 import { MasterMeter } from "./master-meter";
 
 export function DAWControls() {
@@ -178,7 +178,7 @@ export function DAWControls() {
 					className={`flex items-center gap-3 ${DAW_BUTTONS.PANEL} px-3 py-1.5`}
 				>
 					<span className={`${DAW_TEXT.MONO_TIME} min-w-14`}>
-						{formatDuration(playback.currentTime)}
+						{time.formatDuration(playback.currentTime)}
 					</span>
 					<div className="relative flex-1">
 						<input
@@ -198,7 +198,7 @@ export function DAWControls() {
 						/>
 					</div>
 					<span className={`${DAW_TEXT.MONO_TIME} min-w-14`}>
-						{formatDuration(totalDuration)}
+						{time.formatDuration(totalDuration)}
 					</span>
 				</div>
 			</div>

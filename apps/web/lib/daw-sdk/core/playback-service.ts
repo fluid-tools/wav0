@@ -1,5 +1,6 @@
 "use client";
 
+import { automation, volume } from "@wav0/daw-sdk";
 import { z } from "zod";
 import type {
 	Clip,
@@ -7,8 +8,6 @@ import type {
 	Track,
 	TrackEnvelope,
 } from "../types/schemas";
-import { evaluateEnvelopeGainAt } from "../utils/automation-utils";
-import { dbToGain, volumeToDb } from "../utils/volume-utils";
 import { audioService } from "./audio-service";
 
 type ClipPlaybackState = {
@@ -71,6 +70,8 @@ export class PlaybackService {
 	>();
 	// Serialization mutex for all sync operations
 	private syncLock: Promise<void> = Promise.resolve();
+	private lastScheduleLeadMs = 0;
+	private static readonly START_GRACE_SEC = 0.0125;
 
 	private constructor() {}
 
@@ -126,6 +127,11 @@ export class PlaybackService {
 		return this.audioContext;
 	}
 
+	/**
+	 * Get current playback time with high precision
+	 * Uses AudioContext.currentTime which provides sub-millisecond accuracy
+	 * and is synchronized with the audio hardware clock
+	 */
 	private getPlaybackTime(): number {
 		if (this.isPlaying && this.audioContext) {
 			return (
@@ -285,13 +291,19 @@ export class PlaybackService {
 		const now = this.audioContext.currentTime;
 
 		// Step 1: Cancel all existing scheduled values
-		envelopeGain.gain.cancelScheduledValues(now);
+		// Use a small lookahead to catch curves that just started (prevents overlaps during rapid reschedules)
+		const cancelLookahead = 0.001; // 1ms lookahead
+		envelopeGain.gain.cancelScheduledValues(Math.max(0, now - cancelLookahead));
 
 		// Step 2: Anchor to instantaneous effective gain at current transport time
 		const currentTimeMs = this.getPlaybackTime() * 1000;
-		const baseVolumeDb = track.volumeDb ?? volumeToDb(track.volume ?? 75);
-		const baseVolume = dbToGain(baseVolumeDb);
-		const multiplier = evaluateEnvelopeGainAt(envelope, currentTimeMs);
+		const baseVolumeDb =
+			track.volumeDb ?? volume.volumeToDb(track.volume ?? 75);
+		const baseVolume = volume.dbToGain(baseVolumeDb);
+		const multiplier = automation.evaluateEnvelopeGainAt(
+			envelope,
+			currentTimeMs,
+		);
 		const anchorGain = baseVolume * multiplier;
 		envelopeGain.gain.setValueAtTime(anchorGain, now);
 
@@ -363,6 +375,10 @@ export class PlaybackService {
 		let lastTime = currentTimeMs;
 
 		// Schedule future segments without overlaps
+		// Increased epsilon to 1ms for better safety margin during rapid reschedules
+		const schedulingEpsilon = 0.001;
+		// Initialize to now to ensure first segment starts after anchor point
+		let lastScheduledEnd = now;
 		for (const point of futurePoints) {
 			const segmentStart = lastTime;
 			const segmentEnd = point.time;
@@ -406,7 +422,25 @@ export class PlaybackService {
 
 			// Calculate absolute AudioContext time for this segment
 			const acStart = now + (segmentStart - currentTimeMs) / 1000;
-			envelopeGain.gain.setValueCurveAtTime(values, acStart, durationSec);
+			let adjustedStart = acStart;
+			// Ensure no overlap with previously scheduled curves
+			if (adjustedStart < lastScheduledEnd + schedulingEpsilon) {
+				adjustedStart = lastScheduledEnd + schedulingEpsilon;
+			}
+			const adjustedDuration = durationSec - (adjustedStart - acStart);
+			// Skip segment if duration becomes too short after adjustment
+			if (adjustedDuration <= schedulingEpsilon) {
+				lastTime = point.time;
+				lastMultiplier = point.value;
+				continue;
+			}
+			const safeDuration = Math.max(adjustedDuration, schedulingEpsilon);
+			envelopeGain.gain.setValueCurveAtTime(
+				values,
+				adjustedStart,
+				safeDuration,
+			);
+			lastScheduledEnd = adjustedStart + safeDuration;
 
 			lastTime = point.time;
 			lastMultiplier = point.value;
@@ -487,6 +521,10 @@ export class PlaybackService {
 		return this.currentMasterDb;
 	}
 
+	getLastScheduleLeadMs(): number {
+		return this.lastScheduleLeadMs;
+	}
+
 	private applySnapshot(tracks: Track[]): void {
 		if (!this.audioContext || !this.masterGainNode) return;
 		const soloEngaged = tracks.some((track) => track.soloed);
@@ -525,10 +563,10 @@ export class PlaybackService {
 		this.applySnapshot(tracks);
 	}
 
-	synchronizeTracks(tracks: Track[]): void {
+	async synchronizeTracks(tracks: Track[]): Promise<void> {
 		if (this.isPlaying && this.audioContext) {
 			// Atomic: snapshot + clip sync under mutex to avoid gaps
-			this.queueSync(async () => {
+			await this.queueSync(async () => {
 				this.applySnapshot(tracks);
 				await this.synchronizeClipsGlobal(tracks);
 			}).catch((err) => {
@@ -562,6 +600,10 @@ export class PlaybackService {
 		}
 
 		// Phase 1: Stop clips that shouldn't be playing, are on wrong track, or have changed params
+		// This handles:
+		// - Clips that were removed (!desired) - including original clips that were split
+		// - Clips that moved tracks (desired.trackId !== active.trackId)
+		// - Clips that changed position/trim/loop (desired.desc !== active.desc)
 		const stopsNeeded: string[] = [];
 		for (const [clipId, active] of this.activeClips) {
 			const desired = desiredState.get(clipId);
@@ -638,6 +680,10 @@ export class PlaybackService {
 		this.startTime = this.audioContext.currentTime;
 		this.isPlaying = true;
 
+		// Immediate synchronous update before audio scheduling to ensure visual sync
+		const initialTime = this.getPlaybackTime();
+		this.options.onTimeUpdate?.(initialTime);
+
 		this.startMeterUpdates();
 		this.applySnapshot(tracks);
 
@@ -659,10 +705,12 @@ export class PlaybackService {
 			}
 		}
 
+		// Start visual update loop immediately, before audio scheduling
+		// This ensures visual updates begin synchronously with playback start
+		this.startTimeUpdateLoop();
+
 		// Schedule all clips via mutex
 		await this.queueSync(() => this.synchronizeClipsGlobal(tracks));
-
-		this.startTimeUpdateLoop();
 	}
 
 	private async scheduleClipWithState(
@@ -732,6 +780,10 @@ export class PlaybackService {
 			}
 		} else {
 			timeIntoClip = Math.max(0, timelineSec - clipStartSec);
+		}
+
+		if (timeIntoClip > 0 && timeIntoClip < PlaybackService.START_GRACE_SEC) {
+			timeIntoClip = 0;
 		}
 
 		const audioFileReadStart = clipTrimStartSec + timeIntoClip;
@@ -823,7 +875,12 @@ export class PlaybackService {
 				// Anchor to current timeline
 				const now = this.audioContext.currentTime;
 				const currentTl = this.getPlaybackTime();
-				const startAt = now + (timelinePos - currentTl);
+				let leadSec = timelinePos - currentTl;
+				if (leadSec >= 0) {
+					leadSec = Math.max(leadSec, PlaybackService.START_GRACE_SEC);
+				}
+				this.lastScheduleLeadMs = leadSec * 1000;
+				const startAt = now + leadSec;
 
 				if (startAt >= now) {
 					node.start(startAt);
@@ -943,12 +1000,19 @@ export class PlaybackService {
 		this.options.onTimeUpdate?.(0);
 	}
 
-	async rescheduleTrack(updatedTrack: Track): Promise<void> {
+	async rescheduleTrack(
+		updatedTrack: Track,
+		allTracks?: Track[],
+	): Promise<void> {
 		// Alias to global synchronization path
-		const tracks = Array.from(this.currentTracks.values()).map((t) =>
-			t.id === updatedTrack.id ? updatedTrack : t,
-		);
-		this.synchronizeTracks(tracks);
+		// If allTracks is provided, use it for complete state synchronization
+		// Otherwise, build from currentTracks (backward compatibility)
+		const tracks = allTracks
+			? allTracks.map((t) => (t.id === updatedTrack.id ? updatedTrack : t))
+			: Array.from(this.currentTracks.values()).map((t) =>
+					t.id === updatedTrack.id ? updatedTrack : t,
+				);
+		await this.synchronizeTracks(tracks);
 	}
 
 	getCurrentTime(): number {
@@ -960,12 +1024,20 @@ export class PlaybackService {
 	}
 
 	private startTimeUpdateLoop(): void {
+		// Stop any existing loop first
+		this.stopTimeUpdateLoop();
+
 		const updateTime = () => {
-			if (!this.isPlaying) return;
+			if (!this.isPlaying) {
+				this.animationFrameId = null;
+				return;
+			}
+			// Use high-precision AudioContext time for accurate sync
 			const currentTime = this.getPlaybackTime();
 			this.options.onTimeUpdate?.(currentTime);
 			this.animationFrameId = requestAnimationFrame(updateTime);
 		};
+		// Immediate synchronous call for instant visual update
 		updateTime();
 	}
 
@@ -988,11 +1060,11 @@ export class PlaybackService {
 		this.applySnapshot(tracks);
 	}
 
-	updateMasterVolume(volume: number): void {
+	updateMasterVolume(volumePercent: number): void {
 		if (this.masterGainNode && this.audioContext) {
 			// Convert volume percentage to dB, then to linear gain
-			const volumeDb = volumeToDb(volume);
-			const gain = dbToGain(volumeDb);
+			const volumeDb = volume.volumeToDb(volumePercent);
+			const gain = volume.dbToGain(volumeDb);
 			const now = this.audioContext.currentTime;
 			this.cancelGainAutomation(this.masterGainNode.gain, now);
 			this.masterGainNode.gain.setValueAtTime(gain, now);

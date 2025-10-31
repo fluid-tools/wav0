@@ -1,7 +1,7 @@
 "use client";
 
 import { useAtom } from "jotai";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import {
 	horizontalScrollAtom,
 	playbackAtom,
@@ -13,7 +13,7 @@ import {
 	timelinePxPerMsAtom,
 } from "@/lib/daw-sdk";
 
-export function UnifiedOverlay() {
+export const UnifiedOverlay = memo(function UnifiedOverlay() {
 	const [playheadViewport] = useAtom(playheadViewportAtom);
 	const [projectEndX] = useAtom(projectEndViewportPxAtom);
 	const [pxPerMs] = useAtom(timelinePxPerMsAtom);
@@ -32,14 +32,7 @@ export function UnifiedOverlay() {
 		raf: number;
 	} | null>(null);
 
-	// Re-render on resize to ensure full-height
-	useEffect(() => {
-		const el = containerRef.current;
-		if (!el) return;
-		const ro = new ResizeObserver(() => {});
-		ro.observe(el);
-		return () => ro.disconnect();
-	}, []);
+	// Remove unnecessary ResizeObserver - layout handles height automatically
 
 	const snapConfig = useMemo(() => {
 		if (!timeline.snapToGrid) return null;
@@ -192,4 +185,4 @@ export function UnifiedOverlay() {
 			/>
 		</div>
 	);
-}
+});

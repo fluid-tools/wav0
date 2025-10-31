@@ -2,6 +2,7 @@
 
 import { atom } from "jotai";
 import { playbackService } from "../index";
+import { bindEnvelopeToClips } from "../utils/automation-migration-helpers";
 import {
 	playbackAtom,
 	selectedClipIdAtom,
@@ -18,7 +19,7 @@ export const updateClipAtom = atom(
 		trackId: string,
 		clipId: string,
 		updates: Partial<Clip>,
-		options?: { moveAutomation?: boolean },
+		_options?: { moveAutomation?: boolean },
 	) => {
 		const tracks = get(tracksAtom);
 		const playback = get(playbackAtom);
@@ -27,76 +28,83 @@ export const updateClipAtom = atom(
 		const originalTrack = tracks.find((t) => t.id === trackId);
 		const originalClip = originalTrack?.clips?.find((c) => c.id === clipId);
 
-		// Detect if we need to move automation
-		const shouldMoveAutomation =
-			options?.moveAutomation &&
-			updates.startTime !== undefined &&
-			originalClip &&
-			originalClip.startTime !== updates.startTime &&
-			originalTrack?.volumeEnvelope?.enabled;
-
-		let automationDelta = 0;
-		if (
-			shouldMoveAutomation &&
-			originalClip &&
-			updates.startTime !== undefined
-		) {
-			automationDelta = updates.startTime - originalClip.startTime;
-		}
-
 		// Detect clip movement for clip-bound automation (even without moveAutomation flag)
 		const clipMoved =
 			updates.startTime !== undefined &&
 			originalClip &&
 			originalClip.startTime !== updates.startTime;
-		const clipTimeDelta =
-			clipMoved && updates.startTime !== undefined
-				? updates.startTime - originalClip.startTime
-				: 0;
-
 		const updatedTracks = tracks.map((track) => {
 			if (track.id !== trackId || !track.clips) return track;
+
+			// Normalize envelope FIRST with original clips to bind track-level points
+			let normalizedEnvelope = track.volumeEnvelope;
+			if (normalizedEnvelope) {
+				normalizedEnvelope = bindEnvelopeToClips(
+					normalizedEnvelope,
+					track.clips,
+				);
+			}
 
 			// Update clip
 			const updatedClips = track.clips.map((clip) =>
 				clip.id === clipId ? { ...clip, ...updates } : clip,
 			);
+			const nextClip = updatedClips.find((clip) => clip.id === clipId);
+			const nextStartTime =
+				nextClip?.startTime ??
+				updates.startTime ??
+				originalClip?.startTime ??
+				0;
 
 			// Handle automation movement
-			if (track.volumeEnvelope && originalClip && clipMoved) {
-				const clipEndTime =
-					originalClip.startTime +
-					(originalClip.trimEnd - originalClip.trimStart);
-
+			if (normalizedEnvelope && originalClip && clipMoved) {
 				// Move two types of automation:
 				// 1. Clip-bound automation (always moves with clip)
 				// 2. Range-based automation (if moveAutomation flag is set)
-				const shiftedPoints = track.volumeEnvelope.points.map((point) => {
+				const shiftedPoints = normalizedEnvelope.points.map((point) => {
 					// Clip-bound automation: always move with clip
 					if (point.clipId === clipId) {
-						return { ...point, time: point.time + clipTimeDelta };
-					}
-
-					// Range-based automation: only if moveAutomation flag is set
-					if (
-						shouldMoveAutomation &&
-						point.time >= originalClip.startTime &&
-						point.time <= clipEndTime &&
-						!point.clipId // Don't double-move clip-bound points
-					) {
-						return { ...point, time: point.time + automationDelta };
+						const derivedRelative =
+							point.clipRelativeTime !== undefined
+								? point.clipRelativeTime
+								: point.time - originalClip.startTime;
+						const relativeTime = Math.max(0, derivedRelative);
+						return {
+							...point,
+							time: nextStartTime + relativeTime,
+							clipRelativeTime: relativeTime,
+							clipId, // Keep clipId bound
+						};
 					}
 
 					return point;
 				});
 
+				const movedEnvelope = {
+					...normalizedEnvelope,
+					points: shiftedPoints,
+				};
+
+				// Rebind with updated clips to ensure bindings stay correct
+				const finalEnvelope = bindEnvelopeToClips(movedEnvelope, updatedClips);
+
 				return {
 					...track,
 					clips: updatedClips,
-					volumeEnvelope: {
-						...track.volumeEnvelope,
-						points: shiftedPoints,
-					},
+					volumeEnvelope: finalEnvelope,
+				};
+			}
+
+			// If envelope was normalized but clip didn't move, rebind with updated clips
+			if (normalizedEnvelope && normalizedEnvelope !== track.volumeEnvelope) {
+				const finalEnvelope = bindEnvelopeToClips(
+					normalizedEnvelope,
+					updatedClips,
+				);
+				return {
+					...track,
+					clips: updatedClips,
+					volumeEnvelope: finalEnvelope,
 				};
 			}
 
@@ -110,7 +118,11 @@ export const updateClipAtom = atom(
 
 		// Synchronize via global path (no direct reschedule)
 		if (playback.isPlaying) {
-			playbackService.synchronizeTracks(updatedTracks);
+			try {
+				await playbackService.synchronizeTracks(updatedTracks);
+			} catch (error) {
+				console.error("Failed to synchronize tracks after clip update", error);
+			}
 		}
 	},
 );
@@ -147,7 +159,11 @@ export const removeClipAtom = atom(
 
 		// Synchronize via global path (no direct stop/reschedule)
 		if (playback.isPlaying) {
-			playbackService.synchronizeTracks(updatedTracks);
+			try {
+				await playbackService.synchronizeTracks(updatedTracks);
+			} catch (error) {
+				console.error("Failed to synchronize tracks after clip removal", error);
+			}
 		}
 	},
 );
@@ -204,7 +220,8 @@ export const splitClipAtPlayheadAtom = atom(null, async (get, set) => {
 
 	if (playback.isPlaying) {
 		try {
-			await playbackService.rescheduleTrack(updatedTrack);
+			// Synchronize all tracks to ensure original clip stops and both split clips start correctly
+			await playbackService.synchronizeTracks(updatedTracks);
 		} catch (error) {
 			console.error("Failed to reschedule after split", track.id, error);
 		}

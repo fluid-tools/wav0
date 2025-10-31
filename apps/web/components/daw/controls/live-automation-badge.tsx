@@ -1,7 +1,8 @@
 "use client";
 
+import { volume } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
-import { formatDb, playbackAtom, useLiveAutomationGain } from "@/lib/daw-sdk";
+import { playbackAtom, useLiveAutomationGain } from "@/lib/daw-sdk";
 
 type LiveAutomationBadgeProps = {
 	trackId: string;
@@ -25,7 +26,7 @@ export function LiveAutomationBadge({ trackId }: LiveAutomationBadgeProps) {
 				Live
 			</span>
 			<span className="font-mono text-[10px] font-semibold text-amber-700 dark:text-amber-300">
-				{formatDb(currentDb, 1)}
+				{volume.formatDb(currentDb, 1)}
 			</span>
 		</div>
 	);
