@@ -2,6 +2,7 @@
 
 import { atom } from "jotai";
 import { playbackService } from "../index";
+import { bindEnvelopeToClips } from "../utils/automation-migration-helpers";
 import {
 	playbackAtom,
 	selectedClipIdAtom,
@@ -35,6 +36,15 @@ export const updateClipAtom = atom(
 		const updatedTracks = tracks.map((track) => {
 			if (track.id !== trackId || !track.clips) return track;
 
+			// Normalize envelope FIRST with original clips to bind track-level points
+			let normalizedEnvelope = track.volumeEnvelope;
+			if (normalizedEnvelope) {
+				normalizedEnvelope = bindEnvelopeToClips(
+					normalizedEnvelope,
+					track.clips,
+				);
+			}
+
 			// Update clip
 			const updatedClips = track.clips.map((clip) =>
 				clip.id === clipId ? { ...clip, ...updates } : clip,
@@ -47,11 +57,11 @@ export const updateClipAtom = atom(
 				0;
 
 			// Handle automation movement
-			if (track.volumeEnvelope && originalClip && clipMoved) {
+			if (normalizedEnvelope && originalClip && clipMoved) {
 				// Move two types of automation:
 				// 1. Clip-bound automation (always moves with clip)
 				// 2. Range-based automation (if moveAutomation flag is set)
-				const shiftedPoints = track.volumeEnvelope.points.map((point) => {
+				const shiftedPoints = normalizedEnvelope.points.map((point) => {
 					// Clip-bound automation: always move with clip
 					if (point.clipId === clipId) {
 						const derivedRelative =
@@ -63,19 +73,38 @@ export const updateClipAtom = atom(
 							...point,
 							time: nextStartTime + relativeTime,
 							clipRelativeTime: relativeTime,
+							clipId, // Keep clipId bound
 						};
 					}
 
 					return point;
 				});
 
+				const movedEnvelope = {
+					...normalizedEnvelope,
+					points: shiftedPoints,
+				};
+
+				// Rebind with updated clips to ensure bindings stay correct
+				const finalEnvelope = bindEnvelopeToClips(movedEnvelope, updatedClips);
+
 				return {
 					...track,
 					clips: updatedClips,
-					volumeEnvelope: {
-						...track.volumeEnvelope,
-						points: shiftedPoints,
-					},
+					volumeEnvelope: finalEnvelope,
+				};
+			}
+
+			// If envelope was normalized but clip didn't move, rebind with updated clips
+			if (normalizedEnvelope && normalizedEnvelope !== track.volumeEnvelope) {
+				const finalEnvelope = bindEnvelopeToClips(
+					normalizedEnvelope,
+					updatedClips,
+				);
+				return {
+					...track,
+					clips: updatedClips,
+					volumeEnvelope: finalEnvelope,
 				};
 			}
 

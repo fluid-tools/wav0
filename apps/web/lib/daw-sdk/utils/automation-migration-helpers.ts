@@ -5,6 +5,7 @@
 
 import { automation } from "@wav0/daw-sdk";
 import type {
+	Clip,
 	Track,
 	TrackEnvelope,
 	TrackEnvelopePoint,
@@ -348,5 +349,71 @@ export function shiftTrackAutomationInRange(
 				p.time >= startMs ? { ...p, time: p.time + shiftMs } : p,
 			),
 		},
+	};
+}
+
+/**
+ * Bind automation points to clips based on their position
+ * Points that fall within a clip's time window get clipId/clipRelativeTime metadata
+ * Points that no longer overlap any clip lose their clip binding
+ */
+export function bindEnvelopeToClips(
+	envelope: TrackEnvelope,
+	clips: Clip[] | undefined,
+): TrackEnvelope {
+	if (!clips || clips.length === 0) {
+		// No clips: remove all clip bindings
+		return {
+			...envelope,
+			points: envelope.points.map((point) => {
+				const { clipId: _clipId, clipRelativeTime: _rel, ...rest } = point;
+				return rest;
+			}),
+		};
+	}
+
+	return {
+		...envelope,
+		points: envelope.points.map((point) => {
+			// Compute absolute time for this point
+			const absoluteTime =
+				point.clipRelativeTime !== undefined && point.clipId
+					? // Point is already clip-bound: resolve from clip
+						(() => {
+							const boundClip = clips.find((c) => c.id === point.clipId);
+							if (boundClip) {
+								return boundClip.startTime + point.clipRelativeTime;
+							}
+							// Clip no longer exists: fall back to stored absolute time
+							return point.time;
+						})()
+					: // Point is track-level: use absolute time directly
+						point.time;
+
+			// Find clip that contains this point
+			const containingClip = clips.find((clip) => {
+				const clipStart = clip.startTime;
+				const clipEnd = clip.startTime + (clip.trimEnd - clip.trimStart);
+				return absoluteTime >= clipStart && absoluteTime <= clipEnd;
+			});
+
+			if (containingClip) {
+				// Bind to clip
+				const relativeTime = absoluteTime - containingClip.startTime;
+				return {
+					...point,
+					time: absoluteTime, // Keep absolute time for compatibility
+					clipId: containingClip.id,
+					clipRelativeTime: relativeTime,
+				};
+			}
+
+			// No containing clip: remove clip binding
+			const { clipId: _clipId, clipRelativeTime: _rel, ...rest } = point;
+			return {
+				...rest,
+				time: absoluteTime,
+			};
+		}),
 	};
 }
