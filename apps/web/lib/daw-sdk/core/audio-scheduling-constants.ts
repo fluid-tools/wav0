@@ -51,3 +51,22 @@ export const AUTOMATION_SCHEDULING_EPSILON_SEC = 0.001;
  */
 export const MIN_AUTOMATION_SEGMENT_DURATION_SEC = 0.001;
 
+/**
+ * Maximum expected duration (in seconds) for any automation curve.
+ *
+ * Used as a safe upper bound when canceling scheduled automation values during
+ * rapid reschedules (e.g., when dragging clips during playback). Canceling from
+ * `now - MAX_AUTOMATION_CURVE_DURATION_SEC` ensures all curves from previous
+ * schedules are fully canceled, preventing overlapping setValueCurveAtTime errors.
+ *
+ * Set to 30 seconds as a safe upper bound for any realistic automation curve.
+ * Longer curves would be extremely rare in practice.
+ *
+ * @example
+ * ```ts
+ * const cancelFrom = Math.max(0, now - MAX_AUTOMATION_CURVE_DURATION_SEC);
+ * envelopeGain.gain.cancelScheduledValues(cancelFrom);
+ * ```
+ */
+export const MAX_AUTOMATION_CURVE_DURATION_SEC = 30;
+
