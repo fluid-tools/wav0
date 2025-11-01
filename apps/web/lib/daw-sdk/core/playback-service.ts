@@ -537,8 +537,20 @@ export class PlaybackService {
 		if (!this.audioContext || !this.masterGainNode) return;
 		const soloEngaged = tracks.some((track) => track.soloed);
 		for (const track of tracks) {
-			const state = this.tracks.get(track.id);
-			if (!state) continue;
+			let state = this.tracks.get(track.id);
+			
+			// Auto-initialize new tracks that aren't in the map yet
+			// This handles tracks added during playback
+			if (!state) {
+				state = {
+					clipStates: new Map(),
+					envelopeGainNode: null,
+					muteSoloGainNode: null,
+					isPlaying: false,
+					automationGeneration: 0,
+				};
+				this.tracks.set(track.id, state);
+			}
 
 			if (!state.envelopeGainNode) {
 				state.envelopeGainNode = this.audioContext.createGain();
