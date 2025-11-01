@@ -60,32 +60,6 @@ export function DAWTimeline() {
 	}, [isDraggingEnd, onMouseMove]);
 	const _timelinePlayheadViewport = playheadViewportPx;
 
-	// Calculate time markers (time mode)
-	const getTimeMarkers = () => {
-		if (pxPerMs <= 0) return [];
-		const markers = [];
-		const pixelsPerSecond = pxPerMs * 1000;
-		const secondsPerMarker =
-			timeline.zoom < 0.5 ? 10 : timeline.zoom < 1 ? 5 : 1;
-
-		for (
-			let timeInSeconds = 0;
-			timeInSeconds * pixelsPerSecond < timelineWidth;
-			timeInSeconds += secondsPerMarker
-		) {
-			const timestampMs = timeInSeconds * 1000;
-			markers.push({
-				time: timestampMs,
-				position: timeInSeconds * pixelsPerSecond,
-				label: time.formatDuration(timestampMs),
-			});
-		}
-
-		return markers;
-	};
-
-	// Beat markers computation removed; canvas grid handles bars mode
-
 	const handleTimelineClick = (e: React.MouseEvent | React.PointerEvent) => {
 		const rect = e.currentTarget.getBoundingClientRect();
 		const x = e.clientX - rect.left;
@@ -131,7 +105,6 @@ export function DAWTimeline() {
 
 	// Playhead position calculation (now handled by DAWPlayhead component)
 
-	const timeMarkers = getTimeMarkers();
 	const [horizontalScroll] = useAtom(horizontalScrollAtom);
 
 	return (
@@ -141,28 +114,14 @@ export function DAWTimeline() {
 			style={{ width: timelineWidth }}
 		>
 			{/* Visual layer - non-interactive */}
+			{/* Always use TimelineGridCanvas - it handles both time and bars mode with proper snap alignment */}
 			<div className="absolute inset-0 pointer-events-none z-0">
-				{tGrid.mode === "bars" ? (
-					<TimelineGridCanvas
-						width={timelineWidth}
-						height={400}
-						pxPerMs={pxPerMs}
-						scrollLeft={horizontalScroll}
-					/>
-				) : (
-					timeMarkers.map((marker) => (
-						<div
-							key={`time-${marker.time}`}
-							className="absolute top-0"
-							style={{ left: marker.position }}
-						>
-							<div className="w-px h-3 bg-foreground" />
-							<span className="text-xs text-muted-foreground ml-1 font-mono">
-								{marker.label}
-							</span>
-						</div>
-					))
-				)}
+				<TimelineGridCanvas
+					width={timelineWidth}
+					height={400}
+					pxPerMs={pxPerMs}
+					scrollLeft={horizontalScroll}
+				/>
 			</div>
 
 			{/* Timeline click layer - interactive background */}
