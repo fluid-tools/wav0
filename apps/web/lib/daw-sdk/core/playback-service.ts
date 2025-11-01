@@ -11,6 +11,7 @@ import type {
 import {
 	AUTOMATION_CANCEL_LOOKAHEAD_SEC,
 	AUTOMATION_SCHEDULING_EPSILON_SEC,
+	MAX_AUTOMATION_CURVE_DURATION_SEC,
 	MIN_AUTOMATION_SEGMENT_DURATION_SEC,
 } from "./audio-scheduling-constants";
 import { audioService } from "./audio-service";
@@ -294,15 +295,14 @@ export class PlaybackService {
 		const envelopeGain = state.envelopeGainNode;
 		const now = this.audioContext.currentTime;
 
-		const cancelLookahead = AUTOMATION_CANCEL_LOOKAHEAD_SEC;
-		let cancelFrom = Math.max(0, now - cancelLookahead);
-		if (
-			state.lastAutomationEndTime !== undefined &&
-			cancelFrom < state.lastAutomationEndTime
-		) {
-			cancelFrom = Math.max(cancelFrom, state.lastAutomationEndTime);
-		}
+		// Always cancel from now - MAX_CURVE_DURATION to ensure all active curves are canceled
+		// This is critical during rapid reschedules (e.g., dragging clips) - curves from previous
+		// schedules must be fully canceled regardless of their duration to prevent overlaps
+		const cancelFrom = Math.max(0, now - MAX_AUTOMATION_CURVE_DURATION_SEC);
 		envelopeGain.gain.cancelScheduledValues(cancelFrom);
+		
+		// Reset automation tracking to now after cancellation for clean scheduling state
+		state.lastAutomationEndTime = now;
 
 		// Step 2: Anchor to instantaneous effective gain at current transport time
 		const currentTimeMs = this.getPlaybackTime() * 1000;
@@ -382,10 +382,8 @@ export class PlaybackService {
 		let lastTime = currentTimeMs;
 
 		const schedulingEpsilon = AUTOMATION_SCHEDULING_EPSILON_SEC;
-		let lastScheduledEnd = state.lastAutomationEndTime ?? now;
-		if (lastScheduledEnd < now) {
-			lastScheduledEnd = now;
-		}
+		// After cancellation, scheduling always starts from now
+		let lastScheduledEnd = now;
 		for (const point of futurePoints) {
 			const segmentStart = lastTime;
 			const segmentEnd = point.time;
@@ -431,6 +429,11 @@ export class PlaybackService {
 			let adjustedStart = acStart;
 			if (adjustedStart < lastScheduledEnd + schedulingEpsilon) {
 				adjustedStart = lastScheduledEnd + schedulingEpsilon;
+			}
+			// Safety check: ensure adjustedStart is >= now to prevent scheduling in the past
+			// This prevents overlaps with any curves that might not have been fully canceled
+			if (adjustedStart < now) {
+				adjustedStart = now + schedulingEpsilon;
 			}
 			const adjustedDuration = durationSec - (adjustedStart - acStart);
 			if (adjustedDuration <= schedulingEpsilon) {
