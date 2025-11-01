@@ -9,6 +9,15 @@ export function useTimebase() {
 	const [timeline] = useAtom(timelineAtom);
 
 	function snap(ms: number): number {
+		// Handle time mode snapping with granularity intervals
+		if (grid.mode === "time") {
+			const snapInterval = getSnapIntervalMs();
+			if (snapInterval > 0) {
+				return Math.round(ms / snapInterval) * snapInterval;
+			}
+			return ms;
+		}
+		// Bars mode uses musical timing
 		return time.snapTimeMs(ms, grid, music.tempoBpm, music.timeSignature);
 	}
 

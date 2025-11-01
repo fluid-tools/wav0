@@ -326,6 +326,8 @@ export namespace time {
 		}
 
 		// If snap interval is provided and snap is enabled, use snap-based grid
+		// Use same rounding logic as snap function: Math.round(ms / interval) * interval
+		// Generate markers using integer multiples to avoid floating point accumulation errors
 		if (snapIntervalMs !== undefined && snapIntervalMs > 0) {
 			const majors: TimeMarker[] = [];
 			const minors: number[] = [];
@@ -336,18 +338,29 @@ export namespace time {
 			const majorMs = snapIntervalMs * 4;
 			const labelFormat = majorMs >= 1000 ? "mm:ss" : "ss.ms";
 
-			const firstMajor = Math.floor(viewStartMs / majorMs) * majorMs;
-			for (let ms = firstMajor; ms <= viewEndMs; ms += majorMs) {
-				if (ms >= viewStartMs) {
+			// Find starting integer multiples - use floor to ensure we start before viewStartMs
+			const startMajorMultiple = Math.floor(viewStartMs / majorMs);
+			const endMajorMultiple = Math.ceil(viewEndMs / majorMs);
+			
+			// Generate major markers using integer multiples (avoids floating point drift)
+			for (let i = startMajorMultiple; i <= endMajorMultiple; i++) {
+				const ms = i * majorMs;
+				// ms is already an exact integer multiple of snapIntervalMs, so it matches snap points
+				if (ms >= viewStartMs && ms <= viewEndMs) {
 					majors.push({ ms, label: formatTimeMs(ms, labelFormat) });
 				}
 			}
 
-			// Generate minors at snap intervals
-			const firstMinor = Math.floor(viewStartMs / minorMs) * minorMs;
-			for (let ms = firstMinor; ms <= viewEndMs; ms += minorMs) {
-				if (ms % majorMs === 0) continue; // Skip majors
-				if (ms >= viewStartMs) {
+			// Generate minor markers using integer multiples
+			const startMinorMultiple = Math.floor(viewStartMs / minorMs);
+			const endMinorMultiple = Math.ceil(viewEndMs / minorMs);
+			
+			for (let i = startMinorMultiple; i <= endMinorMultiple; i++) {
+				const ms = i * minorMs;
+				// ms is already an exact integer multiple of snapIntervalMs, so it matches snap points
+				// Skip if this is a major marker
+				if (ms % majorMs === 0) continue;
+				if (ms >= viewStartMs && ms <= viewEndMs) {
 					minors.push(ms);
 				}
 			}
