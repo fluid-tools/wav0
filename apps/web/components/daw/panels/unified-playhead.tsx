@@ -18,14 +18,6 @@ type Props = {
 	timelineHeaderHeight: number;
 };
 
-/**
- * UnifiedPlayhead - Single playhead that spans both timeline header and track content
- *
- * This is the Logic Pro style approach: one continuous vertical line from timeline
- * ruler down through all tracks, with a draggable handle at the top.
- *
- * Positioned absolutely at the panel level to avoid split playhead issues.
- */
 export const UnifiedPlayhead = memo(function UnifiedPlayhead({
 	timelineHeaderHeight,
 }: Props) {
@@ -50,16 +42,13 @@ export const UnifiedPlayhead = memo(function UnifiedPlayhead({
 
 	const { snap } = useTimebase();
 
-	// Update playhead position synchronously before paint
 	useLayoutEffect(() => {
 		if (!playheadLineRef.current || !playheadHandleRef.current) return;
 
-		// Calculate position using unified timeToPixel function
 		const playheadX = Math.round(
 			time.timeToPixel(playback.currentTime, pxPerMs, horizontalScroll)
 		);
 
-		// Apply transform directly to DOM for frame-perfect sync
 		playheadLineRef.current.style.transform = `translateX(${playheadX}px)`;
 		playheadHandleRef.current.style.transform = `translateX(${playheadX - 12}px)`;
 	}, [playback.currentTime, pxPerMs, horizontalScroll]);
@@ -68,19 +57,13 @@ export const UnifiedPlayhead = memo(function UnifiedPlayhead({
 		(clientX: number, timeStamp?: number) => {
 			if (!containerRef.current || pxPerMs <= 0) return;
 
-			// IMPORTANT: UnifiedPlayhead is OUTSIDE scroll containers at panel level
-			// The timeline scroll container is a sibling's child, not an ancestor
-			// Use querySelector to find it reliably
 			const timelineScrollContainer = document.querySelector('[data-daw-timeline-scroll="true"]') as HTMLElement | null;
 			if (!timelineScrollContainer) return;
 
-			// Get the timeline content element (first child of scroll container)
 			const timelineElement = timelineScrollContainer.firstElementChild as HTMLElement | null;
 			if (!timelineElement) return;
 
 			const rect = timelineElement.getBoundingClientRect();
-			// clientX - rect.left gives us position in timeline coordinates
-			// rect.left is negative when scrolled, so this automatically accounts for scroll
 			const absoluteX = Math.max(0, clientX - rect.left);
 			if (!Number.isFinite(absoluteX)) return;
 
@@ -126,9 +109,7 @@ export const UnifiedPlayhead = memo(function UnifiedPlayhead({
 		if (pointerId !== null && element.hasPointerCapture?.(pointerId)) {
 			try {
 				element.releasePointerCapture(pointerId);
-			} catch {
-				// Ignore capture release failures
-			}
+			} catch {}
 		}
 		if (state.raf) {
 			cancelAnimationFrame(state.raf);
@@ -175,19 +156,17 @@ export const UnifiedPlayhead = memo(function UnifiedPlayhead({
 			ref={containerRef}
 			className="pointer-events-none absolute inset-0 z-50"
 		>
-			{/* Playhead line - spans from timeline header through track content */}
 			<div
 				ref={playheadLineRef}
 				className="pointer-events-none absolute left-0 w-px bg-red-500"
 				style={{
 					top: 0,
 					bottom: 0,
-					transform: "translateX(0px)", // Initial position (updated by layoutEffect)
+					transform: "translateX(0px)",
 					willChange: "transform",
 				}}
 			/>
 
-			{/* Draggable handle - positioned at top in timeline header area */}
 			<button
 				ref={playheadHandleRef}
 				type="button"
@@ -195,7 +174,7 @@ export const UnifiedPlayhead = memo(function UnifiedPlayhead({
 				style={{
 					top: 0,
 					height: timelineHeaderHeight,
-					transform: "translateX(-12px)", // Initial position (updated by layoutEffect)
+					transform: "translateX(-12px)",
 					willChange: "transform",
 				}}
 				onPointerDown={(event) => {
@@ -214,7 +193,6 @@ export const UnifiedPlayhead = memo(function UnifiedPlayhead({
 				}}
 				aria-label="Move playhead"
 			>
-				{/* Visible handle indicator at top */}
 				<span className="pointer-events-none absolute left-1/2 -translate-x-1/2 top-6 flex flex-col items-center">
 					<span className="h-3 w-4 rounded bg-red-500 shadow-[0_1px_3px_rgba(0,0,0,0.25)]" />
 				</span>
