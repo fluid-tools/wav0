@@ -12,6 +12,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ClipContextMenu } from "@/components/daw/context-menus/clip-context-menu";
 import { ClipFadeHandles } from "@/components/daw/controls/clip-fade-handles";
 import { AutomationLane } from "@/components/daw/panels/automation-lane";
+import { PlayheadLine } from "@/components/daw/panels/playhead-line";
 import { DAW_HEIGHTS } from "@/lib/constants/daw-design";
 import {
 	activeToolAtom,
@@ -647,13 +648,16 @@ export function DAWTrackContent() {
 
 	return (
 		<>
-			<div
-				ref={containerRef}
-				className="relative w-full h-full"
-				data-daw-grid
-				data-dragging={draggingClip ? "true" : undefined}
-			>
-				{tracks.map((track, index) => {
+		<div
+			ref={containerRef}
+			className="relative w-full h-full"
+			data-daw-grid
+			data-dragging={draggingClip ? "true" : undefined}
+		>
+			{/* Playhead line - synchronized with header playhead */}
+			<PlayheadLine />
+
+			{tracks.map((track, index) => {
 					// Track row layout
 					const trackHeight = Math.round(
 						DAW_HEIGHTS.TRACK_ROW * trackHeightZoom,
