@@ -6,7 +6,7 @@
 "use client";
 
 import type { TransportEvent, TransportState } from "@wav0/daw-sdk";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useDAWContext } from "../providers/daw-provider";
 
 export interface UseTransportEventsOptions {
@@ -23,6 +23,11 @@ export interface UseTransportEventsOptions {
  */
 export function useTransportEvents(options: UseTransportEventsOptions = {}) {
 	const daw = useDAWContext();
+	// Store latest callbacks in ref to avoid re-running effect when they change
+	const optionsRef = useRef(options);
+	useEffect(() => {
+		optionsRef.current = options;
+	}, [options]);
 
 	useEffect(() => {
 		if (!daw) return;
@@ -31,20 +36,21 @@ export function useTransportEvents(options: UseTransportEventsOptions = {}) {
 
 		const handleTransportEvent = ((event: CustomEvent<TransportEvent>) => {
 			const { state, currentTime } = event.detail;
+			const currentOptions = optionsRef.current;
 
 			// Call generic state change handler
-			options.onStateChange?.(state, currentTime);
+			currentOptions.onStateChange?.(state, currentTime);
 
 			// Call specific handlers
 			switch (state) {
 				case "playing":
-					options.onPlay?.();
+					currentOptions.onPlay?.();
 					break;
 				case "stopped":
-					options.onStop?.();
+					currentOptions.onStop?.();
 					break;
 				case "paused":
-					options.onPause?.();
+					currentOptions.onPause?.();
 					break;
 			}
 		}) as EventListener;
@@ -54,13 +60,7 @@ export function useTransportEvents(options: UseTransportEventsOptions = {}) {
 		return () => {
 			transport.removeEventListener("transport", handleTransportEvent);
 		};
-	}, [
-		daw,
-		options.onStateChange,
-		options.onPlay,
-		options.onStop,
-		options.onPause,
-	]);
+	}, [daw]);
 
 	return {
 		transport: daw?.getTransport() ?? null,

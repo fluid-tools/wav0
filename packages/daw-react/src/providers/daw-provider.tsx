@@ -104,8 +104,16 @@ export function useBridges(): {
 	playback: PlaybackServiceBridge | null;
 } {
 	const context = useContext(DAWContext);
-	if (!context) {
+	// undefined means hook used outside provider - throw error
+	if (context === undefined) {
 		throw new Error("useBridges must be used within DAWProvider");
+	}
+	// null means DAW not ready yet - return null bridges gracefully
+	if (!context) {
+		return {
+			audio: null,
+			playback: null,
+		};
 	}
 	return {
 		audio: context.audioBridge,
