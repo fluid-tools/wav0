@@ -41,7 +41,14 @@ export function resolveClipRelativePoint(
 	point: TrackEnvelopePoint,
 	clipStartTime: number,
 ): TrackEnvelopePoint {
-	const relativeTime = point.clipRelativeTime ?? point.time;
+	// If clip-bound but clipRelativeTime is missing, assume 0 (start of clip)
+	// Otherwise, use clipRelativeTime if defined, or point.time if not clip-bound
+	const relativeTime =
+		point.clipRelativeTime !== undefined
+			? point.clipRelativeTime
+			: point.clipId
+				? 0 // Clip-bound but missing clipRelativeTime: assume start of clip
+				: point.time; // Not clip-bound: use absolute time as-is
 	return {
 		...point,
 		time: relativeTime + clipStartTime,
