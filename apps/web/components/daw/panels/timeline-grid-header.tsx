@@ -1,22 +1,22 @@
 "use client";
+import { time } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
 import { useMemo } from "react";
-import { cachedTimeGridAtom } from "@/lib/daw-sdk/state/view";
+import {
+	cachedTimeGridAtom,
+	horizontalScrollAtom,
+	timelinePxPerMsAtom,
+} from "@/lib/daw-sdk";
 
 type Props = {
 	width: number;
 	height: number;
-	pxPerMs: number;
-	scrollLeft: number;
 };
 
-export function TimelineGridHeader({
-	width,
-	height,
-	pxPerMs,
-	scrollLeft,
-}: Props) {
+export function TimelineGridHeader({ width, height }: Props) {
 	const [timeGrid] = useAtom(cachedTimeGridAtom);
+	const [pxPerMs] = useAtom(timelinePxPerMsAtom);
+	const [scrollLeft] = useAtom(horizontalScrollAtom);
 
 	// Memoize SVG elements for performance
 	const svgElements = useMemo(() => {
@@ -27,7 +27,8 @@ export function TimelineGridHeader({
 		const minLabelSpacing = 28; // px
 
 		for (const marker of timeGrid.majors) {
-			const x = marker.ms * pxPerMs - scrollLeft;
+			// Use unified timeToPixel function - same calculation as playhead and grid lines
+			const x = time.timeToPixel(marker.ms, pxPerMs, scrollLeft);
 
 			// Only render labels that are visible and have enough spacing
 			if (x - lastLabelX >= minLabelSpacing && x >= 0 && x <= width) {

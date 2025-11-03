@@ -1,27 +1,28 @@
 "use client";
+import { time } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
-import { memo, useDeferredValue, useEffect, useMemo, useRef } from "react";
-import { cachedTimeGridAtom } from "@/lib/daw-sdk/state/view";
+import { memo, useEffect, useMemo, useRef } from "react";
+import {
+	cachedTimeGridAtom,
+	horizontalScrollAtom,
+	timelinePxPerMsAtom,
+} from "@/lib/daw-sdk";
 import { TimelineGridHeader } from "./timeline-grid-header";
 
 type Props = {
 	width: number;
 	height: number;
-	pxPerMs: number;
-	scrollLeft: number;
 };
 
 export const TimelineGridCanvas = memo(function TimelineGridCanvas({
 	width,
 	height,
-	pxPerMs,
-	scrollLeft,
 }: Props) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 
-	// Use deferred values for smooth high-frequency updates
-	const deferredPxPerMs = useDeferredValue(pxPerMs);
-	const deferredScrollLeft = useDeferredValue(scrollLeft);
+	// Use immediate values for real-time sync with playhead
+	const [pxPerMs] = useAtom(timelinePxPerMsAtom);
+	const [scrollLeft] = useAtom(horizontalScrollAtom);
 
 	// Use cached time grid atom
 	const timeGrid = useAtom(cachedTimeGridAtom)[0];
@@ -52,39 +53,38 @@ export const TimelineGridCanvas = memo(function TimelineGridCanvas({
 		// Clear canvas
 		ctx.clearRect(0, 0, width, height);
 
-		// Draw minor grid lines
+		// Draw minor grid lines using unified timeToPixel function
 		ctx.strokeStyle = themeColors.minor;
 		ctx.lineWidth = 1;
 		ctx.beginPath();
 		for (const ms of timeGrid.minors) {
-			const x = ms * deferredPxPerMs - deferredScrollLeft;
-			if (x >= 0 && x <= width) {
-				ctx.moveTo(x, 0);
-				ctx.lineTo(x, height);
+			// Use unified timeToPixel function - same calculation as playhead
+			const x = time.timeToPixel(ms, pxPerMs, scrollLeft);
+			// Round only at final pixel position for crisp canvas rendering
+			const roundedX = Math.round(x);
+			if (roundedX >= 0 && roundedX <= width) {
+				ctx.moveTo(roundedX, 0);
+				ctx.lineTo(roundedX, height);
 			}
 		}
 		ctx.stroke();
 
-		// Draw major grid lines
+		// Draw major grid lines using unified timeToPixel function
 		ctx.strokeStyle = themeColors.major;
 		ctx.lineWidth = 1;
 		ctx.beginPath();
 		for (const marker of timeGrid.majors) {
-			const x = marker.ms * deferredPxPerMs - deferredScrollLeft;
-			if (x >= 0 && x <= width) {
-				ctx.moveTo(x, 0);
-				ctx.lineTo(x, height);
+			// Use unified timeToPixel function - same calculation as playhead
+			const x = time.timeToPixel(marker.ms, pxPerMs, scrollLeft);
+			// Round only at final pixel position for crisp canvas rendering
+			const roundedX = Math.round(x);
+			if (roundedX >= 0 && roundedX <= width) {
+				ctx.moveTo(roundedX, 0);
+				ctx.lineTo(roundedX, height);
 			}
 		}
 		ctx.stroke();
-	}, [
-		width,
-		height,
-		deferredPxPerMs,
-		deferredScrollLeft,
-		timeGrid,
-		themeColors,
-	]);
+	}, [width, height, pxPerMs, scrollLeft, timeGrid, themeColors]);
 
 	return (
 		<div className="relative" style={{ width, height }}>
@@ -93,12 +93,7 @@ export const TimelineGridCanvas = memo(function TimelineGridCanvas({
 				className="absolute inset-0 pointer-events-none"
 				style={{ width, height }}
 			/>
-			<TimelineGridHeader
-				width={width}
-				height={height}
-				pxPerMs={deferredPxPerMs}
-				scrollLeft={deferredScrollLeft}
-			/>
+			<TimelineGridHeader width={width} height={height} />
 		</div>
 	);
 });

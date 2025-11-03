@@ -43,7 +43,6 @@ import { DAWTimeline } from "./panels/daw-timeline";
 import { DAWTrackContent } from "./panels/daw-track-content";
 import { DAWTrackList } from "./panels/daw-track-list";
 import { ClipMoveToastManager } from "./toast/clip-move-toast";
-import { UnifiedOverlay } from "./unified-overlay";
 
 export function DAWContainer() {
 	// Enable event-driven atom synchronization with new SDK
@@ -461,7 +460,6 @@ export function DAWContainer() {
 						{/* Timeline and Grid Panel */}
 						<ResizablePanel defaultSize={75}>
 							<div className="relative h-full flex flex-col overflow-hidden">
-								<UnifiedOverlay />
 								{/* Timeline Header */}
 								<div
 									className="border-b relative overflow-hidden z-10"

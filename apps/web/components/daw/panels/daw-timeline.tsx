@@ -1,21 +1,20 @@
 "use client";
 
-import { time } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MarkerTrack } from "@/components/daw/panels/marker-track";
 import { TimelineGridCanvas } from "@/components/daw/panels/timeline-grid-canvas";
+import { UnifiedOverlay } from "@/components/daw/unified-overlay";
 import {
 	addMarkerAtom,
-	horizontalScrollAtom,
 	playbackAtom,
-	playheadViewportPxAtom,
 	projectEndOverrideAtom,
 	projectEndPositionAtom,
 	setCurrentTimeAtom,
 	timelineAtom,
 	timelinePxPerMsAtom,
 	timelineWidthAtom,
+	horizontalScrollAtom,
 } from "@/lib/daw-sdk";
 import { useTimebase } from "@/lib/daw-sdk/hooks/use-timebase";
 
@@ -30,10 +29,10 @@ export function DAWTimeline() {
 	);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [isDraggingEnd, setIsDraggingEnd] = useState(false);
-	const [playheadViewportPx] = useAtom(playheadViewportPxAtom);
 	const [pxPerMs] = useAtom(timelinePxPerMsAtom);
+	const [horizontalScroll] = useAtom(horizontalScrollAtom);
 	const [, addMarker] = useAtom(addMarkerAtom);
-	const { grid: tGrid, snap } = useTimebase();
+	const { snap } = useTimebase();
 
 	// legacy marker drag removed in favor of dedicated MarkerTrack
 
@@ -58,15 +57,16 @@ export function DAWTimeline() {
 			document.removeEventListener("mousemove", onMouseMove);
 		};
 	}, [isDraggingEnd, onMouseMove]);
-	const _timelinePlayheadViewport = playheadViewportPx;
 
 	const handleTimelineClick = (e: React.MouseEvent | React.PointerEvent) => {
 		const rect = e.currentTarget.getBoundingClientRect();
 		const x = e.clientX - rect.left;
 		if (pxPerMs <= 0) return;
 
-		// Allow clicking past project end; snap playhead and move if needed
-		const rawMs = Math.max(0, x / pxPerMs);
+		// x is viewport position relative to DAWTimeline's visible left edge
+		// Add horizontalScroll to get absolute timeline position
+		const absoluteX = Math.max(0, x + horizontalScroll);
+		const rawMs = Math.max(0, absoluteX / pxPerMs);
 		const timeMs = timeline.snapToGrid ? snap(rawMs) : rawMs;
 		setCurrentTime(timeMs);
 	};
@@ -103,10 +103,6 @@ export function DAWTimeline() {
 		handleTimelineClick(event);
 	};
 
-	// Playhead position calculation (now handled by DAWPlayhead component)
-
-	const [horizontalScroll] = useAtom(horizontalScrollAtom);
-
 	return (
 		<div
 			ref={containerRef}
@@ -116,12 +112,12 @@ export function DAWTimeline() {
 			{/* Visual layer - non-interactive */}
 			{/* Always use TimelineGridCanvas - it handles both time and bars mode with proper snap alignment */}
 			<div className="absolute inset-0 pointer-events-none z-0">
-				<TimelineGridCanvas
-					width={timelineWidth}
-					height={400}
-					pxPerMs={pxPerMs}
-					scrollLeft={horizontalScroll}
-				/>
+				<TimelineGridCanvas width={timelineWidth} height={400} />
+			</div>
+
+			{/* Playhead overlay - positioned relative to scroll container for perfect sync */}
+			<div className="absolute inset-0 pointer-events-none z-15">
+				<UnifiedOverlay />
 			</div>
 
 			{/* Timeline click layer - interactive background */}
