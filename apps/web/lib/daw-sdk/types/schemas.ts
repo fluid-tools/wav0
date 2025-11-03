@@ -141,7 +141,6 @@ export const PlaybackOptionsSchema = z.object({
 
 // ===== Type Exports =====
 
-export type CurveType = z.infer<typeof CurveTypeSchema>;
 export type TrackEnvelopeSegment = z.infer<typeof TrackEnvelopeSegmentSchema>;
 export type TrackEnvelopePoint = z.infer<typeof TrackEnvelopePointSchema>;
 export type TrackEnvelope = z.infer<typeof TrackEnvelopeSchema>;
