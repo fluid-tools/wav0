@@ -13,9 +13,9 @@ import {
 	timelinePxPerMsAtom,
 } from "@/lib/daw-sdk";
 import { useTimebase } from "@/lib/daw-sdk/hooks/use-timebase";
+import { time } from "@wav0/daw-sdk";
 
 export const UnifiedOverlay = memo(function UnifiedOverlay() {
-	const [playheadViewport] = useAtom(playheadViewportAtom);
 	const [projectEndX] = useAtom(projectEndViewportPxAtom);
 	const [pxPerMs] = useAtom(timelinePxPerMsAtom);
 	const [timeline] = useAtom(timelineAtom);
@@ -23,6 +23,12 @@ export const UnifiedOverlay = memo(function UnifiedOverlay() {
 	const [horizontalScroll] = useAtom(horizontalScrollAtom);
 	const [, setCurrentTime] = useAtom(setCurrentTimeAtom);
 	const [, setPlayheadDragging] = useAtom(playheadDraggingAtom);
+	
+	// Calculate playhead position using same logic as grid markers for perfect alignment
+	// Round only at final pixel position, matching TimelineGridCanvas behavior
+	const playheadX = Math.round(
+		time.timeToPixel(playback.currentTime, pxPerMs, horizontalScroll)
+	);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const dragRef = useRef<{
 		active: boolean;
@@ -41,6 +47,8 @@ export const UnifiedOverlay = memo(function UnifiedOverlay() {
 			if (!containerRef.current || pxPerMs <= 0) return;
 			const rect = containerRef.current.getBoundingClientRect();
 			const localX = clientX - rect.left;
+			// localX is viewport position relative to DAWTimeline's visible left edge
+			// Add horizontalScroll to get absolute timeline position
 			const absoluteX = Math.max(0, localX + horizontalScroll);
 			if (!Number.isFinite(absoluteX)) return;
 
@@ -66,7 +74,7 @@ export const UnifiedOverlay = memo(function UnifiedOverlay() {
 				});
 			}
 		},
-		[horizontalScroll, pxPerMs, setCurrentTime, timeline.snapToGrid, snap],
+		[pxPerMs, horizontalScroll, setCurrentTime, timeline.snapToGrid, snap],
 	);
 
 	const stopDrag = useCallback(() => {
@@ -135,16 +143,14 @@ export const UnifiedOverlay = memo(function UnifiedOverlay() {
 	return (
 		<div
 			ref={containerRef}
-			className="pointer-events-none absolute inset-0 z-50"
+			className="pointer-events-none absolute inset-0"
 		>
 			<button
 				type="button"
-				className="cursor-ew pointer-events-auto absolute top-0 bottom-0 w-6 -translate-x-1/2 bg-transparent outline-none"
+				className="cursor-ew pointer-events-auto absolute top-0 bottom-0 w-6 bg-transparent outline-none"
 				style={{
-					transform: `translate3d(${playheadViewport.viewportPx}px,0,0) translateX(-50%)`,
-					willChange: "transform",
-					WebkitTransform: `translate3d(${playheadViewport.viewportPx}px,0,0) translateX(-50%)`,
-					left: 0,
+					left: `${playheadX - 12}px`,
+					willChange: "left",
 				}}
 				onPointerDown={(event) => {
 					event.preventDefault();

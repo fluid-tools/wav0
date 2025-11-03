@@ -77,6 +77,48 @@ export namespace time {
 	}
 
 	/**
+	 * Unified time-to-pixel conversion with scroll offset
+	 * This is the SINGLE SOURCE OF TRUTH for all time-to-pixel conversions
+	 * Used by both grid markers and playhead for perfect synchronization
+	 * @param ms - Time in milliseconds
+	 * @param pxPerMs - Pixels per millisecond (zoom level)
+	 * @param scrollLeft - Horizontal scroll offset in pixels
+	 * @returns Pixel position in viewport coordinates (0 = left edge of viewport)
+	 */
+	export function timeToPixel(
+		ms: number,
+		pxPerMs: number,
+		scrollLeft: number,
+	): number {
+		if (!Number.isFinite(ms) || !Number.isFinite(pxPerMs) || !Number.isFinite(scrollLeft)) {
+			return 0;
+		}
+		// Convert time to absolute pixel position, then subtract scroll offset
+		// This ensures exact same calculation path for grid and playhead
+		return ms * pxPerMs - scrollLeft;
+	}
+
+	/**
+	 * Unified pixel-to-time conversion with scroll offset
+	 * Inverse of timeToPixel - converts viewport pixel position to time
+	 * @param px - Pixel position in viewport coordinates (0 = left edge of viewport)
+	 * @param pxPerMs - Pixels per millisecond (zoom level)
+	 * @param scrollLeft - Horizontal scroll offset in pixels
+	 * @returns Time in milliseconds
+	 */
+	export function pixelToTime(
+		px: number,
+		pxPerMs: number,
+		scrollLeft: number,
+	): number {
+		if (!Number.isFinite(px) || !Number.isFinite(pxPerMs) || pxPerMs <= 0) {
+			return 0;
+		}
+		// Convert viewport pixel to absolute pixel, then to time
+		return (px + scrollLeft) / pxPerMs;
+	}
+
+	/**
 	 * Musical timebase conversions
 	 */
 	export function msToBeats(
@@ -302,32 +344,37 @@ export namespace time {
 		}
 
 		const seconds = Math.floor(ms / 1000);
-		const msRemainder = Math.floor((ms % 1000) / 100);
+		const msRemainder = Math.round((ms % 1000) / 100);
 		return `${seconds}.${msRemainder}`;
 	}
 
 	/**
 	 * Generate time grid markers for viewport
-	 * @param params.viewStartMs - Start of viewport in milliseconds
-	 * @param params.viewEndMs - End of viewport in milliseconds
+	 * Uses pixel viewport to avoid floating point errors from time viewport calculations
+	 * @param params.scrollLeft - Horizontal scroll offset in pixels
+	 * @param params.width - Viewport width in pixels
 	 * @param params.pxPerMs - Pixels per millisecond (zoom level)
 	 * @param params.snapIntervalMs - Optional snap interval in milliseconds. When provided, generates grid markers at exact snap intervals.
 	 */
 	export function generateTimeGrid(params: {
-		viewStartMs: number;
-		viewEndMs: number;
+		scrollLeft: number;
+		width: number;
 		pxPerMs: number;
 		snapIntervalMs?: number;
 	}): TimeGrid {
-		const { viewStartMs, viewEndMs, pxPerMs, snapIntervalMs } = params;
+		const { scrollLeft, width, pxPerMs, snapIntervalMs } = params;
 
-		if (pxPerMs <= 0 || viewEndMs <= viewStartMs) {
+		if (pxPerMs <= 0 || width <= 0) {
 			return { majors: [], minors: [] };
 		}
 
+		// Convert pixel viewport to time bounds using unified pixelToTime function
+		// This ensures we use the exact same conversion logic everywhere
+		const viewStartMs = pixelToTime(0, pxPerMs, scrollLeft);
+		const viewEndMs = pixelToTime(width, pxPerMs, scrollLeft);
+
 		// If snap interval is provided and snap is enabled, use snap-based grid
-		// Use same rounding logic as snap function: Math.round(ms / interval) * interval
-		// Generate markers using integer multiples to avoid floating point accumulation errors
+		// Generate markers at exact snap intervals, filter by pixel visibility
 		if (snapIntervalMs !== undefined && snapIntervalMs > 0) {
 			const majors: TimeMarker[] = [];
 			const minors: number[] = [];
@@ -338,29 +385,33 @@ export namespace time {
 			const majorMs = snapIntervalMs * 4;
 			const labelFormat = majorMs >= 1000 ? "mm:ss" : "ss.ms";
 
-			// Find starting integer multiples - use floor to ensure we start before viewStartMs
-			const startMajorMultiple = Math.floor(viewStartMs / majorMs);
-			const endMajorMultiple = Math.ceil(viewEndMs / majorMs);
+			// Find starting integer multiples - extend slightly beyond viewport for smooth scrolling
+			const startMajorMultiple = Math.floor(viewStartMs / majorMs) - 1;
+			const endMajorMultiple = Math.ceil(viewEndMs / majorMs) + 1;
 			
 			// Generate major markers using integer multiples (avoids floating point drift)
 			for (let i = startMajorMultiple; i <= endMajorMultiple; i++) {
 				const ms = i * majorMs;
-				// ms is already an exact integer multiple of snapIntervalMs, so it matches snap points
-				if (ms >= viewStartMs && ms <= viewEndMs) {
+				// Convert to pixel position using unified timeToPixel function
+				const px = timeToPixel(ms, pxPerMs, scrollLeft);
+				// Only include markers visible in viewport (with small margin for smooth scrolling)
+				if (px >= -1 && px <= width + 1) {
 					majors.push({ ms, label: formatTimeMs(ms, labelFormat) });
 				}
 			}
 
 			// Generate minor markers using integer multiples
-			const startMinorMultiple = Math.floor(viewStartMs / minorMs);
-			const endMinorMultiple = Math.ceil(viewEndMs / minorMs);
+			const startMinorMultiple = Math.floor(viewStartMs / minorMs) - 1;
+			const endMinorMultiple = Math.ceil(viewEndMs / minorMs) + 1;
 			
 			for (let i = startMinorMultiple; i <= endMinorMultiple; i++) {
 				const ms = i * minorMs;
-				// ms is already an exact integer multiple of snapIntervalMs, so it matches snap points
 				// Skip if this is a major marker
 				if (ms % majorMs === 0) continue;
-				if (ms >= viewStartMs && ms <= viewEndMs) {
+				// Convert to pixel position using unified timeToPixel function
+				const px = timeToPixel(ms, pxPerMs, scrollLeft);
+				// Only include markers visible in viewport (with small margin for smooth scrolling)
+				if (px >= -1 && px <= width + 1) {
 					minors.push(ms);
 				}
 			}
@@ -374,16 +425,28 @@ export namespace time {
 		const majors: TimeMarker[] = [];
 		const minors: number[] = [];
 
-		const firstMajor = Math.floor(viewStartMs / majorMs) * majorMs;
-		for (let ms = firstMajor; ms <= viewEndMs; ms += majorMs) {
-			if (ms >= viewStartMs) {
+		// Find first major marker before viewport start
+		const firstMajorMultiple = Math.floor(viewStartMs / majorMs) - 1;
+		const endMajorMultiple = Math.ceil(viewEndMs / majorMs) + 1;
+
+		// Generate major markers
+		for (let i = firstMajorMultiple; i <= endMajorMultiple; i++) {
+			const ms = i * majorMs;
+			const px = timeToPixel(ms, pxPerMs, scrollLeft);
+			if (px >= -1 && px <= width + 1) {
 				majors.push({ ms, label: formatTimeMs(ms, labelFormat) });
 			}
 		}
 
-		for (let ms = firstMajor; ms <= viewEndMs; ms += minorMs) {
+		// Generate minor markers
+		const firstMinorMultiple = Math.floor(viewStartMs / minorMs) - 1;
+		const endMinorMultiple = Math.ceil(viewEndMs / minorMs) + 1;
+
+		for (let i = firstMinorMultiple; i <= endMinorMultiple; i++) {
+			const ms = i * minorMs;
 			if (ms % majorMs === 0) continue;
-			if (ms >= viewStartMs) {
+			const px = timeToPixel(ms, pxPerMs, scrollLeft);
+			if (px >= -1 && px <= width + 1) {
 				minors.push(ms);
 			}
 		}
