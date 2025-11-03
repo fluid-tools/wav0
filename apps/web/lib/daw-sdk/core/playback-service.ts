@@ -9,7 +9,6 @@ import type {
 	TrackEnvelope,
 } from "../types/schemas";
 import {
-	AUTOMATION_CANCEL_LOOKAHEAD_SEC,
 	AUTOMATION_SCHEDULING_EPSILON_SEC,
 	MAX_AUTOMATION_CURVE_DURATION_SEC,
 	MIN_AUTOMATION_SEGMENT_DURATION_SEC,
@@ -300,7 +299,7 @@ export class PlaybackService {
 		// schedules must be fully canceled regardless of their duration to prevent overlaps
 		const cancelFrom = Math.max(0, now - MAX_AUTOMATION_CURVE_DURATION_SEC);
 		envelopeGain.gain.cancelScheduledValues(cancelFrom);
-		
+
 		// Reset automation tracking to now after cancellation for clean scheduling state
 		state.lastAutomationEndTime = now;
 
@@ -538,7 +537,7 @@ export class PlaybackService {
 		const soloEngaged = tracks.some((track) => track.soloed);
 		for (const track of tracks) {
 			let state = this.tracks.get(track.id);
-			
+
 			// Auto-initialize new tracks that aren't in the map yet
 			// This handles tracks added during playback
 			if (!state) {

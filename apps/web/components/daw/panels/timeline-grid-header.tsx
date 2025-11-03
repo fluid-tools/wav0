@@ -1,5 +1,4 @@
 "use client";
-import { time } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
 import { useLayoutEffect, useRef } from "react";
 import {
@@ -29,7 +28,10 @@ export function TimelineGridHeader({ width, height }: Props) {
 		ctx.clearRect(0, 0, width, height);
 
 		ctx.font = "10px monospace";
-		ctx.fillStyle = getComputedStyle(canvas).getPropertyValue("--timeline-grid-label").trim() || "rgba(255,255,255,0.7)";
+		ctx.fillStyle =
+			getComputedStyle(canvas)
+				.getPropertyValue("--timeline-grid-label")
+				.trim() || "rgba(255,255,255,0.7)";
 		ctx.textBaseline = "top";
 
 		const viewportStart = scrollLeft / pxPerMs;

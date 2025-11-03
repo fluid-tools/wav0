@@ -1,18 +1,18 @@
 "use client";
 
-import { TrackGridLines } from "@/components/daw/panels/track-grid-lines";
-import { timelineWidthAtom } from "@/lib/daw-sdk";
 import { useAtom } from "jotai";
 import { memo, useEffect, useRef, useState } from "react";
+import { TrackGridLines } from "@/components/daw/panels/track-grid-lines";
+import { timelineWidthAtom } from "@/lib/daw-sdk";
 
 /**
  * TrackGridCanvas - Renders synchronized grid lines in track content area
- * 
+ *
  * Positioned at scroll container level to fill viewport height regardless of:
  * - Vertical scroll position
  * - Track count
  * - Content height
- * 
+ *
  * Uses same grid generation logic as timeline header for perfect synchronization.
  * Renders grid lines only (no labels) to avoid double markings.
  */
@@ -23,7 +23,9 @@ export const TrackGridCanvas = memo(function TrackGridCanvas() {
 
 	// Measure viewport height from scroll container
 	useEffect(() => {
-		const container = containerRef.current?.closest('[data-daw-grid-scroll="true"]');
+		const container = containerRef.current?.closest(
+			'[data-daw-grid-scroll="true"]',
+		);
 		if (!container) return;
 
 		const updateHeight = () => {
@@ -40,7 +42,12 @@ export const TrackGridCanvas = memo(function TrackGridCanvas() {
 	}, []);
 
 	if (viewportHeight === 0) {
-		return <div ref={containerRef} className="absolute inset-0 pointer-events-none" />;
+		return (
+			<div
+				ref={containerRef}
+				className="absolute inset-0 pointer-events-none"
+			/>
+		);
 	}
 
 	return (

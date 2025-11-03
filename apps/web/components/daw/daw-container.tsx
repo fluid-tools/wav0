@@ -488,25 +488,25 @@ export function DAWContainer() {
 
 								{/* Track Content Grid */}
 								<div className="relative z-10 flex-1 overflow-hidden">
-							<div
-								ref={trackGridScrollRef}
-								className="h-full w-full overflow-auto"
-								data-daw-grid-scroll="true"
-								onScroll={onTrackGridScroll}
-								style={{ scrollbarWidth: "thin" }}
-							>
-								<TrackGridCanvas />
+									<div
+										ref={trackGridScrollRef}
+										className="h-full w-full overflow-auto"
+										data-daw-grid-scroll="true"
+										onScroll={onTrackGridScroll}
+										style={{ scrollbarWidth: "thin" }}
+									>
+										<TrackGridCanvas />
 
-								<div
-									style={{
-										width: timelineWidth,
-										height: contentHeight,
-										position: "relative",
-									}}
-								>
-									<DAWTrackContent />
-								</div>
-							</div>
+										<div
+											style={{
+												width: timelineWidth,
+												height: contentHeight,
+												position: "relative",
+											}}
+										>
+											<DAWTrackContent />
+										</div>
+									</div>
 								</div>
 							</div>
 						</ResizablePanel>

@@ -1,7 +1,8 @@
 "use client";
 
+import { time } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
-import { memo, useRef, useLayoutEffect, useCallback } from "react";
+import { memo, useCallback, useLayoutEffect, useRef } from "react";
 import {
 	horizontalScrollAtom,
 	playbackAtom,
@@ -11,8 +12,6 @@ import {
 	timelinePxPerMsAtom,
 } from "@/lib/daw-sdk";
 import { useTimebase } from "@/lib/daw-sdk/hooks/use-timebase";
-import { time } from "@wav0/daw-sdk";
-import { DAW_HEIGHTS } from "@/lib/constants/daw-design";
 
 type Props = {
 	timelineHeaderHeight: number;
@@ -46,7 +45,7 @@ export const UnifiedPlayhead = memo(function UnifiedPlayhead({
 		if (!playheadLineRef.current || !playheadHandleRef.current) return;
 
 		const playheadX = Math.round(
-			time.timeToPixel(playback.currentTime, pxPerMs, horizontalScroll)
+			time.timeToPixel(playback.currentTime, pxPerMs, horizontalScroll),
 		);
 
 		playheadLineRef.current.style.transform = `translateX(${playheadX}px)`;
@@ -54,13 +53,16 @@ export const UnifiedPlayhead = memo(function UnifiedPlayhead({
 	}, [playback.currentTime, pxPerMs, horizontalScroll]);
 
 	const updateTime = useCallback(
-		(clientX: number, timeStamp?: number) => {
+		(clientX: number, _timeStamp?: number) => {
 			if (!containerRef.current || pxPerMs <= 0) return;
 
-			const timelineScrollContainer = document.querySelector('[data-daw-timeline-scroll="true"]') as HTMLElement | null;
+			const timelineScrollContainer = document.querySelector(
+				'[data-daw-timeline-scroll="true"]',
+			) as HTMLElement | null;
 			if (!timelineScrollContainer) return;
 
-			const timelineElement = timelineScrollContainer.firstElementChild as HTMLElement | null;
+			const timelineElement =
+				timelineScrollContainer.firstElementChild as HTMLElement | null;
 			if (!timelineElement) return;
 
 			const rect = timelineElement.getBoundingClientRect();

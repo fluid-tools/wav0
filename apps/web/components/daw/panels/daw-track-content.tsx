@@ -624,14 +624,13 @@ export function DAWTrackContent() {
 
 	return (
 		<>
-		<div
-			ref={containerRef}
-			className="relative w-full h-full"
-			data-daw-grid
-			data-dragging={draggingClip ? "true" : undefined}
-		>
-
-			{tracks.map((track, index) => {
+			<div
+				ref={containerRef}
+				className="relative w-full h-full"
+				data-daw-grid
+				data-dragging={draggingClip ? "true" : undefined}
+			>
+				{tracks.map((track, index) => {
 					// Track row layout
 					const trackHeight = Math.round(
 						DAW_HEIGHTS.TRACK_ROW * trackHeightZoom,

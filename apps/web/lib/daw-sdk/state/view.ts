@@ -77,7 +77,11 @@ export const playheadViewportAtom = atom((get) => {
 	const { pxPerMs, horizontalScroll } = get(timelineViewportAtom);
 	const playback = get(playbackAtom);
 	// Use unified timeToPixel function - same calculation as grid markers
-	const viewportPx = time.timeToPixel(playback.currentTime, pxPerMs, horizontalScroll);
+	const viewportPx = time.timeToPixel(
+		playback.currentTime,
+		pxPerMs,
+		horizontalScroll,
+	);
 	const absolutePx = playback.currentTime * pxPerMs;
 	return {
 		absolutePx,
@@ -108,7 +112,6 @@ export const snapIntervalMsAtom = atom((get) => {
 				return 1000; // 1 second
 			case "fine":
 				return 100; // 100ms
-			case "medium":
 			default:
 				return 500; // 500ms
 		}
@@ -135,7 +138,6 @@ export const snapIntervalMsAtom = atom((get) => {
 			const fineBeats = subdivBeats / 4;
 			return Math.max(fineBeats * secondsPerBeat * 1000, 50);
 		}
-		case "medium":
 		default:
 			// Medium: use current subdivision
 			return subdivBeats * secondsPerBeat * 1000;
@@ -154,7 +156,9 @@ export const timeGridCacheKeyAtom = atom((get) => {
 	// Round scrollLeft and width to pixels (they're already integers in practice)
 	return JSON.stringify({
 		pxPerMs: Number.isFinite(pxPerMs) ? pxPerMs : 0,
-		scrollLeft: Number.isFinite(horizontalScroll) ? Math.round(horizontalScroll) : 0,
+		scrollLeft: Number.isFinite(horizontalScroll)
+			? Math.round(horizontalScroll)
+			: 0,
 		width: Number.isFinite(timelineWidth) ? Math.round(timelineWidth) : 0,
 		snapInterval,
 		snapToGrid: timeline.snapToGrid,
@@ -192,8 +196,9 @@ export const cachedTimeGridAtom = atom((get) => {
 	const timelineWidth = get(timelineWidthAtom);
 
 	// Pass snap interval when snap is enabled to align visual grid with snap points
-	const snapIntervalMs =
-		timeline.snapToGrid ? get(snapIntervalMsAtom) : undefined;
+	const snapIntervalMs = timeline.snapToGrid
+		? get(snapIntervalMsAtom)
+		: undefined;
 
 	const result = time.generateTimeGrid({
 		scrollLeft: horizontalScroll,

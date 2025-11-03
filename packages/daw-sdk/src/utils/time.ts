@@ -90,7 +90,11 @@ export namespace time {
 		pxPerMs: number,
 		scrollLeft: number,
 	): number {
-		if (!Number.isFinite(ms) || !Number.isFinite(pxPerMs) || !Number.isFinite(scrollLeft)) {
+		if (
+			!Number.isFinite(ms) ||
+			!Number.isFinite(pxPerMs) ||
+			!Number.isFinite(scrollLeft)
+		) {
 			return 0;
 		}
 		// Convert time to absolute pixel position, then subtract scroll offset
@@ -388,7 +392,7 @@ export namespace time {
 			// Find starting integer multiples - extend slightly beyond viewport for smooth scrolling
 			const startMajorMultiple = Math.floor(viewStartMs / majorMs) - 1;
 			const endMajorMultiple = Math.ceil(viewEndMs / majorMs) + 1;
-			
+
 			// Generate major markers using integer multiples (avoids floating point drift)
 			for (let i = startMajorMultiple; i <= endMajorMultiple; i++) {
 				const ms = i * majorMs;
@@ -403,7 +407,7 @@ export namespace time {
 			// Generate minor markers using integer multiples
 			const startMinorMultiple = Math.floor(viewStartMs / minorMs) - 1;
 			const endMinorMultiple = Math.ceil(viewEndMs / minorMs) + 1;
-			
+
 			for (let i = startMinorMultiple; i <= endMinorMultiple; i++) {
 				const ms = i * minorMs;
 				// Skip if this is a major marker
