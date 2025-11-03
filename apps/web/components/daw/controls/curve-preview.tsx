@@ -1,8 +1,7 @@
 "use client";
 
-import { curves } from "@wav0/daw-sdk";
+import { type CurveType, curves } from "@wav0/daw-sdk";
 import { memo } from "react";
-import type { CurveType } from "@/lib/daw-sdk";
 import { cn } from "@/lib/utils";
 
 type CurvePreviewProps = {
@@ -37,9 +36,45 @@ export const CurvePreview = memo(function CurvePreview({
 
 	for (let i = 0; i < numPoints; i++) {
 		const t = i / (numPoints - 1);
-		// Convert safeShape from 0-1 range to -99 to +99 range for curve evaluation
-		const curveValue = (safeShape - 0.5) * 198;
-		const value = curves.evaluateSegmentCurve(0, 1, t, curveValue);
+		let value: number;
+
+		// Map CurveType to appropriate curve evaluation
+		switch (type) {
+			case "linear": {
+				// Linear: always use 0 curve value
+				value = curves.evaluateSegmentCurve(0, 1, t, 0);
+				break;
+			}
+			case "easeIn": {
+				// EaseIn: exponential (fast start, slow end) = negative curve
+				// Use shape (0-1) to control intensity: map to -99 to 0
+				const curveValue = -(safeShape * 99);
+				value = curves.evaluateSegmentCurve(0, 1, t, curveValue);
+				break;
+			}
+			case "easeOut": {
+				// EaseOut: logarithmic (slow start, fast end) = positive curve
+				// Use shape (0-1) to control intensity: map to 0 to +99
+				const curveValue = safeShape * 99;
+				value = curves.evaluateSegmentCurve(0, 1, t, curveValue);
+				break;
+			}
+			case "sCurve": {
+				// S-curve: slow start, fast middle, slow end
+				// Use smoothstep function for S-curve: t * t * (3 - 2 * t)
+				// Apply shape to modulate the S-curve intensity
+				const smoothstep = t * t * (3 - 2 * t);
+				// Blend between linear and smoothstep based on shape
+				const intensity = safeShape;
+				value = t * (1 - intensity) + smoothstep * intensity;
+				break;
+			}
+			default: {
+				// Fallback to linear
+				value = curves.evaluateSegmentCurve(0, 1, t, 0);
+				break;
+			}
+		}
 
 		// Guard against NaN/Infinity
 		if (!Number.isFinite(value)) {
