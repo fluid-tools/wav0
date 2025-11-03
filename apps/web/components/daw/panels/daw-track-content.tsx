@@ -12,7 +12,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ClipContextMenu } from "@/components/daw/context-menus/clip-context-menu";
 import { ClipFadeHandles } from "@/components/daw/controls/clip-fade-handles";
 import { AutomationLane } from "@/components/daw/panels/automation-lane";
-import { PlayheadLine } from "@/components/daw/panels/playhead-line";
 import { DAW_HEIGHTS } from "@/lib/constants/daw-design";
 import {
 	activeToolAtom,
@@ -654,8 +653,7 @@ export function DAWTrackContent() {
 			data-daw-grid
 			data-dragging={draggingClip ? "true" : undefined}
 		>
-			{/* Playhead line - synchronized with header playhead */}
-			<PlayheadLine />
+			{/* Playhead rendering moved to UnifiedPlayhead at panel level */}
 
 			{tracks.map((track, index) => {
 					// Track row layout
@@ -1111,23 +1109,6 @@ export function DAWTrackContent() {
 					className="absolute top-0 bottom-0 bg-muted/10 pointer-events-none z-30"
 					style={{ left: projectEndPosition, right: 0 }}
 				/>
-
-				{/* Grid Lines */}
-				<div className="absolute inset-0 pointer-events-none">
-					{(() => {
-						const gridSpacing = 100;
-						const width =
-							containerRef.current?.getBoundingClientRect().width ?? 0;
-						const count = Math.ceil(width / gridSpacing);
-						return Array.from({ length: count }).map((_, i) => (
-							<div
-								key={`grid-line-${i * gridSpacing}`}
-								className="absolute top-0 bottom-0 w-px bg-border/20"
-								style={{ left: i * gridSpacing }}
-							/>
-						));
-					})()}
-				</div>
 			</div>
 
 			{/* Automation dialog removed in favor of default-move with Undo */}

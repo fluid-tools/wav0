@@ -59,13 +59,14 @@ export function DAWTimeline() {
 	}, [isDraggingEnd, onMouseMove]);
 
 	const handleTimelineClick = (e: React.MouseEvent | React.PointerEvent) => {
-		const rect = e.currentTarget.getBoundingClientRect();
-		const x = e.clientX - rect.left;
 		if (pxPerMs <= 0) return;
 
-		// x is viewport position relative to DAWTimeline's visible left edge
-		// Add horizontalScroll to get absolute timeline position
-		const absoluteX = Math.max(0, x + horizontalScroll);
+		// IMPORTANT: The timeline div is INSIDE the scroll container
+		// getBoundingClientRect() already accounts for scroll position
+		// (rect.left will be negative when scrolled)
+		// So clientX - rect.left gives us the absolute timeline position directly
+		const rect = e.currentTarget.getBoundingClientRect();
+		const absoluteX = Math.max(0, e.clientX - rect.left);
 		const rawMs = Math.max(0, absoluteX / pxPerMs);
 		const timeMs = timeline.snapToGrid ? snap(rawMs) : rawMs;
 		setCurrentTime(timeMs);

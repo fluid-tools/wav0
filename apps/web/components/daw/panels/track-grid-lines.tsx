@@ -1,4 +1,5 @@
 "use client";
+
 import { time } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
 import { memo, useLayoutEffect, useMemo, useRef } from "react";
@@ -7,14 +8,19 @@ import {
 	horizontalScrollAtom,
 	timelinePxPerMsAtom,
 } from "@/lib/daw-sdk";
-import { TimelineGridHeader } from "./timeline-grid-header";
 
 type Props = {
 	width: number;
 	height: number;
 };
 
-export const TimelineGridCanvas = memo(function TimelineGridCanvas({
+/**
+ * TrackGridLines - Renders grid lines only (no labels)
+ *
+ * Used in track content area where labels are not needed.
+ * Extracted from TimelineGridCanvas without TimelineGridHeader.
+ */
+export const TrackGridLines = memo(function TrackGridLines({
 	width,
 	height,
 }: Props) {
@@ -43,7 +49,7 @@ export const TimelineGridCanvas = memo(function TimelineGridCanvas({
 	}, []); // Only compute once on mount
 
 	// Draw grid synchronously before browser paint using layoutEffect
-	// This ensures grid lines stay perfectly in sync with playhead and numbered markers
+	// This ensures grid lines stay perfectly in sync with timeline header grid and playhead
 	useLayoutEffect(() => {
 		const canvas = canvasRef.current;
 		if (!canvas || !themeColors) return;
@@ -57,7 +63,6 @@ export const TimelineGridCanvas = memo(function TimelineGridCanvas({
 		// IMPORTANT: Canvas is INSIDE scroll container, so use ABSOLUTE timeline coordinates
 		// Do NOT subtract scrollLeft - the browser handles scrolling
 		// Only draw markers visible in current viewport for performance
-
 		const viewportStart = scrollLeft / pxPerMs;
 		const viewportEnd = (scrollLeft + width) / pxPerMs;
 
@@ -93,13 +98,10 @@ export const TimelineGridCanvas = memo(function TimelineGridCanvas({
 	}, [width, height, pxPerMs, scrollLeft, timeGrid, themeColors]);
 
 	return (
-		<div className="relative" style={{ width, height }}>
-			<canvas
-				ref={canvasRef}
-				className="absolute inset-0 pointer-events-none"
-				style={{ width, height }}
-			/>
-			<TimelineGridHeader width={width} height={height} />
-		</div>
+		<canvas
+			ref={canvasRef}
+			className="absolute inset-0 pointer-events-none"
+			style={{ width, height }}
+		/>
 	);
 });
