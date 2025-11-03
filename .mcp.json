@@ -1,32 +1,23 @@
 {
-    "mcpServers": {
-      "firecrawl": {
-        "command": "npx",
-        "args": [
-          "-y",
-          "firecrawl-mcp"
-        ],
-        "env": {
-          "FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY}"
-        }
-      },
-      "context7": {
-        "command": "npx",
-        "args": [
-          "-y",
-          "@context7/mcp-server"
-        ],
-        "env": {
-          "CONTEXT7_API_KEY": "${CTX_7_TOKEN}"
-        }
-      },
-      "next-devtools": {
-        "command": "bunx",
-        "args": [
-          "-y",
-          "next-devtools-mcp@latest"
-        ],
-        "env": {}
-      }
-    }
-  }
+	"mcpServers": {
+		"firecrawl": {
+			"command": "npx",
+			"args": ["-y", "firecrawl-mcp"],
+			"env": {
+				"FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY}"
+			}
+		},
+		"context7": {
+			"command": "npx",
+			"args": ["-y", "@context7/mcp-server"],
+			"env": {
+				"CONTEXT7_API_KEY": "${CTX_7_TOKEN}"
+			}
+		},
+		"next-devtools": {
+			"command": "bunx",
+			"args": ["-y", "next-devtools-mcp@latest"],
+			"env": {}
+		}
+	}
+}

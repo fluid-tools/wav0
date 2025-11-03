@@ -7,6 +7,7 @@ import { TimelineGridCanvas } from "@/components/daw/panels/timeline-grid-canvas
 import { UnifiedOverlay } from "@/components/daw/unified-overlay";
 import {
 	addMarkerAtom,
+	horizontalScrollAtom,
 	playbackAtom,
 	projectEndOverrideAtom,
 	projectEndPositionAtom,
@@ -14,7 +15,6 @@ import {
 	timelineAtom,
 	timelinePxPerMsAtom,
 	timelineWidthAtom,
-	horizontalScrollAtom,
 } from "@/lib/daw-sdk";
 import { useTimebase } from "@/lib/daw-sdk/hooks/use-timebase";
 
@@ -30,7 +30,7 @@ export function DAWTimeline() {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [isDraggingEnd, setIsDraggingEnd] = useState(false);
 	const [pxPerMs] = useAtom(timelinePxPerMsAtom);
-	const [horizontalScroll] = useAtom(horizontalScrollAtom);
+	const [_horizontalScroll] = useAtom(horizontalScrollAtom);
 	const [, addMarker] = useAtom(addMarkerAtom);
 	const { snap } = useTimebase();
 

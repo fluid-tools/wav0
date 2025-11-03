@@ -81,7 +81,9 @@ function SnapGranularityControls() {
 					<Select
 						value={timeline.snapGranularity}
 						onValueChange={(value: string) =>
-							setSnapGranularity(value as "coarse" | "medium" | "fine" | "custom")
+							setSnapGranularity(
+								value as "coarse" | "medium" | "fine" | "custom",
+							)
 						}
 					>
 						<SelectTrigger className="h-7 w-20 text-xs">

@@ -69,4 +69,3 @@ export const MIN_AUTOMATION_SEGMENT_DURATION_SEC = 0.001;
  * ```
  */
 export const MAX_AUTOMATION_CURVE_DURATION_SEC = 30;
-

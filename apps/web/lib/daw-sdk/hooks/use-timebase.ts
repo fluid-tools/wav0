@@ -171,7 +171,6 @@ export function useTimebase() {
 					return 1000; // 1 second
 				case "fine":
 					return 100; // 100ms
-				case "medium":
 				default:
 					return 500; // 500ms
 			}
@@ -184,7 +183,9 @@ export function useTimebase() {
 			grid.resolution,
 			music.timeSignature,
 		);
-		const subdivBeats = grid.triplet ? baseDivisionBeats / 3 : baseDivisionBeats;
+		const subdivBeats = grid.triplet
+			? baseDivisionBeats / 3
+			: baseDivisionBeats;
 
 		switch (effectiveGranularity) {
 			case "coarse":
@@ -198,7 +199,6 @@ export function useTimebase() {
 				const fineBeats = subdivBeats / 4;
 				return Math.max(fineBeats * secondsPerBeat * 1000, 50);
 			}
-			case "medium":
 			default:
 				// Medium: use current subdivision
 				return subdivBeats * secondsPerBeat * 1000;
