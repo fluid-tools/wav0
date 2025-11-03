@@ -34,8 +34,6 @@ export function DAWTimeline() {
 	const [, addMarker] = useAtom(addMarkerAtom);
 	const { snap } = useTimebase();
 
-	// legacy marker drag removed in favor of dedicated MarkerTrack
-
 	const onMouseMove = useCallback(
 		(e: MouseEvent) => {
 			if (!isDraggingEnd || !containerRef.current) return;
@@ -61,10 +59,6 @@ export function DAWTimeline() {
 	const handleTimelineClick = (e: React.MouseEvent | React.PointerEvent) => {
 		if (pxPerMs <= 0) return;
 
-		// IMPORTANT: The timeline div is INSIDE the scroll container
-		// getBoundingClientRect() already accounts for scroll position
-		// (rect.left will be negative when scrolled)
-		// So clientX - rect.left gives us the absolute timeline position directly
 		const rect = e.currentTarget.getBoundingClientRect();
 		const absoluteX = Math.max(0, e.clientX - rect.left);
 		const rawMs = Math.max(0, absoluteX / pxPerMs);
@@ -72,10 +66,8 @@ export function DAWTimeline() {
 		setCurrentTime(timeMs);
 	};
 
-	// Add marker at playhead on key "m"
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
-			// Ignore if typing in an input or if modifier keys are pressed
 			const target = e.target as HTMLElement;
 			if (
 				target.tagName === "INPUT" ||
@@ -110,18 +102,14 @@ export function DAWTimeline() {
 			className="h-full w-full relative bg-muted/10"
 			style={{ width: timelineWidth }}
 		>
-			{/* Visual layer - non-interactive */}
-			{/* Always use TimelineGridCanvas - it handles both time and bars mode with proper snap alignment */}
 			<div className="absolute inset-0 pointer-events-none z-0">
 				<TimelineGridCanvas width={timelineWidth} height={400} />
 			</div>
 
-			{/* Playhead overlay - positioned relative to scroll container for perfect sync */}
 			<div className="absolute inset-0 pointer-events-none z-15">
 				<UnifiedOverlay />
 			</div>
 
-			{/* Timeline click layer - interactive background */}
 			{/* biome-ignore lint/a11y/useSemanticElements: Cannot use button element as it would create nested interactive elements with MarkerTrack buttons and project end slider */}
 			<div
 				className="absolute inset-0 cursor-pointer z-10"
@@ -144,14 +132,12 @@ export function DAWTimeline() {
 				aria-label="Timeline - click to set playback position"
 			/>
 
-			{/* Markers layer - higher priority */}
 			<div className="absolute inset-0 pointer-events-none z-20">
 				<div className="pointer-events-auto">
 					<MarkerTrack pxPerMs={pxPerMs} width={timelineWidth} />
 				</div>
 			</div>
 
-			{/* Project end slider - highest priority */}
 			<div
 				className="absolute top-0 bottom-0 w-px bg-yellow-500/70 z-30 pointer-events-auto"
 				style={{

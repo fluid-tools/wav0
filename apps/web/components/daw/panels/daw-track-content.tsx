@@ -106,7 +106,6 @@ export function DAWTrackContent() {
 		};
 		update();
 
-		// Debounce window resize to avoid excessive updates during resize
 		let resizeTimeout: NodeJS.Timeout;
 		const debouncedUpdate = () => {
 			clearTimeout(resizeTimeout);
@@ -224,7 +223,6 @@ export function DAWTrackContent() {
 		};
 	}, [interactionActive, ensureAutoScroll]);
 
-	// Attach document-level pointer listeners while resizing, dragging, or loop-dragging
 	useEffect(() => {
 		if (!interactionActive) return;
 
@@ -284,7 +282,6 @@ export function DAWTrackContent() {
 				}
 
 				if (draggingClip) {
-					// Compute preview-only position
 					const deltaX = lastX - draggingClip.startX;
 					const deltaTime = deltaX / pixelsPerMs;
 					let previewStartTime = Math.max(
@@ -312,7 +309,6 @@ export function DAWTrackContent() {
 					const previewTrackId =
 						tracks[newTrackIndex]?.id ?? draggingClip.trackId;
 
-					// Send MOVE event to drag machine
 					sendDragEvent({
 						type: "MOVE",
 						previewTrackId,
@@ -346,9 +342,7 @@ export function DAWTrackContent() {
 
 		const onUp = async () => {
 			try {
-				// Commit drag if preview exists
 				if (dragPreview && draggingClip) {
-					// Use updater function to always get latest tracks state, avoiding stale closure issues
 					let computedUpdated: Track[] | null = null;
 					let computedClip: Clip | null = null;
 					let computedOriginalTrack: Track | null = null;
@@ -360,7 +354,6 @@ export function DAWTrackContent() {
 					} | null = null;
 
 					setTracks((prev) => {
-						// Use prev (latest state) instead of closure-captured tracks
 						const originalTrack = prev.find(
 							(t) => t.id === dragPreview.originalTrackId,
 						);
@@ -372,10 +365,9 @@ export function DAWTrackContent() {
 						);
 
 						if (!originalTrack || !targetTrack || !clip) {
-							return prev; // No changes if track/clip not found
+							return prev;
 						}
 
-						// Store for use outside callback
 						computedClip = clip;
 						computedOriginalTrack = originalTrack;
 						computedTargetTrack = targetTrack;
@@ -387,19 +379,16 @@ export function DAWTrackContent() {
 							dragPreview.originalStartTime !== dragPreview.previewStartTime;
 
 						if (!moved) {
-							return prev; // No changes needed
+							return prev;
 						}
 
 						const clipDurationMs = clip.trimEnd - clip.trimStart;
 						const clipEndTime = clip.startTime + clipDurationMs;
 
 						if (isSameTrack) {
-							// Same track: update clip start; clip-bound automation stays relative
-							// For same-track moves, use updateClip which handles synchronization
-							return prev; // updateClip will handle state update
+							return prev;
 						}
 
-						// Cross-track: transfer automation with proper timestamp adjustment
 						const hasAutomation =
 							originalTrack.volumeEnvelope?.enabled ?? false;
 
@@ -410,10 +399,8 @@ export function DAWTrackContent() {
 						} | null = null;
 
 						if (hasAutomation && originalTrack.volumeEnvelope) {
-							// Get project end for time clamping (ms)
 							const projectEndMs =
 								totalDuration && totalDuration > 0 ? totalDuration : 300000;
-							// Normalize final drop time
 							const finalDropTime = Math.max(
 								0,
 								Math.min(
@@ -443,7 +430,6 @@ export function DAWTrackContent() {
 							}
 						}
 
-						// Compute updated tracks from latest state (prev)
 						const updated = prev.map((t) => {
 							if (t.id === originalTrack.id) {
 								const updatedTrack = {
@@ -451,7 +437,6 @@ export function DAWTrackContent() {
 									clips: t.clips?.filter((c) => c.id !== clip.id) ?? [],
 								};
 								if (automationData) {
-									// Remove transferred points from source track
 									const currentEnv = updatedTrack.volumeEnvelope;
 									if (currentEnv) {
 										const remainingPointIds = new Set(
@@ -515,15 +500,12 @@ export function DAWTrackContent() {
 						return updated;
 					});
 
-					// Handle same-track moves and cross-track moves separately
 					if (
 						computedUpdated &&
 						computedClip &&
 						computedOriginalTrack &&
 						computedTargetTrack
 					) {
-						// Cross-track move: computedUpdated is set
-						// TypeScript doesn't narrow correctly here due to closure assignment, use assertions
 						const clip = computedClip as Clip;
 						const originalTrack = computedOriginalTrack as Track;
 						const targetTrack = computedTargetTrack as Track;
@@ -533,8 +515,6 @@ export function DAWTrackContent() {
 							await playbackService.stopClip(originalTrack.id, clip.id);
 						}
 
-						// Sync all tracks atomically with complete updated state
-						// This ensures moved clips are properly stopped on old track and started on new track
 						if (playback.isPlaying) {
 							try {
 								await playbackService.synchronizeTracks(updated);
@@ -559,8 +539,6 @@ export function DAWTrackContent() {
 							...prev.slice(0, 9),
 						]);
 					} else if (computedClip && computedOriginalTrack) {
-						// Same-track move: use updateClip which handles synchronization
-						// TypeScript doesn't narrow correctly here due to closure assignment, use assertions
 						const clip = computedClip as Clip;
 						const originalTrack = computedOriginalTrack as Track;
 						const isSameTrack =
@@ -603,7 +581,6 @@ export function DAWTrackContent() {
 			} catch (error) {
 				console.error("Error committing drag:", error);
 			} finally {
-				// Always finalize drag state
 				sendDragEvent({ type: "DROP" });
 				lastPointer.current = null;
 				setResizingClip(null);
@@ -613,7 +590,7 @@ export function DAWTrackContent() {
 			}
 		};
 
-		const onCancel = onUp; // Same finalization logic
+		const onCancel = onUp;
 
 		window.addEventListener("mousemove", onMove);
 		window.addEventListener("mouseup", onUp);
@@ -653,7 +630,6 @@ export function DAWTrackContent() {
 			data-daw-grid
 			data-dragging={draggingClip ? "true" : undefined}
 		>
-			{/* Playhead rendering moved to UnifiedPlayhead at panel level */}
 
 			{tracks.map((track, index) => {
 					// Track row layout
