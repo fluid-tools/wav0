@@ -69,9 +69,13 @@ export const UnifiedPlayhead = memo(function UnifiedPlayhead({
 			if (!containerRef.current || pxPerMs <= 0) return;
 
 			// IMPORTANT: UnifiedPlayhead is OUTSIDE scroll containers at panel level
-			// But we need to calculate position relative to the timeline which IS scrolled
-			// Get the timeline element's bounding rect to account for scroll
-			const timelineElement = containerRef.current.closest('[data-daw-timeline-scroll="true"]')?.firstElementChild as HTMLElement | null;
+			// The timeline scroll container is a sibling's child, not an ancestor
+			// Use querySelector to find it reliably
+			const timelineScrollContainer = document.querySelector('[data-daw-timeline-scroll="true"]') as HTMLElement | null;
+			if (!timelineScrollContainer) return;
+
+			// Get the timeline content element (first child of scroll container)
+			const timelineElement = timelineScrollContainer.firstElementChild as HTMLElement | null;
 			if (!timelineElement) return;
 
 			const rect = timelineElement.getBoundingClientRect();
