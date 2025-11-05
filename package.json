@@ -26,8 +26,5 @@
 		"apps/*",
 		"packages/*",
 		"tooling/*"
-	],
-	"dependencies": {
-		"next": "^16.0.1"
-	}
+	]
 }
