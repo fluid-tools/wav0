@@ -153,8 +153,10 @@ export class Transport extends EventTarget {
 		// Calculate clip start time in AudioContext time
 		const clipStartInPlayback = clip.startTime - playbackStart;
 		const clipStartAC = this.contextStartTime + clipStartInPlayback / 1000;
-		const loopEndAC = this.contextStartTime + (loopUntilSec * 1000 - playbackStart) / 1000;
-		const oneShotEndAC = this.contextStartTime + (clipOneShotEndSec * 1000 - playbackStart) / 1000;
+		const loopEndAC =
+			this.contextStartTime + (loopUntilSec * 1000 - playbackStart) / 1000;
+		const oneShotEndAC =
+			this.contextStartTime + (clipOneShotEndSec * 1000 - playbackStart) / 1000;
 
 		// Apply fade envelopes (cancel → anchor → future-only) with generation guard
 		try {
