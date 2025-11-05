@@ -9,6 +9,15 @@ export { createDAW, DAW } from "./core/daw";
 export { OPFSManager } from "./core/opfs-manager";
 export { Transport } from "./core/transport";
 
+// Audio scheduling constants
+export {
+	AUTOMATION_CANCEL_LOOKAHEAD_SEC,
+	AUTOMATION_SCHEDULING_EPSILON_SEC,
+	MIN_AUTOMATION_SEGMENT_DURATION_SEC,
+	MAX_AUTOMATION_CURVE_DURATION_SEC,
+	START_GRACE_SEC,
+} from "./core/audio-scheduling-constants";
+
 // Core types
 export type * from "./types/core";
 export type * from "./types/schemas";
