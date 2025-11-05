@@ -75,11 +75,13 @@ export const TimelineGridCanvas = memo(function TimelineGridCanvas({
 
 	return (
 		<div className="relative" style={{ width, height }}>
-			<canvas
-				ref={canvasRef}
-				className="absolute inset-0 pointer-events-none"
-				style={{ width, height }}
-			/>
+		<canvas
+			ref={canvasRef}
+			className="absolute inset-0 pointer-events-none"
+			width={width}
+			height={height}
+			style={{ width, height }}
+		/>
 			<TimelineGridHeader width={width} height={height} />
 		</div>
 	);
