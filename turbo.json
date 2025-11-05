@@ -25,6 +25,9 @@
 			"inputs": ["$TURBO_DEFAULT$", ".env*"],
 			"outputs": ["convex/_generated/**"]
 		},
+		"test": {
+			"dependsOn": ["^test"]
+		},
 		"lint": {
 			"dependsOn": ["^lint"]
 		},

@@ -8,10 +8,11 @@ bun build            # TypeScript check + build with Turbopack
 bun start            # Start production server
 
 # Code Quality
-bun typecheck        # TypeScript type checking
+bun check-types      # TypeScript type checking
 bun lint             # Run Biome linter
 bun lint:fix         # Auto-fix linting issues
 bun format           # Format code with Biome
+bun test             # Run tests
 ```
 
 ## Code Style Guidelines

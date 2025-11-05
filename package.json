@@ -14,6 +14,7 @@
 		"dev": "turbo dev",
 		"build": "turbo build",
 		"lint": "turbo lint",
+		"test": "turbo test",
 		"deploy": "turbo deploy",
 		"check-types": "turbo check-types",
 		"dev:web": "turbo -F @wav0/web dev",
