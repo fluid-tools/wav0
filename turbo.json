@@ -21,7 +21,7 @@
 			"outputs": [".next/**", "!.next/cache/**", "dist/**"]
 		},
 		"deploy": {
-			"dependsOn": ["^build"],
+			"dependsOn": ["^build", "@wav0/web#build"],
 			"inputs": ["$TURBO_DEFAULT$", ".env*"],
 			"outputs": ["convex/_generated/**"]
 		},
