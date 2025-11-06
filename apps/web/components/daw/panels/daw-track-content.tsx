@@ -6,7 +6,7 @@ import type {
 	TrackEnvelopePoint,
 	TrackEnvelopeSegment,
 } from "@wav0/daw-sdk";
-import { time as timeUtils } from "@wav0/daw-sdk";
+import { time } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ClipContextMenu } from "@/components/daw/context-menus/clip-context-menu";
@@ -887,7 +887,7 @@ export function DAWTrackContent() {
 														{clip.name}
 													</div>
 													<div className="text-[11px] text-muted-foreground tabular-nums">
-														{timeUtils.formatDuration(
+														{time.formatDuration(
 															clip.trimEnd - clip.trimStart,
 															{
 																pxPerMs: pixelsPerMs,
