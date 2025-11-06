@@ -8,6 +8,11 @@ import type {
 	Track,
 	TrackEnvelope,
 } from "../types/schemas";
+import {
+	AUTOMATION_SCHEDULING_EPSILON_SEC,
+	MAX_AUTOMATION_CURVE_DURATION_SEC,
+	MIN_AUTOMATION_SEGMENT_DURATION_SEC,
+} from "./audio-scheduling-constants";
 import { audioService } from "./audio-service";
 
 type ClipPlaybackState = {
@@ -27,6 +32,7 @@ type TrackPlaybackState = {
 	isPlaying: boolean;
 	automationGeneration: number;
 	lastEnvelopeDesc?: string;
+	lastAutomationEndTime?: number;
 };
 
 /**
@@ -204,10 +210,8 @@ export class PlaybackService {
 			clipState.gainNode = null;
 		}
 
-		// Remove from global registry
 		this.activeClips.delete(clipId);
 
-		// Defensive: remove from any lingering per-track clipStates
 		for (const trackState of this.tracks.values()) {
 			trackState.clipStates.delete(clipId);
 		}
@@ -290,10 +294,14 @@ export class PlaybackService {
 		const envelopeGain = state.envelopeGainNode;
 		const now = this.audioContext.currentTime;
 
-		// Step 1: Cancel all existing scheduled values
-		// Use a small lookahead to catch curves that just started (prevents overlaps during rapid reschedules)
-		const cancelLookahead = 0.001; // 1ms lookahead
-		envelopeGain.gain.cancelScheduledValues(Math.max(0, now - cancelLookahead));
+		// Always cancel from now - MAX_CURVE_DURATION to ensure all active curves are canceled
+		// This is critical during rapid reschedules (e.g., dragging clips) - curves from previous
+		// schedules must be fully canceled regardless of their duration to prevent overlaps
+		const cancelFrom = Math.max(0, now - MAX_AUTOMATION_CURVE_DURATION_SEC);
+		envelopeGain.gain.cancelScheduledValues(cancelFrom);
+
+		// Reset automation tracking to now after cancellation for clean scheduling state
+		state.lastAutomationEndTime = now;
 
 		// Step 2: Anchor to instantaneous effective gain at current transport time
 		const currentTimeMs = this.getPlaybackTime() * 1000;
@@ -306,8 +314,6 @@ export class PlaybackService {
 		);
 		const anchorGain = baseVolume * multiplier;
 		envelopeGain.gain.setValueAtTime(anchorGain, now);
-
-		// baseVolume already computed above
 
 		if (!envelope || !envelope.enabled || envelope.points.length === 0) {
 			envelopeGain.gain.setValueAtTime(baseVolume, now);
@@ -374,10 +380,8 @@ export class PlaybackService {
 		let lastMultiplier = currentMultiplier;
 		let lastTime = currentTimeMs;
 
-		// Schedule future segments without overlaps
-		// Increased epsilon to 1ms for better safety margin during rapid reschedules
-		const schedulingEpsilon = 0.001;
-		// Initialize to now to ensure first segment starts after anchor point
+		const schedulingEpsilon = AUTOMATION_SCHEDULING_EPSILON_SEC;
+		// After cancellation, scheduling always starts from now
 		let lastScheduledEnd = now;
 		for (const point of futurePoints) {
 			const segmentStart = lastTime;
@@ -390,7 +394,7 @@ export class PlaybackService {
 			}
 
 			const durationSec = (segmentEnd - segmentStart) / 1000;
-			if (durationSec < 0.001) {
+			if (durationSec < MIN_AUTOMATION_SEGMENT_DURATION_SEC) {
 				lastTime = point.time;
 				lastMultiplier = point.value;
 				continue;
@@ -420,15 +424,17 @@ export class PlaybackService {
 				values[i] = baseVolume * multiplier;
 			}
 
-			// Calculate absolute AudioContext time for this segment
 			const acStart = now + (segmentStart - currentTimeMs) / 1000;
 			let adjustedStart = acStart;
-			// Ensure no overlap with previously scheduled curves
 			if (adjustedStart < lastScheduledEnd + schedulingEpsilon) {
 				adjustedStart = lastScheduledEnd + schedulingEpsilon;
 			}
+			// Safety check: ensure adjustedStart is >= now to prevent scheduling in the past
+			// This prevents overlaps with any curves that might not have been fully canceled
+			if (adjustedStart < now) {
+				adjustedStart = now + schedulingEpsilon;
+			}
 			const adjustedDuration = durationSec - (adjustedStart - acStart);
-			// Skip segment if duration becomes too short after adjustment
 			if (adjustedDuration <= schedulingEpsilon) {
 				lastTime = point.time;
 				lastMultiplier = point.value;
@@ -445,6 +451,7 @@ export class PlaybackService {
 			lastTime = point.time;
 			lastMultiplier = point.value;
 		}
+		state.lastAutomationEndTime = lastScheduledEnd;
 	}
 
 	/**
@@ -529,8 +536,20 @@ export class PlaybackService {
 		if (!this.audioContext || !this.masterGainNode) return;
 		const soloEngaged = tracks.some((track) => track.soloed);
 		for (const track of tracks) {
-			const state = this.tracks.get(track.id);
-			if (!state) continue;
+			let state = this.tracks.get(track.id);
+
+			// Auto-initialize new tracks that aren't in the map yet
+			// This handles tracks added during playback
+			if (!state) {
+				state = {
+					clipStates: new Map(),
+					envelopeGainNode: null,
+					muteSoloGainNode: null,
+					isPlaying: false,
+					automationGeneration: 0,
+				};
+				this.tracks.set(track.id, state);
+			}
 
 			if (!state.envelopeGainNode) {
 				state.envelopeGainNode = this.audioContext.createGain();
@@ -560,7 +579,15 @@ export class PlaybackService {
 	private refreshMix(): void {
 		if (this.currentTracks.size === 0) return;
 		const tracks = Array.from(this.currentTracks.values());
-		this.applySnapshot(tracks);
+		if (this.isPlaying && this.audioContext) {
+			this.queueSync(async () => {
+				this.applySnapshot(tracks);
+			}).catch((err) => {
+				console.error("Failed to refresh mix during playback:", err);
+			});
+		} else {
+			this.applySnapshot(tracks);
+		}
 	}
 
 	async synchronizeTracks(tracks: Track[]): Promise<void> {
@@ -721,7 +748,6 @@ export class PlaybackService {
 	): Promise<void> {
 		if (!this.audioContext || !this.masterGainNode) return;
 
-		// Purge lingering sources defensively
 		if (cps.audioSources.length > 0) {
 			for (const node of cps.audioSources) {
 				try {
@@ -1057,7 +1083,15 @@ export class PlaybackService {
 	}
 
 	updateSoloStates(tracks: Track[]): void {
-		this.applySnapshot(tracks);
+		if (this.isPlaying && this.audioContext) {
+			this.queueSync(async () => {
+				this.applySnapshot(tracks);
+			}).catch((err) => {
+				console.error("Failed to update solo states during playback:", err);
+			});
+		} else {
+			this.applySnapshot(tracks);
+		}
 	}
 
 	updateMasterVolume(volumePercent: number): void {

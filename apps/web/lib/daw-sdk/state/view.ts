@@ -8,7 +8,7 @@ import { time } from "@wav0/daw-sdk";
 import { atom } from "jotai";
 import { DAW_PIXELS_PER_SECOND_AT_ZOOM_1 } from "@/lib/constants";
 import { horizontalScrollAtom, playbackAtom, timelineAtom } from "./atoms";
-import { gridAtom } from "./index";
+import { gridAtom, musicalMetadataAtom } from "./index";
 import { totalDurationAtom } from "./tracks";
 
 export type TimelineViewportMetrics = {
@@ -37,8 +37,13 @@ export const timelineViewportAtom = atom<TimelineViewportMetrics>((get) => {
 		pxPerMs: clampedPxPerMs,
 		zoom: timeline.zoom,
 		horizontalScroll: clampedScroll,
-		playheadViewportPx: safeCurrentTime * clampedPxPerMs - clampedScroll,
-		projectEndViewportPx: safeDurationMs * clampedPxPerMs - clampedScroll,
+		// Use unified timeToPixel function for perfect sync with grid markers
+		playheadViewportPx: Math.round(
+			time.timeToPixel(safeCurrentTime, clampedPxPerMs, clampedScroll),
+		),
+		projectEndViewportPx: Math.round(
+			time.timeToPixel(safeDurationMs, clampedPxPerMs, clampedScroll),
+		),
 	};
 });
 
@@ -71,42 +76,92 @@ export const timelinePxPerMsAtom = atom(
 export const playheadViewportAtom = atom((get) => {
 	const { pxPerMs, horizontalScroll } = get(timelineViewportAtom);
 	const playback = get(playbackAtom);
-	const rawX = playback.currentTime * pxPerMs;
+	// Use unified timeToPixel function - same calculation as grid markers
+	const viewportPx = time.timeToPixel(
+		playback.currentTime,
+		pxPerMs,
+		horizontalScroll,
+	);
+	const absolutePx = playback.currentTime * pxPerMs;
 	return {
-		absolutePx: rawX,
-		viewportPx: rawX - horizontalScroll,
+		absolutePx,
+		// Round only at final pixel position for canvas rendering
+		viewportPx: Math.round(viewportPx),
 		ms: playback.currentTime,
 	};
 });
 
-// Derived atoms for canvas grid performance optimization
-export const viewStartMsAtom = atom((get) => {
-	const { pxPerMs, horizontalScroll } = get(timelineViewportAtom);
-	return horizontalScroll / pxPerMs;
+// Removed viewStartMsAtom, viewEndMsAtom, viewSpanMsAtom
+// Grid generation now uses pixel viewport directly to avoid floating point errors
+
+// Snap interval atom - derives snap interval from grid mode, BPM, and granularity
+export const snapIntervalMsAtom = atom((get) => {
+	const grid = get(gridAtom);
+	const timeline = get(timelineAtom);
+	const music = get(musicalMetadataAtom);
+	const { snapGranularity, customSnapIntervalMs } = timeline;
+
+	if (snapGranularity === "custom" && customSnapIntervalMs !== undefined) {
+		return customSnapIntervalMs;
+	}
+
+	if (grid.mode === "time") {
+		// For time mode, derive from granularity
+		switch (snapGranularity) {
+			case "coarse":
+				return 1000; // 1 second
+			case "fine":
+				return 100; // 100ms
+			default:
+				return 500; // 500ms
+		}
+	}
+
+	// For bars mode, derive from grid resolution and granularity
+	const den = music.timeSignature.den;
+	const secondsPerBeat = (60 / music.tempoBpm) * (4 / den);
+	const baseDivisionBeats = time.getDivisionBeats(
+		grid.resolution,
+		music.timeSignature,
+	);
+	const subdivBeats = grid.triplet ? baseDivisionBeats / 3 : baseDivisionBeats;
+
+	switch (snapGranularity) {
+		case "coarse":
+			// Coarse: 1/4 notes (or division if larger)
+			return Math.max(
+				baseDivisionBeats * secondsPerBeat * 1000,
+				secondsPerBeat * 1000,
+			);
+		case "fine": {
+			// Fine: 1/16 of subdivision (or minimum 1/32 note)
+			const fineBeats = subdivBeats / 4;
+			return Math.max(fineBeats * secondsPerBeat * 1000, 50);
+		}
+		default:
+			// Medium: use current subdivision
+			return subdivBeats * secondsPerBeat * 1000;
+	}
 });
 
-export const viewEndMsAtom = atom((get) => {
-	const { pxPerMs, horizontalScroll } = get(timelineViewportAtom);
-	const timelineWidth = get(timelineWidthAtom);
-	return (horizontalScroll + timelineWidth) / pxPerMs;
-});
-
-export const viewSpanMsAtom = atom((get) => {
-	const start = get(viewStartMsAtom);
-	const end = get(viewEndMsAtom);
-	return end - start;
-});
-
-// Cache key for time grid
+// Cache key for time grid - uses pixel viewport instead of time viewport
 export const timeGridCacheKeyAtom = atom((get) => {
 	const pxPerMs = get(timelinePxPerMsAtom);
-	const viewSpan = get(viewSpanMsAtom);
-	const viewStart = get(viewStartMsAtom);
+	const horizontalScroll = get(horizontalScrollAtom);
+	const timelineWidth = get(timelineWidthAtom);
+	const timeline = get(timelineAtom);
+	const snapInterval = timeline.snapToGrid ? get(snapIntervalMsAtom) : null;
 
+	// Use exact pixel values - no rounding needed since we're using pixel viewport
+	// Round scrollLeft and width to pixels (they're already integers in practice)
 	return JSON.stringify({
-		pxPerMs: Math.round(pxPerMs * 1000) / 1000, // Round to 3 decimal places
-		viewSpan: Math.round(viewSpan * 10) / 10, // Round to 0.1ms precision
-		viewStart: Math.round(viewStart * 10) / 10, // Round to 0.1ms precision
+		pxPerMs: Number.isFinite(pxPerMs) ? pxPerMs : 0,
+		scrollLeft: Number.isFinite(horizontalScroll)
+			? Math.round(horizontalScroll)
+			: 0,
+		width: Number.isFinite(timelineWidth) ? Math.round(timelineWidth) : 0,
+		snapInterval,
+		snapToGrid: timeline.snapToGrid,
 	});
 });
 
@@ -120,6 +175,7 @@ const timeGridCache = new Map<
 
 export const cachedTimeGridAtom = atom((get) => {
 	const grid = get(gridAtom);
+	const timeline = get(timelineAtom);
 
 	// Only generate time grid if mode is "time"
 	if (grid.mode !== "time") {
@@ -134,15 +190,21 @@ export const cachedTimeGridAtom = atom((get) => {
 		return cached;
 	}
 
-	// Compute new time grid
-	const viewStartMs = get(viewStartMsAtom);
-	const viewEndMs = get(viewEndMsAtom);
+	// Compute new time grid using pixel viewport
 	const pxPerMs = get(timelinePxPerMsAtom);
+	const horizontalScroll = get(horizontalScrollAtom);
+	const timelineWidth = get(timelineWidthAtom);
+
+	// Pass snap interval when snap is enabled to align visual grid with snap points
+	const snapIntervalMs = timeline.snapToGrid
+		? get(snapIntervalMsAtom)
+		: undefined;
 
 	const result = time.generateTimeGrid({
-		viewStartMs,
-		viewEndMs,
+		scrollLeft: horizontalScroll,
+		width: timelineWidth,
 		pxPerMs,
+		snapIntervalMs,
 	});
 
 	// Cache the result

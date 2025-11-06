@@ -24,24 +24,42 @@ import { migrateAutomationToSegments } from "./automation-migration";
 import type { Clip, Track, TrackEnvelope, TrackEnvelopePoint } from "./types";
 import { clampEnvelopeGain, createDefaultEnvelope } from "./types";
 
-export const addTrackAtom = atom(null, (get, set, track: Omit<Track, "id">) => {
-	const tracks = get(tracksAtom);
-	const newTrack: Track = {
-		...track,
-		id: crypto.randomUUID(),
-		volumeEnvelope: track.volumeEnvelope
-			? {
-					...track.volumeEnvelope,
-					points: track.volumeEnvelope.points.map((point) => ({
-						...point,
-						value: clampEnvelopeGain(point.value),
-					})),
-				}
-			: createDefaultEnvelope(track.volume ?? 75),
-	};
-	set(tracksAtom, [...tracks, newTrack]);
-	return newTrack.id;
-});
+export const addTrackAtom = atom(
+	null,
+	async (get, set, track: Omit<Track, "id">) => {
+		const tracks = get(tracksAtom);
+		const newTrack: Track = {
+			...track,
+			id: crypto.randomUUID(),
+			volumeEnvelope: track.volumeEnvelope
+				? {
+						...track.volumeEnvelope,
+						points: track.volumeEnvelope.points.map((point) => ({
+							...point,
+							value: clampEnvelopeGain(point.value),
+						})),
+					}
+				: createDefaultEnvelope(track.volume ?? 75),
+		};
+		const updatedTracks = [...tracks, newTrack];
+		set(tracksAtom, updatedTracks);
+
+		// Synchronize with playback service if playing to initialize new track
+		const playback = get(playbackAtom);
+		if (playback.isPlaying) {
+			try {
+				await playbackService.synchronizeTracks(updatedTracks);
+			} catch (error) {
+				console.error(
+					"Failed to synchronize tracks after adding new track",
+					error,
+				);
+			}
+		}
+
+		return newTrack.id;
+	},
+);
 
 export const removeTrackAtom = atom(null, (get, set, trackId: string) => {
 	const tracks = get(tracksAtom);
@@ -238,7 +256,9 @@ export const loadAudioFileAtom = atom(
 		const playback = get(playbackAtom);
 		if (playback.isPlaying) {
 			try {
-				await playbackService.rescheduleTrack(newTrack);
+				// Pass all tracks to ensure new track is included in synchronization
+				const allTracks = get(tracksAtom);
+				await playbackService.rescheduleTrack(newTrack, allTracks);
 			} catch (error) {
 				console.error(
 					"Failed to reschedule after creating track",

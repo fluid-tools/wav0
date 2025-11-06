@@ -8,10 +8,11 @@ bun build            # TypeScript check + build with Turbopack
 bun start            # Start production server
 
 # Code Quality
-bun typecheck        # TypeScript type checking
+bun check-types      # TypeScript type checking
 bun lint             # Run Biome linter
 bun lint:fix         # Auto-fix linting issues
 bun format           # Format code with Biome
+bun test             # Run tests
 ```
 
 ## Code Style Guidelines
@@ -178,8 +179,9 @@ For playback engine (specifically, the audio manager/context), we have chosen th
 
 - MEDIA BUNNY GUIDE: https://mediabunny.dev/guide/introduction
 - MEDIA BUNNY EXAMPLES: https://mediabunny.dev/examples
-
+- WEB AUDIO API DOCS: https://webaudio.github.io/web-audio-api/
 
 ## MCP Server Instructions
-- Firecrawl MCP for crawling, scraping, and more.
-- Context7 MCP for docs.
+* Firecrawl MCP for crawling, scraping, and more.
+* Context7 MCP for docs - for instance, if you need up-to-date docs on the Web Audio API or React, you can use the context7 mcp to search the web for the latest docs. or if you want the latest React docs.
+

@@ -1,28 +1,30 @@
 {
 	"name": "wav0",
+	"devDependencies": {
+		"@biomejs/biome": "2.2.4",
+		"dotenv-cli": "^11.0.0",
+		"turbo": "^2.6.0",
+		"ultracite": "5.4.7"
+	},
+	"packageManager": "bun@1.3.1",
 	"private": true,
-	"type": "module",
-	"workspaces": [
-		"apps/*",
-		"packages/*",
-		"tooling/*"
-	],
 	"scripts": {
 		"check": "biome check --write .",
 		"format": "biome format --write .",
 		"dev": "turbo dev",
 		"build": "turbo build",
 		"lint": "turbo lint",
+		"test": "turbo test",
 		"deploy": "turbo deploy",
 		"check-types": "turbo check-types",
 		"dev:web": "turbo -F @wav0/web dev",
 		"dev:server": "turbo -F @wav0/backend dev",
 		"dev:setup": "turbo -F @wav0/backend dev:setup"
 	},
-	"devDependencies": {
-		"turbo": "^2.5.8",
-		"@biomejs/biome": "2.2.4",
-		"ultracite": "5.4.7"
-	},
-	"packageManager": "bun@1.2.23"
+	"type": "module",
+	"workspaces": [
+		"apps/*",
+		"packages/*",
+		"tooling/*"
+	]
 }

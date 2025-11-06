@@ -42,12 +42,11 @@ import { EventListSheet } from "./inspectors/event-list-sheet";
 import { DAWTimeline } from "./panels/daw-timeline";
 import { DAWTrackContent } from "./panels/daw-track-content";
 import { DAWTrackList } from "./panels/daw-track-list";
+import { TrackGridCanvas } from "./panels/track-grid-canvas";
+import { UnifiedPlayhead } from "./panels/unified-playhead";
 import { ClipMoveToastManager } from "./toast/clip-move-toast";
-import { UnifiedOverlay } from "./unified-overlay";
 
 export function DAWContainer() {
-	// Enable event-driven atom synchronization with new SDK
-	// This keeps old atoms in sync with Transport/AudioEngine events
 	useDAWAtomSync(playbackAtom, tracksAtom);
 
 	const [timelineWidth] = useAtom(timelineWidthAtom);
@@ -84,11 +83,38 @@ export function DAWContainer() {
 	const automationDragActiveRef = useRef(false);
 	const panLockRef = useRef(false);
 
-	/**
-	 * Cache zoom and scroll state locally so wheel + pointer interactions
-	 * stay smooth between atom commits.
-	 */
 	const scrollRef = useRef({ left: 0, top: 0 });
+
+	const scrollBatchRef = useRef<{
+		pending: boolean;
+		raf: number;
+		nextLeft: number;
+		nextTop: number;
+	}>({
+		pending: false,
+		raf: 0,
+		nextLeft: 0,
+		nextTop: 0,
+	});
+
+	const batchScrollUpdate = useCallback(
+		(left: number, top: number) => {
+			const batch = scrollBatchRef.current;
+			batch.nextLeft = left;
+			batch.nextTop = top;
+
+			if (batch.pending) return;
+
+			batch.pending = true;
+			batch.raf = requestAnimationFrame(() => {
+				batch.pending = false;
+				batch.raf = 0;
+				setHorizontalScroll(batch.nextLeft);
+				setVerticalScroll(batch.nextTop);
+			});
+		},
+		[setHorizontalScroll, setVerticalScroll],
+	);
 
 	useEffect(() => {
 		const handlePanLock = (event: Event) => {
@@ -112,8 +138,7 @@ export function DAWContainer() {
 				detail.left !== undefined ? detail.left : controller.scrollLeft;
 			const top = detail.top !== undefined ? detail.top : controller.scrollTop;
 			controller.setScroll(left, top);
-			setHorizontalScroll(left);
-			setVerticalScroll(top);
+			batchScrollUpdate(left, top);
 		};
 		window.addEventListener(
 			"wav0:grid-pan-lock",
@@ -132,15 +157,20 @@ export function DAWContainer() {
 				"wav0:grid-scroll-request",
 				handleScrollRequest as EventListener,
 			);
-		};
-	}, [setHorizontalScroll, setVerticalScroll]);
 
-	// Initialize audio from OPFS on component mount
+			const batch = scrollBatchRef.current;
+			if (batch.raf) {
+				cancelAnimationFrame(batch.raf);
+				batch.raf = 0;
+				batch.pending = false;
+			}
+		};
+	}, [batchScrollUpdate]);
+
 	useEffect(() => {
 		initializeAudioFromOPFS();
 	}, [initializeAudioFromOPFS]);
 
-	// Calculate content dimensions with global track height
 	const currentTrackHeight = Math.round(
 		DAW_HEIGHTS.TRACK_ROW * trackHeightZoom,
 	);
@@ -156,31 +186,28 @@ export function DAWContainer() {
 		[],
 	);
 
-	// Timeline scroll handler
 	const onTimelineScroll = useCallback(
 		(e: React.UIEvent<HTMLDivElement>) => {
 			const target = e.target as HTMLDivElement;
 			const left = target.scrollLeft;
 			scrollRef.current.left = left;
 			scheduleScrollSync(left, scrollRef.current.top);
-			setHorizontalScroll(left);
+			batchScrollUpdate(left, scrollRef.current.top);
 		},
-		[scheduleScrollSync, setHorizontalScroll],
+		[scheduleScrollSync, batchScrollUpdate],
 	);
 
-	// Track list scroll handler
 	const onTrackListScroll = useCallback(
 		(e: React.UIEvent<HTMLDivElement>) => {
 			const target = e.target as HTMLDivElement;
 			const top = target.scrollTop;
 			scrollRef.current.top = top;
 			scheduleScrollSync(scrollRef.current.left, top);
-			setVerticalScroll(top);
+			batchScrollUpdate(scrollRef.current.left, top);
 		},
-		[scheduleScrollSync, setVerticalScroll],
+		[scheduleScrollSync, batchScrollUpdate],
 	);
 
-	// Track grid scroll handler with user scroll detection
 	const scrollDebounceRef = useRef<NodeJS.Timeout | null>(null);
 	const onTrackGridScroll = useCallback(
 		(e: React.UIEvent<HTMLDivElement>) => {
@@ -188,23 +215,18 @@ export function DAWContainer() {
 			const { scrollLeft: left, scrollTop: top } = target;
 			scrollRef.current = { left, top };
 			scheduleScrollSync(left, top);
-			setHorizontalScroll(left);
-			setVerticalScroll(top);
+			batchScrollUpdate(left, top);
 
-			// Mark user as scrolling
 			setUserIsScrolling(true);
 			setAutoFollowEnabled(false);
 
-			// Clear existing debounce
 			if (scrollDebounceRef.current) {
 				clearTimeout(scrollDebounceRef.current);
 			}
 
-			// After 500ms of no scrolling, check if playhead is visible
 			scrollDebounceRef.current = setTimeout(() => {
 				setUserIsScrolling(false);
 
-				// Re-enable auto-follow if playhead is within viewport
 				const controller = gridControllerRef.current;
 				const grid = trackGridScrollRef.current;
 				if (controller && grid) {
@@ -213,7 +235,6 @@ export function DAWContainer() {
 					const viewportLeft = controller.scrollLeft;
 					const viewportRight = viewportLeft + width;
 
-					// If playhead is visible, re-enable auto-follow
 					if (x >= viewportLeft && x <= viewportRight) {
 						setAutoFollowEnabled(true);
 					}
@@ -222,8 +243,7 @@ export function DAWContainer() {
 		},
 		[
 			scheduleScrollSync,
-			setHorizontalScroll,
-			setVerticalScroll,
+			batchScrollUpdate,
 			setUserIsScrolling,
 			setAutoFollowEnabled,
 			playheadViewport.absolutePx,
@@ -272,14 +292,13 @@ export function DAWContainer() {
 		const handlePointerMove = (event: PointerEvent) => {
 			if (!(event.buttons & 1)) return;
 			if (panLockRef.current) return;
-			if (automationDragActiveRef.current) return; // Don't scroll during automation drag
+			if (automationDragActiveRef.current) return;
 			controller.setScroll(
 				controller.scrollLeft - event.movementX,
 				controller.scrollTop - event.movementY,
 			);
 		};
 
-		// Listen for automation drag events
 		const handleAutomationDragStart = () => {
 			automationDragActiveRef.current = true;
 		};
@@ -315,10 +334,8 @@ export function DAWContainer() {
 	}, [viewport, setTimelineZoom]);
 
 	useEffect(() => {
-		// Prevent back/forward swipe gestures interfering with DAW grid
 		const preventTouchNav = (e: TouchEvent) => {
 			if (e.touches && e.touches.length === 2) {
-				// pinch zoom
 				e.preventDefault();
 			}
 		};
@@ -332,22 +349,14 @@ export function DAWContainer() {
 		};
 	}, []);
 
-	// Smart playhead-follow with user scroll detection
 	useEffect(() => {
 		const controller = gridControllerRef.current;
 		const grid = trackGridScrollRef.current;
 		if (!controller || !grid) return;
 
-		// Don't auto-scroll if user is dragging playhead
 		if (isPlayheadDragging) return;
-
-		// Don't auto-scroll if user is manually scrolling
 		if (userIsScrolling) return;
-
-		// Don't auto-scroll if auto-follow is disabled
 		if (!autoFollowEnabled) return;
-
-		// Don't auto-scroll if not playing
 		if (!playback.isPlaying) return;
 
 		const x = playheadViewport.absolutePx;
@@ -356,11 +365,9 @@ export function DAWContainer() {
 		if (width <= 0) return;
 		const left = controller.scrollLeft;
 
-		// Define center band (35-65% of viewport)
 		const bandLeft = left + width * 0.35;
 		const bandRight = left + width * 0.65;
 
-		// Auto-scroll to keep playhead centered when it exits the band
 		if (x < bandLeft || x > bandRight) {
 			const target = Math.max(0, x - width * 0.5);
 			if (Math.abs(target - controller.scrollLeft) < 0.5) return;
@@ -388,11 +395,6 @@ export function DAWContainer() {
 			<div className="flex-1 flex flex-col overflow-hidden">
 				{/* Transport Controls */}
 				<DAWControls />
-
-				{/* Temporary Audio Test Panel */}
-				{/* <div className="border-b p-2">
-					<AudioTestPanel />
-				</div> */}
 
 				{/* Timeline + Tracks Layout */}
 				<div className="flex-1 flex overflow-hidden">
@@ -461,7 +463,8 @@ export function DAWContainer() {
 						{/* Timeline and Grid Panel */}
 						<ResizablePanel defaultSize={75}>
 							<div className="relative h-full flex flex-col overflow-hidden">
-								<UnifiedOverlay />
+								<UnifiedPlayhead timelineHeaderHeight={DAW_HEIGHTS.TIMELINE} />
+
 								{/* Timeline Header */}
 								<div
 									className="border-b relative overflow-hidden z-10"
@@ -492,6 +495,8 @@ export function DAWContainer() {
 										onScroll={onTrackGridScroll}
 										style={{ scrollbarWidth: "thin" }}
 									>
+										<TrackGridCanvas />
+
 										<div
 											style={{
 												width: timelineWidth,

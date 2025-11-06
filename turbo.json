@@ -21,9 +21,12 @@
 			"outputs": [".next/**", "!.next/cache/**", "dist/**"]
 		},
 		"deploy": {
-			"dependsOn": ["^deploy"],
+			"dependsOn": ["^build", "^deploy"],
 			"inputs": ["$TURBO_DEFAULT$", ".env*"],
 			"outputs": ["convex/_generated/**"]
+		},
+		"test": {
+			"dependsOn": ["^test"]
 		},
 		"lint": {
 			"dependsOn": ["^lint"]
