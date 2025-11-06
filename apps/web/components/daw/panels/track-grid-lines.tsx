@@ -76,6 +76,8 @@ export const TrackGridLines = memo(function TrackGridLines({
 	return (
 		<canvas
 			ref={canvasRef}
+			width={width}
+			height={height}
 			className="absolute inset-0 pointer-events-none"
 			style={{ width, height }}
 		/>
