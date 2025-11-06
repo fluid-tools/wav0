@@ -1,5 +1,6 @@
 "use client";
 
+import { time } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MarkerTrack } from "@/components/daw/panels/marker-track";
