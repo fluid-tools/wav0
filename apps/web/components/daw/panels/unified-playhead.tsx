@@ -69,7 +69,10 @@ export const UnifiedPlayhead = memo(function UnifiedPlayhead({
 			const absoluteX = Math.max(0, clientX - rect.left);
 			if (!Number.isFinite(absoluteX)) return;
 
-			const rawMs = Math.max(0, time.pixelToTime(absoluteX, pxPerMs, horizontalScroll));
+			const rawMs = Math.max(
+				0,
+				time.pixelToTime(absoluteX, pxPerMs, horizontalScroll),
+			);
 			const nextMs = timeline.snapToGrid ? snap(rawMs) : rawMs;
 
 			const state = dragRef.current;
