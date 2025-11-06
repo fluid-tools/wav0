@@ -7,6 +7,8 @@
  * @module daw-sdk
  */
 
+// ===== Core Constants =====
+export * from "./core/audio-scheduling-constants";
 // ===== Core Services =====
 export type { LoadedAudioTrack } from "./core/audio-service";
 export { AudioService, audioService } from "./core/audio-service";

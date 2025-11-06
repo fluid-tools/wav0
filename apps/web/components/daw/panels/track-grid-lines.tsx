@@ -1,4 +1,5 @@
 "use client";
+
 import { useAtom } from "jotai";
 import { memo, useLayoutEffect, useMemo, useRef } from "react";
 import {
@@ -6,14 +7,13 @@ import {
 	horizontalScrollAtom,
 	timelinePxPerMsAtom,
 } from "@/lib/daw-sdk";
-import { TimelineGridHeader } from "./timeline-grid-header";
 
 type Props = {
 	width: number;
 	height: number;
 };
 
-export const TimelineGridCanvas = memo(function TimelineGridCanvas({
+export const TrackGridLines = memo(function TrackGridLines({
 	width,
 	height,
 }: Props) {
@@ -74,15 +74,12 @@ export const TimelineGridCanvas = memo(function TimelineGridCanvas({
 	}, [width, height, pxPerMs, scrollLeft, timeGrid, themeColors]);
 
 	return (
-		<div className="relative" style={{ width, height }}>
-			<canvas
-				ref={canvasRef}
-				className="absolute inset-0 pointer-events-none"
-				width={width}
-				height={height}
-				style={{ width, height }}
-			/>
-			<TimelineGridHeader width={width} height={height} />
-		</div>
+		<canvas
+			ref={canvasRef}
+			width={width}
+			height={height}
+			className="absolute inset-0 pointer-events-none"
+			style={{ width, height }}
+		/>
 	);
 });

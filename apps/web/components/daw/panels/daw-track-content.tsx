@@ -6,7 +6,7 @@ import type {
 	TrackEnvelopePoint,
 	TrackEnvelopeSegment,
 } from "@wav0/daw-sdk";
-import { time as timeUtils } from "@wav0/daw-sdk";
+import { time } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ClipContextMenu } from "@/components/daw/context-menus/clip-context-menu";
@@ -34,6 +34,7 @@ import {
 	updateClipAtom,
 	updateTrackAtom,
 } from "@/lib/daw-sdk";
+import { useTimebase } from "@/lib/daw-sdk/hooks/use-timebase";
 import { cn } from "@/lib/utils";
 
 export function DAWTrackContent() {
@@ -52,6 +53,7 @@ export function DAWTrackContent() {
 	const [totalDuration] = useAtom(totalDurationAtom);
 	const [_dragMachineSnapshot, sendDragEvent] = useAtom(dragMachineAtom);
 	const dragPreview = useAtom(dragPreviewAtom)[0];
+	const { snap } = useTimebase();
 	const [resizingClip, setResizingClip] = useState<{
 		trackId: string;
 		clipId: string;
@@ -104,7 +106,6 @@ export function DAWTrackContent() {
 		};
 		update();
 
-		// Debounce window resize to avoid excessive updates during resize
 		let resizeTimeout: NodeJS.Timeout;
 		const debouncedUpdate = () => {
 			clearTimeout(resizeTimeout);
@@ -222,7 +223,6 @@ export function DAWTrackContent() {
 		};
 	}, [interactionActive, ensureAutoScroll]);
 
-	// Attach document-level pointer listeners while resizing, dragging, or loop-dragging
 	useEffect(() => {
 		if (!interactionActive) return;
 
@@ -282,17 +282,14 @@ export function DAWTrackContent() {
 				}
 
 				if (draggingClip) {
-					// Compute preview-only position
 					const deltaX = lastX - draggingClip.startX;
 					const deltaTime = deltaX / pixelsPerMs;
 					let previewStartTime = Math.max(
 						0,
 						draggingClip.startTime + deltaTime,
 					);
-					if (timeline.snapToGrid && timeline.gridSize > 0) {
-						previewStartTime =
-							Math.round(previewStartTime / timeline.gridSize) *
-							timeline.gridSize;
+					if (timeline.snapToGrid) {
+						previewStartTime = snap(previewStartTime);
 					}
 
 					const trackHeight = Math.round(
@@ -312,7 +309,6 @@ export function DAWTrackContent() {
 					const previewTrackId =
 						tracks[newTrackIndex]?.id ?? draggingClip.trackId;
 
-					// Send MOVE event to drag machine
 					sendDragEvent({
 						type: "MOVE",
 						previewTrackId,
@@ -333,9 +329,8 @@ export function DAWTrackContent() {
 								? oneShotEnd
 								: loopDragging.startLoopEnd;
 						let newLoopEnd = Math.max(oneShotEnd, baseLoopEnd + deltaTime);
-						if (timeline.snapToGrid && timeline.gridSize > 0) {
-							newLoopEnd =
-								Math.round(newLoopEnd / timeline.gridSize) * timeline.gridSize;
+						if (timeline.snapToGrid) {
+							newLoopEnd = snap(newLoopEnd);
 						}
 						updateClip(loopDragging.trackId, loopDragging.clipId, {
 							loopEnd: newLoopEnd,
@@ -347,9 +342,7 @@ export function DAWTrackContent() {
 
 		const onUp = async () => {
 			try {
-				// Commit drag if preview exists
 				if (dragPreview && draggingClip) {
-					// Use updater function to always get latest tracks state, avoiding stale closure issues
 					let computedUpdated: Track[] | null = null;
 					let computedClip: Clip | null = null;
 					let computedOriginalTrack: Track | null = null;
@@ -361,7 +354,6 @@ export function DAWTrackContent() {
 					} | null = null;
 
 					setTracks((prev) => {
-						// Use prev (latest state) instead of closure-captured tracks
 						const originalTrack = prev.find(
 							(t) => t.id === dragPreview.originalTrackId,
 						);
@@ -373,10 +365,9 @@ export function DAWTrackContent() {
 						);
 
 						if (!originalTrack || !targetTrack || !clip) {
-							return prev; // No changes if track/clip not found
+							return prev;
 						}
 
-						// Store for use outside callback
 						computedClip = clip;
 						computedOriginalTrack = originalTrack;
 						computedTargetTrack = targetTrack;
@@ -388,19 +379,16 @@ export function DAWTrackContent() {
 							dragPreview.originalStartTime !== dragPreview.previewStartTime;
 
 						if (!moved) {
-							return prev; // No changes needed
+							return prev;
 						}
 
 						const clipDurationMs = clip.trimEnd - clip.trimStart;
 						const clipEndTime = clip.startTime + clipDurationMs;
 
 						if (isSameTrack) {
-							// Same track: update clip start; clip-bound automation stays relative
-							// For same-track moves, use updateClip which handles synchronization
-							return prev; // updateClip will handle state update
+							return prev;
 						}
 
-						// Cross-track: transfer automation with proper timestamp adjustment
 						const hasAutomation =
 							originalTrack.volumeEnvelope?.enabled ?? false;
 
@@ -411,10 +399,8 @@ export function DAWTrackContent() {
 						} | null = null;
 
 						if (hasAutomation && originalTrack.volumeEnvelope) {
-							// Get project end for time clamping (ms)
 							const projectEndMs =
 								totalDuration && totalDuration > 0 ? totalDuration : 300000;
-							// Normalize final drop time
 							const finalDropTime = Math.max(
 								0,
 								Math.min(
@@ -444,7 +430,6 @@ export function DAWTrackContent() {
 							}
 						}
 
-						// Compute updated tracks from latest state (prev)
 						const updated = prev.map((t) => {
 							if (t.id === originalTrack.id) {
 								const updatedTrack = {
@@ -452,7 +437,6 @@ export function DAWTrackContent() {
 									clips: t.clips?.filter((c) => c.id !== clip.id) ?? [],
 								};
 								if (automationData) {
-									// Remove transferred points from source track
 									const currentEnv = updatedTrack.volumeEnvelope;
 									if (currentEnv) {
 										const remainingPointIds = new Set(
@@ -516,15 +500,12 @@ export function DAWTrackContent() {
 						return updated;
 					});
 
-					// Handle same-track moves and cross-track moves separately
 					if (
 						computedUpdated &&
 						computedClip &&
 						computedOriginalTrack &&
 						computedTargetTrack
 					) {
-						// Cross-track move: computedUpdated is set
-						// TypeScript doesn't narrow correctly here due to closure assignment, use assertions
 						const clip = computedClip as Clip;
 						const originalTrack = computedOriginalTrack as Track;
 						const targetTrack = computedTargetTrack as Track;
@@ -534,8 +515,6 @@ export function DAWTrackContent() {
 							await playbackService.stopClip(originalTrack.id, clip.id);
 						}
 
-						// Sync all tracks atomically with complete updated state
-						// This ensures moved clips are properly stopped on old track and started on new track
 						if (playback.isPlaying) {
 							try {
 								await playbackService.synchronizeTracks(updated);
@@ -560,8 +539,6 @@ export function DAWTrackContent() {
 							...prev.slice(0, 9),
 						]);
 					} else if (computedClip && computedOriginalTrack) {
-						// Same-track move: use updateClip which handles synchronization
-						// TypeScript doesn't narrow correctly here due to closure assignment, use assertions
 						const clip = computedClip as Clip;
 						const originalTrack = computedOriginalTrack as Track;
 						const isSameTrack =
@@ -604,7 +581,6 @@ export function DAWTrackContent() {
 			} catch (error) {
 				console.error("Error committing drag:", error);
 			} finally {
-				// Always finalize drag state
 				sendDragEvent({ type: "DROP" });
 				lastPointer.current = null;
 				setResizingClip(null);
@@ -614,7 +590,7 @@ export function DAWTrackContent() {
 			}
 		};
 
-		const onCancel = onUp; // Same finalization logic
+		const onCancel = onUp;
 
 		window.addEventListener("mousemove", onMove);
 		window.addEventListener("mouseup", onUp);
@@ -636,7 +612,6 @@ export function DAWTrackContent() {
 		updateClip,
 		tracks,
 		timeline.snapToGrid,
-		timeline.gridSize,
 		trackHeightZoom,
 		totalDuration,
 		playback.isPlaying,
@@ -644,6 +619,7 @@ export function DAWTrackContent() {
 		dragPreview,
 		sendDragEvent,
 		setMoveHistory,
+		snap,
 	]);
 
 	return (
@@ -911,7 +887,7 @@ export function DAWTrackContent() {
 														{clip.name}
 													</div>
 													<div className="text-[11px] text-muted-foreground tabular-nums">
-														{timeUtils.formatDuration(
+														{time.formatDuration(
 															clip.trimEnd - clip.trimStart,
 															{
 																pxPerMs: pixelsPerMs,
@@ -1108,23 +1084,6 @@ export function DAWTrackContent() {
 					className="absolute top-0 bottom-0 bg-muted/10 pointer-events-none z-30"
 					style={{ left: projectEndPosition, right: 0 }}
 				/>
-
-				{/* Grid Lines */}
-				<div className="absolute inset-0 pointer-events-none">
-					{(() => {
-						const gridSpacing = 100;
-						const width =
-							containerRef.current?.getBoundingClientRect().width ?? 0;
-						const count = Math.ceil(width / gridSpacing);
-						return Array.from({ length: count }).map((_, i) => (
-							<div
-								key={`grid-line-${i * gridSpacing}`}
-								className="absolute top-0 bottom-0 w-px bg-border/20"
-								style={{ left: i * gridSpacing }}
-							/>
-						));
-					})()}
-				</div>
 			</div>
 
 			{/* Automation dialog removed in favor of default-move with Undo */}

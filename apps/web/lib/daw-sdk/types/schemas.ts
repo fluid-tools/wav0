@@ -88,6 +88,10 @@ export const TimelineStateSchema = z.object({
 	scrollPosition: z.number().min(0),
 	snapToGrid: z.boolean(),
 	gridSize: z.number().min(0),
+	snapGranularity: z
+		.enum(["coarse", "medium", "fine", "custom"])
+		.default("medium"),
+	customSnapIntervalMs: z.number().min(0).optional(),
 });
 
 export const TimelineSectionSchema = z.object({
@@ -137,7 +141,6 @@ export const PlaybackOptionsSchema = z.object({
 
 // ===== Type Exports =====
 
-export type CurveType = z.infer<typeof CurveTypeSchema>;
 export type TrackEnvelopeSegment = z.infer<typeof TrackEnvelopeSegmentSchema>;
 export type TrackEnvelopePoint = z.infer<typeof TrackEnvelopePointSchema>;
 export type TrackEnvelope = z.infer<typeof TrackEnvelopeSchema>;
