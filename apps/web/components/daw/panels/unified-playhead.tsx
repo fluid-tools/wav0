@@ -69,7 +69,7 @@ export const UnifiedPlayhead = memo(function UnifiedPlayhead({
 			const absoluteX = Math.max(0, clientX - rect.left);
 			if (!Number.isFinite(absoluteX)) return;
 
-			const rawMs = Math.max(0, absoluteX / pxPerMs);
+			const rawMs = Math.max(0, time.pixelToTime(absoluteX, pxPerMs, horizontalScroll));
 			const nextMs = timeline.snapToGrid ? snap(rawMs) : rawMs;
 
 			const state = dragRef.current;
@@ -90,7 +90,7 @@ export const UnifiedPlayhead = memo(function UnifiedPlayhead({
 				});
 			}
 		},
-		[pxPerMs, setCurrentTime, timeline.snapToGrid, snap],
+		[pxPerMs, setCurrentTime, timeline.snapToGrid, snap, horizontalScroll],
 	);
 
 	const stopDrag = useCallback(() => {
