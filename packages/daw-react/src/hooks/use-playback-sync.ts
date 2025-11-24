@@ -46,29 +46,45 @@ export function usePlaybackSync<T extends PlaybackStateAtom>({
 		},
 	);
 
-	// Non-reactive time updater - always reads latest values
-	const updateTime = useEffectEvent(() => {
-		if (!playbackState.isPlaying || !enabled) return;
-
-		const currentTime = getCurrentTime();
-		setPlaybackState({
-			...playbackState,
-			currentTime,
-		} as T);
-	});
-
-	const { transport, getCurrentTime } = useTransportEvents({
+	const { transport } = useTransportEvents({
 		onStateChange: handleStateChange, // Stable reference now
 	});
 
-	// Single stable interval - only recreates when enabled changes
-	useEffect(() => {
+	// Non-reactive time update handler - always reads latest playbackState
+	const handleTimeUpdate = useEffectEvent((currentTime: number) => {
 		if (!enabled) return;
+		// Read latest playbackState through closure
+		const latestState = playbackState;
+		if (latestState.isPlaying) {
+			setPlaybackState({
+				...latestState,
+				currentTime,
+			} as T);
+		}
+	});
 
-		const interval = setInterval(updateTime, 16); // ~60fps
+	// Listen for time-update events from Transport (replaces setInterval polling)
+	useEffect(() => {
+		if (!enabled || !transport) return;
 
-		return () => clearInterval(interval);
-	}, [enabled, updateTime]); // Minimal, stable dependencies
+		const eventHandler = ((event: CustomEvent) => {
+			const { currentTime } = event.detail;
+			handleTimeUpdate(currentTime);
+		}) as EventListener;
+
+		transport.addEventListener("time-update", eventHandler);
+
+		return () => {
+			transport.removeEventListener("time-update", eventHandler);
+		};
+	}, [enabled, transport, handleTimeUpdate]);
+
+	// Remove old setInterval-based polling (replaced by event-based updates)
+	// useEffect(() => {
+	//   if (!enabled) return;
+	//   const interval = setInterval(updateTime, 16); // ~60fps
+	//   return () => clearInterval(interval);
+	// }, [enabled, updateTime]);
 
 	return {
 		transport,

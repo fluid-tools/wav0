@@ -8,4 +8,9 @@ This includes:
 - Casts to any to get around type issues
 - Any other style that is inconsistent with the file
 
+For Design:
+- Avoid big shadows, purple gradients, and overly bold and default-sloppy typography.
+- Typography - intentional + consistent.
+- Focus on core design tokens.
+
 Report at the end with only a 1-3 sentence summary of what you changed

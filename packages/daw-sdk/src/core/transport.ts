@@ -9,9 +9,9 @@
  * - Generation tokens prevent late audio scheduling
  */
 
+import type { TransportEvent, TransportState } from "../types/core";
+import type { Clip, Track } from "../types/schemas";
 import type { AudioEngine } from "./audio-engine";
-import type { TransportState, TransportEvent } from "../types/core";
-import type { Clip } from "../types/schemas";
 import {
 	AUTOMATION_CANCEL_LOOKAHEAD_SEC,
 	START_GRACE_SEC,
@@ -29,6 +29,18 @@ interface ClipScheduleState {
 	audioSources: AudioBufferSourceNode[];
 }
 
+/**
+ * Per-track state for gain chain management
+ */
+interface TrackState {
+	/** Envelope gain node (for volume automation) */
+	envelopeGainNode: GainNode;
+	/** Mute/solo gain node (for mute and solo control) */
+	muteSoloGainNode: GainNode;
+	/** Clip states belonging to this track */
+	clipStates: Map<string, ClipScheduleState>;
+}
+
 export class Transport extends EventTarget {
 	private state: TransportState = "stopped";
 	private playbackStartTime = 0;
@@ -36,15 +48,38 @@ export class Transport extends EventTarget {
 	private activeNodes = new Set<AudioBufferSourceNode>();
 	/** Track clip schedule states by clip ID */
 	private clipStates = new Map<string, ClipScheduleState>();
+	/** Track states by track ID */
+	private trackStates = new Map<string, TrackState>();
+	/** Mapping of clip ID to track ID for routing */
+	private clipToTrackMap = new Map<string, string>();
+	/** Master bus gain node */
+	private masterGainNode: GainNode | null = null;
+	/** Master bus analyser node for metering */
+	private masterAnalyser: AnalyserNode | null = null;
+	/** RAF loop for time updates */
+	private timeUpdateLoop: number | null = null;
 
 	constructor(
 		private audioEngine: AudioEngine,
 		private audioContext: AudioContext,
 	) {
 		super();
+
+		// Initialize master bus
+		this.masterGainNode = this.audioContext.createGain();
+		this.masterAnalyser = this.audioContext.createAnalyser();
+		this.masterGainNode.connect(this.masterAnalyser);
+		this.masterAnalyser.connect(this.audioContext.destination);
 	}
 
-	async play(clips: Clip[], fromTime: number = 0): Promise<void> {
+	// Overload signatures
+	async play(tracks: Track[], fromTime?: number): Promise<void>;
+	async play(clips: Clip[], fromTime: number): Promise<void>;
+	// Implementation
+	async play(
+		tracksOrClips: Track[] | Clip[],
+		fromTime: number = 0,
+	): Promise<void> {
 		if (this.state === "playing") return;
 
 		this.stop(); // Clear any existing playback
@@ -52,6 +87,35 @@ export class Transport extends EventTarget {
 		this.playbackStartTime = fromTime;
 		this.contextStartTime = this.audioContext.currentTime;
 
+		// Check if tracks or clips
+		if (tracksOrClips.length > 0 && "clips" in tracksOrClips[0]) {
+			// It's tracks - extract clips and use track-based play
+			const tracks = tracksOrClips as Track[];
+			await this.initializeWithTracks(tracks);
+
+			// Build clip-to-track mapping
+			this.clipToTrackMap.clear();
+			const clips: Clip[] = [];
+			for (const track of tracks) {
+				if (track.clips) {
+					for (const clip of track.clips) {
+						this.clipToTrackMap.set(clip.id, track.id);
+						clips.push(clip);
+					}
+				}
+			}
+
+			// Use clips-based play
+			await this.playClips(clips, fromTime);
+		} else {
+			// It's clips - clear mapping (no track routing)
+			this.clipToTrackMap.clear();
+			const clips = tracksOrClips as Clip[];
+			await this.playClips(clips, fromTime);
+		}
+	}
+
+	private async playClips(clips: Clip[], fromTime: number): Promise<void> {
 		// Schedule all clips
 		for (const clip of clips) {
 			this.scheduleClip(clip, fromTime);
@@ -67,6 +131,9 @@ export class Transport extends EventTarget {
 				},
 			}),
 		);
+
+		// Start time update loop
+		this.startTimeUpdateLoop();
 	}
 
 	private async scheduleClip(clip: Clip, playbackStart: number): Promise<void> {
@@ -81,8 +148,23 @@ export class Transport extends EventTarget {
 				clipGainNode: this.audioContext.createGain(),
 				audioSources: [],
 			};
-			// Connect clip gain to destination (future: connect to track envelope/mute/solo chain)
-			clipState.clipGainNode.connect(this.audioContext.destination);
+
+			// Route through track gain chain if track exists, otherwise direct to destination
+			const trackId = this.clipToTrackMap.get(clip.id);
+			if (trackId) {
+				const trackState = this.trackStates.get(trackId);
+				if (trackState) {
+					// Route: clipGain → envelopeGain → muteSoloGain → destination (master added in Phase 3)
+					clipState.clipGainNode.connect(trackState.envelopeGainNode);
+				} else {
+					// Fallback: direct to destination if track not found
+					clipState.clipGainNode.connect(this.audioContext.destination);
+				}
+			} else {
+				// No track association: direct to destination (legacy clips-only mode)
+				clipState.clipGainNode.connect(this.audioContext.destination);
+			}
+
 			this.clipStates.set(clip.id, clipState);
 		}
 
@@ -244,6 +326,9 @@ export class Transport extends EventTarget {
 	stop(): void {
 		this.state = "stopped";
 
+		// Stop time update loop
+		this.stopTimeUpdateLoop();
+
 		// Stop all active nodes
 		for (const node of this.activeNodes) {
 			try {
@@ -330,5 +415,117 @@ export class Transport extends EventTarget {
 
 	getState(): TransportState {
 		return this.state;
+	}
+
+	/**
+	 * Initialize tracks with gain chain setup
+	 * Must be called before play() when using track-based playback
+	 */
+	async initializeWithTracks(tracks: Track[]): Promise<void> {
+		this.trackStates.clear();
+		for (const track of tracks) {
+			const envelopeGainNode = this.audioContext.createGain();
+			const muteSoloGainNode = this.audioContext.createGain();
+
+			// Connect envelope → muteSolo → master
+			envelopeGainNode.connect(muteSoloGainNode);
+			if (this.masterGainNode) {
+				muteSoloGainNode.connect(this.masterGainNode);
+			}
+
+			this.trackStates.set(track.id, {
+				envelopeGainNode,
+				muteSoloGainNode,
+				clipStates: new Map(),
+			});
+		}
+	}
+
+	/**
+	 * Update track volume (in dB)
+	 */
+	updateTrackVolume(trackId: string, volumeDb: number): void {
+		const trackState = this.trackStates.get(trackId);
+		if (trackState) {
+			// Convert dB to linear gain: gain = 10^(dB/20)
+			const linearGain = 10 ** (volumeDb / 20);
+			trackState.envelopeGainNode.gain.value = linearGain;
+		}
+	}
+
+	/**
+	 * Update track mute state
+	 */
+	updateTrackMute(trackId: string, muted: boolean): void {
+		const trackState = this.trackStates.get(trackId);
+		if (trackState) {
+			trackState.muteSoloGainNode.gain.value = muted ? 0 : 1;
+		}
+	}
+
+	/**
+	 * Set master volume (linear gain, 0-1)
+	 */
+	setMasterVolume(volume: number): void {
+		if (this.masterGainNode) {
+			this.masterGainNode.gain.value = volume;
+		}
+	}
+
+	/**
+	 * Get master meter level in dB
+	 */
+	getMasterDb(): number {
+		if (!this.masterAnalyser) {
+			return Number.NEGATIVE_INFINITY;
+		}
+
+		const bufferLength = this.masterAnalyser.frequencyBinCount;
+		const dataArray = new Float32Array(bufferLength);
+		this.masterAnalyser.getFloatTimeDomainData(dataArray);
+
+		// Calculate RMS
+		let sum = 0;
+		for (let i = 0; i < bufferLength; i++) {
+			sum += dataArray[i] * dataArray[i];
+		}
+		const rms = Math.sqrt(sum / bufferLength);
+
+		// Convert to dB: dB = 20 * log10(rms)
+		// Clamp to avoid -Infinity for silence
+		if (rms < 1e-10) {
+			return Number.NEGATIVE_INFINITY;
+		}
+		return 20 * Math.log10(rms);
+	}
+
+	/**
+	 * Start RAF-based time update loop
+	 */
+	private startTimeUpdateLoop(): void {
+		this.stopTimeUpdateLoop(); // Ensure no existing loop
+
+		const update = () => {
+			if (this.state === "playing") {
+				this.dispatchEvent(
+					new CustomEvent("time-update", {
+						detail: { currentTime: this.getCurrentTime() },
+					}),
+				);
+				this.timeUpdateLoop = requestAnimationFrame(update);
+			}
+		};
+
+		update();
+	}
+
+	/**
+	 * Stop RAF-based time update loop
+	 */
+	private stopTimeUpdateLoop(): void {
+		if (this.timeUpdateLoop !== null) {
+			cancelAnimationFrame(this.timeUpdateLoop);
+			this.timeUpdateLoop = null;
+		}
 	}
 }

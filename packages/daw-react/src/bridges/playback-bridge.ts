@@ -6,7 +6,7 @@
 
 "use client";
 
-import type { DAW } from "@wav0/daw-sdk";
+import type { DAW, Track } from "@wav0/daw-sdk";
 
 /**
  * Bridge between legacy playbackService and new Transport
@@ -39,10 +39,68 @@ export class PlaybackServiceBridge {
 	}
 
 	/**
-	 * Play through legacy service (SDK not yet fully integrated)
+	 * Play - tries new SDK Transport first, falls back to legacy if error
 	 */
-	async play(tracks: any[], fromTime?: number): Promise<void> {
-		await this.legacyService.play(tracks, fromTime);
+	async play(
+		tracks: Track[],
+		options?: {
+			startTime?: number;
+			onTimeUpdate?: (time: number) => void;
+			onPlaybackEnd?: () => void;
+		},
+	): Promise<void> {
+		try {
+			const transport = this.sdk.getTransport();
+			
+			// Initialize tracks
+			await transport.initializeWithTracks(tracks);
+			
+			// Convert startTime from seconds to milliseconds
+			const fromTime = options?.startTime ? options.startTime * 1000 : 0;
+			
+			// Play through new SDK first (this may call stop() internally)
+			await transport.play(tracks, fromTime);
+			
+			// Set up event listeners AFTER play() completes to avoid catching
+			// the initial stop event that play() dispatches internally
+			if (options?.onTimeUpdate || options?.onPlaybackEnd) {
+				const handleTimeUpdate = ((event: CustomEvent) => {
+					const { currentTime } = event.detail;
+					// Convert from milliseconds to seconds for callback
+					options?.onTimeUpdate?.(currentTime / 1000);
+				}) as EventListener;
+				
+				const handleStop = ((event: CustomEvent) => {
+					const { type } = event.detail;
+					if (type === "stop") {
+						options?.onPlaybackEnd?.();
+					}
+				}) as EventListener;
+				
+				transport.addEventListener("time-update", handleTimeUpdate);
+				transport.addEventListener("transport", handleStop);
+				
+				// Cleanup listeners after playback ends
+				const cleanup = () => {
+					transport.removeEventListener("time-update", handleTimeUpdate);
+					transport.removeEventListener("transport", handleStop);
+				};
+				
+				// Store cleanup for later
+				this.cleanupFns.push(cleanup);
+			}
+		} catch (err) {
+			console.warn("[PlaybackBridge] Using legacy playback", err);
+			// Fallback to legacy
+			await this.legacyService.play(tracks, options || {});
+		}
+	}
+
+	/**
+	 * Initialize tracks with playback engine (required before play)
+	 */
+	async initializeWithTracks(tracks: Track[]): Promise<void> {
+		await this.legacyService.initializeWithTracks(tracks);
 	}
 
 	/**
@@ -123,17 +181,29 @@ export class PlaybackServiceBridge {
 	}
 
 	/**
-	 * Get master meter level in dB
+	 * Get master meter level in dB - tries SDK first, falls back to legacy
 	 */
 	getMasterMeterDb(): number {
-		return this.legacyService.getMasterDb();
+		try {
+			const transport = this.sdk.getTransport();
+			return transport.getMasterDb();
+		} catch (err) {
+			console.warn("[PlaybackBridge] Using legacy getMasterDb", err);
+			return this.legacyService.getMasterDb();
+		}
 	}
 
 	/**
-	 * Set master volume
+	 * Set master volume - tries SDK first, falls back to legacy
 	 */
 	setMasterVolume(volume: number): void {
-		this.legacyService.setMasterVolume(volume);
+		try {
+			const transport = this.sdk.getTransport();
+			transport.setMasterVolume(volume);
+		} catch (err) {
+			console.warn("[PlaybackBridge] Using legacy setMasterVolume", err);
+			this.legacyService.setMasterVolume(volume);
+		}
 	}
 
 	/**
