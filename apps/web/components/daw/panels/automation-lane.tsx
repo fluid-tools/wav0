@@ -8,6 +8,7 @@ import type { Track, TrackEnvelopePoint } from "@/lib/daw-sdk";
 import {
 	addAutomationPoint,
 	automationViewEnabledAtom,
+	horizontalScrollAtom,
 	migrateAutomationToSegments,
 	playbackAtom,
 	resolveClipRelativePoint,
@@ -30,6 +31,7 @@ export function AutomationLane({
 	const [playback] = useAtom(playbackAtom);
 	const [, updateTrack] = useAtom(updateTrackAtom);
 	const [automationViewEnabled] = useAtom(automationViewEnabledAtom);
+	const [horizontalScroll] = useAtom(horizontalScrollAtom);
 	const [draggingPoint, setDraggingPoint] = useState<{
 		pointId: string;
 		startX: number;
@@ -94,13 +96,26 @@ export function AutomationLane({
 			const deltaTime = deltaX / pxPerMs;
 			const newTime = Math.max(0, draggingPoint.startTime + deltaTime);
 
+			// Build clip start time map for clip-bound points
+			const clipStartTimeMap = new Map<string, number>(
+				(track.clips ?? []).map((c) => [c.id, c.startTime]),
+			);
+
 			// Update point in envelope
 			if (!envelope) return;
-			const updatedPoints = envelope.points.map((p) =>
-				p.id === draggingPoint.pointId
-					? { ...p, value: newValue, time: newTime }
-					: p,
-			);
+			const updatedPoints = envelope.points.map((p) => {
+				if (p.id !== draggingPoint.pointId) return p;
+				// Also update clipRelativeTime for clip-bound points
+				const clipStartTime = p.clipId
+					? clipStartTimeMap.get(p.clipId) ?? 0
+					: 0;
+				return {
+					...p,
+					value: newValue,
+					time: newTime,
+					...(p.clipId && { clipRelativeTime: newTime - clipStartTime }),
+				};
+			});
 
 			updateTrack(track.id, {
 				volumeEnvelope: {
@@ -109,7 +124,7 @@ export function AutomationLane({
 				},
 			});
 		},
-		[draggingPoint, trackHeight, envelope, track.id, updateTrack, pxPerMs],
+		[draggingPoint, trackHeight, envelope, track.id, track.clips, updateTrack, pxPerMs],
 	);
 
 	const handlePointerUp = useCallback(
@@ -311,6 +326,7 @@ export function AutomationLane({
 			track={track}
 			trackHeight={trackHeight}
 			pxPerMs={pxPerMs}
+			scrollLeft={horizontalScroll}
 		>
 			{/* biome-ignore lint/a11y/useKeyWithClickEvents: Click requires mouse coordinates; keyboard access via context menu */}
 			<svg

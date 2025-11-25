@@ -1,33 +1,63 @@
 /**
- * WAV0 DAW SDK
+ * WAV0 DAW SDK - Legacy Compatibility Layer
  *
- * Modular, type-safe, SDK-level DAW library for web-based audio production.
- * Built with MediaBunny, Zod, and modern web APIs.
+ * This module re-exports from @wav0/daw-react and @wav0/daw-sdk packages,
+ * along with legacy atoms not yet migrated.
  *
+ * New code should import directly from @wav0/daw-react instead.
+ *
+ * @deprecated Use @wav0/daw-react directly for new code
  * @module daw-sdk
  */
 
-// ===== Core Constants =====
-export * from "./core/audio-scheduling-constants";
-// ===== Core Services =====
+// ===== Re-exports from @wav0/daw-sdk =====
+// Utilities as namespaces
+export { automation, curves, time, volume } from "@wav0/daw-sdk";
+
+// Types
+export type {
+	AudioData,
+	AutomationType,
+	Clip,
+	ClipInspectorTarget,
+	PlaybackOptions,
+	PlaybackState,
+	ProjectMarker,
+	TimelineSection,
+	TimelineState,
+	Tool,
+	Track,
+	TrackEnvelope,
+	TrackEnvelopePoint,
+	TrackEnvelopeSegment,
+	TransportEvent,
+	TransportState,
+} from "@wav0/daw-sdk";
+
+// ===== Legacy Services (still required during migration) =====
 export type { LoadedAudioTrack } from "./core/audio-service";
 export { AudioService, audioService } from "./core/audio-service";
 export { PlaybackService, playbackService } from "./core/playback-service";
-// ===== Core Types =====
+
+// ===== Legacy Core Types =====
 export * from "./core/types";
 
-// ===== React Hooks =====
+// ===== Legacy Audio Scheduling Constants =====
+export * from "./core/audio-scheduling-constants";
+
+// ===== Legacy React Hooks =====
 export * from "./hooks/use-clip-inspector";
 export * from "./hooks/use-drag-interaction";
 export * from "./hooks/use-live-automation-gain";
 export * from "./hooks/use-playback-sync";
 
-// ===== State Management =====
+// ===== Legacy State Management (Atoms) =====
+// All atoms and write atoms - this is the main export during migration
 export * from "./state";
-// ===== Utilities (Pure Functions) =====
-// NOTE: Core utils migrated to @wav0/daw-sdk namespaces (time, volume, automation, curves)
-// Migration and helper functions remain here temporarily
+
+// ===== Legacy Utilities (Migration/Helpers) =====
 export * from "./state/automation-migration";
-// ===== Type Schemas & Validation =====
-export * from "./types/schemas";
 export * from "./utils/automation-migration-helpers";
+
+// ===== Legacy Type Schemas (Zod validators) =====
+export * from "./types/schemas";

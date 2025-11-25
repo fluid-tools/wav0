@@ -25,6 +25,7 @@ type AutomationContextMenuProps = {
 	track: Track;
 	trackHeight: number;
 	pxPerMs: number;
+	scrollLeft?: number;
 	onAddPoint?: (point: TrackEnvelopePoint) => void;
 	children: React.ReactNode;
 };
@@ -33,6 +34,7 @@ export function AutomationContextMenu({
 	track,
 	trackHeight,
 	pxPerMs,
+	scrollLeft = 0,
 	onAddPoint,
 	children,
 }: AutomationContextMenuProps) {
@@ -58,7 +60,8 @@ export function AutomationContextMenu({
 	const handleAddPoint = () => {
 		if (!contextMenuState || !track.volumeEnvelope) return;
 
-		const time = contextMenuState.x / pxPerMs;
+		// Account for scroll offset
+		const time = (contextMenuState.x + scrollLeft) / pxPerMs;
 		const padding = 20;
 		const usableHeight = trackHeight - padding * 2;
 		const normalizedY =
@@ -83,8 +86,8 @@ export function AutomationContextMenu({
 	const handleDeletePoint = () => {
 		if (!contextMenuState || !track.volumeEnvelope) return;
 
-		// Find point near cursor
-		const time = contextMenuState.x / pxPerMs;
+		// Find point near cursor (account for scroll offset)
+		const time = (contextMenuState.x + scrollLeft) / pxPerMs;
 		const nearestPoint = track.volumeEnvelope.points.reduce(
 			(nearest, point) => {
 				const dist = Math.abs(point.time - time);
@@ -105,10 +108,15 @@ export function AutomationContextMenu({
 		}
 	};
 
-	const handleResetSegmentCurve = () => {
+	/**
+	 * Set segment curve at cursor to the given value
+	 * @param curveValue -99 to +99 (negative = ease in, positive = ease out, 0 = linear)
+	 */
+	const handleSetSegmentCurve = (curveValue: number) => {
 		if (!contextMenuState || !track.volumeEnvelope) return;
 
-		const time = contextMenuState.x / pxPerMs;
+		// Account for scroll offset
+		const time = (contextMenuState.x + scrollLeft) / pxPerMs;
 		const sorted = [...track.volumeEnvelope.points].sort(
 			(a, b) => a.time - b.time,
 		);
@@ -127,7 +135,7 @@ export function AutomationContextMenu({
 					const updatedEnvelope = updateSegmentCurve(
 						track.volumeEnvelope,
 						segment.id,
-						0,
+						curveValue,
 					);
 
 					updateTrack(track.id, {
@@ -138,6 +146,8 @@ export function AutomationContextMenu({
 			}
 		}
 	};
+
+	const handleResetSegmentCurve = () => handleSetSegmentCurve(0);
 
 	const handleCopyAutomation = () => {
 		if (!track.volumeEnvelope) return;
@@ -151,7 +161,8 @@ export function AutomationContextMenu({
 	const handlePasteAutomation = () => {
 		if (!copiedAutomation || !contextMenuState) return;
 
-		const offset = contextMenuState.x / pxPerMs;
+		// Account for scroll offset
+		const offset = (contextMenuState.x + scrollLeft) / pxPerMs;
 		const minTime = Math.min(...copiedAutomation.points.map((p) => p.time));
 
 		// Create mapping from old point IDs to new point IDs
@@ -210,7 +221,19 @@ export function AutomationContextMenu({
 				</ContextMenuItem>
 				<ContextMenuSeparator />
 				<ContextMenuItem onClick={handleResetSegmentCurve}>
-					Reset Segment Curve
+					Linear (Reset Curve)
+				</ContextMenuItem>
+				<ContextMenuItem onClick={() => handleSetSegmentCurve(-50)}>
+					Ease In
+				</ContextMenuItem>
+				<ContextMenuItem onClick={() => handleSetSegmentCurve(50)}>
+					Ease Out
+				</ContextMenuItem>
+				<ContextMenuItem onClick={() => handleSetSegmentCurve(-75)}>
+					Strong Ease In
+				</ContextMenuItem>
+				<ContextMenuItem onClick={() => handleSetSegmentCurve(75)}>
+					Strong Ease Out
 				</ContextMenuItem>
 				<ContextMenuSeparator />
 				<ContextMenuItem onClick={handleCopyAutomation}>

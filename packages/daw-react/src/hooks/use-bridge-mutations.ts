@@ -26,7 +26,7 @@ export interface BridgeMutations {
 	deleteFromOPFS: (trackId: string) => Promise<void>;
 
 	// Playback operations
-	play: (clips: Clip[], fromTime?: number) => Promise<void>;
+	play: (tracks: Track[], fromTime?: number) => Promise<void>;
 	stop: () => void;
 	pause: () => void;
 	seek: (timeMs: number) => void;
@@ -117,12 +117,12 @@ export function useBridgeMutations(): BridgeMutations {
 
 	// Playback mutations
 	const handlePlay = useEffectEvent(
-		async (clips: Clip[], fromTime: number = 0) => {
+		async (tracks: Track[], fromTime: number = 0) => {
 			if (!playbackBridge) {
 				console.warn("[useBridgeMutations] Playback bridge not ready");
 				return;
 			}
-			await playbackBridge.play(clips, fromTime);
+			await playbackBridge.play(tracks, { startTime: fromTime / 1000 });
 		},
 	);
 

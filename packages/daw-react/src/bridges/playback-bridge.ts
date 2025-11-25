@@ -104,16 +104,29 @@ export class PlaybackServiceBridge {
 	}
 
 	/**
-	 * Stop playback through legacy service
+	 * Stop playback - uses SDK Transport first, falls back to legacy
 	 */
 	async stop(): Promise<void> {
+		try {
+			const transport = this.sdk.getTransport();
+			transport.stop();
+		} catch (err) {
+			console.warn("[PlaybackBridge] Using legacy stop", err);
+		}
+		// Always stop legacy too for safety
 		await this.legacyService.stop();
 	}
 
 	/**
-	 * Pause playback through legacy service
+	 * Pause playback - uses SDK Transport first, falls back to legacy
 	 */
 	async pause(): Promise<void> {
+		try {
+			const transport = this.sdk.getTransport();
+			transport.pause();
+		} catch (err) {
+			console.warn("[PlaybackBridge] Using legacy pause", err);
+		}
 		await this.legacyService.pause();
 	}
 
@@ -125,59 +138,111 @@ export class PlaybackServiceBridge {
 	}
 
 	/**
-	 * Seek to time through legacy service
+	 * Seek to time - uses SDK Transport first, falls back to legacy
 	 */
 	async seek(timeMs: number): Promise<void> {
+		try {
+			const transport = this.sdk.getTransport();
+			transport.seek(timeMs);
+		} catch (err) {
+			console.warn("[PlaybackBridge] Using legacy seek", err);
+		}
 		await this.legacyService.seek(timeMs);
 	}
 
 	/**
-	 * Get current playback time
+	 * Get current playback time - uses SDK Transport first
 	 */
 	getCurrentTime(): number {
-		return this.legacyService.getCurrentTime();
+		try {
+			const transport = this.sdk.getTransport();
+			return transport.getCurrentTime();
+		} catch (err) {
+			return this.legacyService.getCurrentTime();
+		}
 	}
 
 	/**
-	 * Check if playing
+	 * Check if playing - uses SDK Transport first
 	 */
 	isPlaying(): boolean {
-		return this.legacyService.isPlaying();
+		try {
+			const transport = this.sdk.getTransport();
+			return transport.getState() === "playing";
+		} catch (err) {
+			return this.legacyService.isPlaying();
+		}
 	}
 
 	/**
-	 * Update track volume
+	 * Update track volume - uses SDK Transport for realtime updates
 	 */
 	updateTrackVolume(trackId: string, volume: number): void {
+		try {
+			const transport = this.sdk.getTransport();
+			// Convert percentage to dB
+			const volumeDb = volume <= 0 ? Number.NEGATIVE_INFINITY : 20 * Math.log10(volume / 100);
+			transport.updateTrackVolumeRealtime(trackId, volumeDb);
+		} catch (err) {
+			console.warn("[PlaybackBridge] Using legacy updateTrackVolume", err);
+		}
 		this.legacyService.updateTrackVolume(trackId, volume);
 	}
 
 	/**
-	 * Update track mute state
+	 * Update track mute state - uses SDK Transport
+	 * @param trackId - Track ID to update
+	 * @param muted - Track's mute flag
+	 * @param isSoloed - Whether this track is soloed
+	 * @param soloEngaged - Whether any track has solo enabled
 	 */
-	updateTrackMute(trackId: string, muted: boolean, volume: number): void {
-		this.legacyService.updateTrackMute(trackId, muted, volume);
+	updateTrackMute(
+		trackId: string,
+		muted: boolean,
+		isSoloed: boolean,
+		soloEngaged: boolean,
+	): void {
+		try {
+			const transport = this.sdk.getTransport();
+			transport.updateTrackMute(trackId, muted, isSoloed, soloEngaged);
+		} catch (err) {
+			console.warn("[PlaybackBridge] Using legacy updateTrackMute", err);
+		}
+		// Legacy service still uses old signature (volume param unused for mute)
+		this.legacyService.updateTrackMute(trackId, muted, 75);
 	}
 
 	/**
-	 * Update solo states for all tracks
+	 * Update solo states for all tracks - uses SDK Transport
 	 */
-	updateSoloStates(tracks: any[]): void {
+	updateSoloStates(tracks: Track[]): void {
+		try {
+			const transport = this.sdk.getTransport();
+			transport.updateSoloStates(tracks);
+		} catch (err) {
+			console.warn("[PlaybackBridge] Using legacy updateSoloStates", err);
+		}
 		this.legacyService.updateSoloStates(tracks);
 	}
 
 	/**
-	 * Synchronize tracks with playback engine
+	 * Synchronize tracks with playback engine - uses SDK Transport
 	 */
-	synchronizeTracks(tracks: any[]): void {
-		this.legacyService.synchronizeTracks(tracks);
+	async synchronizeTracks(tracks: Track[]): Promise<void> {
+		try {
+			const transport = this.sdk.getTransport();
+			await transport.synchronizeTracks(tracks);
+		} catch (err) {
+			console.warn("[PlaybackBridge] Using legacy synchronizeTracks", err);
+		}
+		await this.legacyService.synchronizeTracks(tracks);
 	}
 
 	/**
 	 * Reschedule a specific track during playback
 	 */
-	async rescheduleTrack(track: any): Promise<void> {
-		await this.legacyService.rescheduleTrack(track);
+	async rescheduleTrack(track: Track, allTracks?: Track[]): Promise<void> {
+		await this.legacyService.rescheduleTrack(track, allTracks);
 	}
 
 	/**

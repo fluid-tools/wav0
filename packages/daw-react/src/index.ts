@@ -3,10 +3,18 @@
  * @version 0.1.0
  */
 
-// Re-export useful types and utils from SDK for convenience
+// Re-export useful types from SDK for convenience
 export type {
 	AudioData,
+	AutomationType,
 	Clip,
+	ClipInspectorTarget,
+	PlaybackOptions,
+	PlaybackState,
+	ProjectMarker,
+	TimelineSection,
+	TimelineState,
+	Tool,
 	Track,
 	TrackEnvelope,
 	TrackEnvelopePoint,
@@ -14,6 +22,7 @@ export type {
 	TransportEvent,
 	TransportState,
 } from "@wav0/daw-sdk";
+
 // Re-export utils for convenience (so components can import from one place)
 export { automation, curves, time, volume } from "@wav0/daw-sdk";
 
