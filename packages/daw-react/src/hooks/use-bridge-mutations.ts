@@ -5,9 +5,9 @@
 
 "use client";
 
+import type { Clip, Track } from "@wav0/daw-sdk";
 import { useCallback, useEffectEvent } from "react";
 import { useBridges } from "../providers/daw-provider";
-import type { Track, Clip } from "@wav0/daw-sdk";
 
 export interface BridgeMutations {
 	// Track operations

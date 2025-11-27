@@ -10,10 +10,6 @@
  * @module daw-sdk
  */
 
-// ===== Re-exports from @wav0/daw-sdk =====
-// Utilities as namespaces
-export { automation, curves, time, volume } from "@wav0/daw-sdk";
-
 // Types
 export type {
 	AudioData,
@@ -33,17 +29,17 @@ export type {
 	TransportEvent,
 	TransportState,
 } from "@wav0/daw-sdk";
-
+// ===== Re-exports from @wav0/daw-sdk =====
+// Utilities as namespaces
+export { automation, curves, time, volume } from "@wav0/daw-sdk";
+// ===== Legacy Audio Scheduling Constants =====
+export * from "./core/audio-scheduling-constants";
 // ===== Legacy Services (still required during migration) =====
 export type { LoadedAudioTrack } from "./core/audio-service";
 export { AudioService, audioService } from "./core/audio-service";
 export { PlaybackService, playbackService } from "./core/playback-service";
-
 // ===== Legacy Core Types =====
 export * from "./core/types";
-
-// ===== Legacy Audio Scheduling Constants =====
-export * from "./core/audio-scheduling-constants";
 
 // ===== Legacy React Hooks =====
 export * from "./hooks/use-clip-inspector";
@@ -57,7 +53,6 @@ export * from "./state";
 
 // ===== Legacy Utilities (Migration/Helpers) =====
 export * from "./state/automation-migration";
-export * from "./utils/automation-migration-helpers";
-
 // ===== Legacy Type Schemas (Zod validators) =====
 export * from "./types/schemas";
+export * from "./utils/automation-migration-helpers";

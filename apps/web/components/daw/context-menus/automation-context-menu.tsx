@@ -17,6 +17,7 @@ import type {
 import {
 	addAutomationPoint,
 	removeAutomationPoint,
+	resolveClipRelativePoint,
 	updateSegmentCurve,
 	updateTrackAtom,
 } from "@/lib/daw-sdk";
@@ -88,7 +89,14 @@ export function AutomationContextMenu({
 
 		// Find point near cursor (account for scroll offset)
 		const time = (contextMenuState.x + scrollLeft) / pxPerMs;
-		const nearestPoint = track.volumeEnvelope.points.reduce(
+
+		// Resolve clip-relative points to absolute time before comparison
+		const resolvedPoints = track.volumeEnvelope.points.map((point) => {
+			const clip = track.clips?.find((c) => c.id === point.clipId);
+			return clip ? resolveClipRelativePoint(point, clip.startTime) : point;
+		});
+
+		const nearestPoint = resolvedPoints.reduce(
 			(nearest, point) => {
 				const dist = Math.abs(point.time - time);
 				return dist < nearest.dist ? { point, dist } : nearest;
@@ -96,6 +104,7 @@ export function AutomationContextMenu({
 			{ point: null as TrackEnvelopePoint | null, dist: Infinity },
 		);
 
+		// Use original point ID since resolved points maintain IDs
 		if (nearestPoint.point && nearestPoint.dist < 100) {
 			const updatedEnvelope = removeAutomationPoint(
 				track.volumeEnvelope,
@@ -152,14 +161,26 @@ export function AutomationContextMenu({
 	const handleCopyAutomation = () => {
 		if (!track.volumeEnvelope) return;
 
+		// Resolve clip-relative points to absolute time for copy
+		const resolvedPoints = track.volumeEnvelope.points.map((point) => {
+			const clip = track.clips?.find((c) => c.id === point.clipId);
+			const resolved = clip
+				? resolveClipRelativePoint(point, clip.startTime)
+				: point;
+			// Strip clip binding - copied points become track-level
+			const { clipId: _, clipRelativeTime: __, ...rest } = resolved;
+			return rest;
+		});
+
 		setCopiedAutomation({
-			points: track.volumeEnvelope.points,
+			points: resolvedPoints,
 			segments: track.volumeEnvelope.segments || [],
 		});
 	};
 
 	const handlePasteAutomation = () => {
 		if (!copiedAutomation || !contextMenuState) return;
+		if (copiedAutomation.points.length === 0) return;
 
 		// Account for scroll offset
 		const offset = (contextMenuState.x + scrollLeft) / pxPerMs;
