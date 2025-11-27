@@ -15,6 +15,7 @@ import { atom } from "jotai";
 import {
 	createDefaultEnvelope,
 	createDefaultTrack,
+	DEFAULT_TRACK_1,
 	playbackAtom,
 	projectEndOverrideAtom,
 	selectedClipIdAtom,
@@ -327,7 +328,12 @@ export const selectedTrackAtom = atom((get) => {
 });
 
 export const clearTracksAtom = atom(null, (_get, set) => {
-	const defaultTrack = createDefaultTrack("Track 1", "#3b82f6");
+	// Create fresh copy of default track to avoid mutations (preserves stable ID)
+	const defaultTrack: Track = {
+		...DEFAULT_TRACK_1,
+		clips: [],
+		volumeEnvelope: createDefaultEnvelope(75),
+	};
 	set(tracksAtom, [defaultTrack]);
 	set(selectedTrackIdAtom, null);
 	set(selectedClipIdAtom, null);
@@ -338,7 +344,12 @@ export const clearTracksAtom = atom(null, (_get, set) => {
 export const resetProjectAtom = atom(null, (_get, set) => {
 	serviceRegistry.playbackService?.stop().catch(console.error);
 
-	const defaultTrack = createDefaultTrack("Track 1", "#3b82f6");
+	// Create fresh copy of default track to avoid mutations (preserves stable ID)
+	const defaultTrack: Track = {
+		...DEFAULT_TRACK_1,
+		clips: [],
+		volumeEnvelope: createDefaultEnvelope(75),
+	};
 	set(tracksAtom, [defaultTrack]);
 	set(selectedTrackIdAtom, null);
 	set(selectedClipIdAtom, null);

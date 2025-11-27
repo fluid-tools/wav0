@@ -2,7 +2,7 @@
  * WAV0 DAW SDK - Legacy Compatibility Layer
  *
  * This module re-exports from @wav0/daw-react and @wav0/daw-sdk packages,
- * along with legacy atoms not yet migrated.
+ * along with legacy services that haven't been fully migrated.
  *
  * New code should import directly from @wav0/daw-react instead.
  *
@@ -10,7 +10,7 @@
  * @module daw-sdk
  */
 
-// Types
+// ===== Types from @wav0/daw-sdk =====
 export type {
 	AudioData,
 	AutomationType,
@@ -29,30 +29,47 @@ export type {
 	TransportEvent,
 	TransportState,
 } from "@wav0/daw-sdk";
-// ===== Re-exports from @wav0/daw-sdk =====
-// Utilities as namespaces
+
+// ===== Utilities from @wav0/daw-sdk =====
 export { automation, curves, time, volume } from "@wav0/daw-sdk";
-// ===== Legacy Audio Scheduling Constants =====
-export * from "./core/audio-scheduling-constants";
+
+// ===== Constants from @wav0/daw-sdk =====
+export {
+	DAW_PIXELS_PER_SECOND_AT_ZOOM_1,
+	DAW_TIMELINE_HEADER_HEIGHT,
+	DAW_DEFAULT_TRACK_HEIGHT,
+	DAW_MIN_TRACK_HEIGHT,
+	DAW_MAX_TRACK_HEIGHT,
+} from "@wav0/daw-sdk";
+
+// ===== All atoms from @wav0/daw-react =====
+export * from "@wav0/daw-react/atoms";
+
+// ===== Hooks from @wav0/daw-react =====
+export {
+	useDragInteraction,
+	useKeyboardShortcut,
+	useClipInspector,
+	useLiveAutomationGain,
+	useTimebase,
+} from "@wav0/daw-react/hooks";
+export type { DragState } from "@wav0/daw-react/hooks";
+
 // ===== Legacy Services (still required during migration) =====
 export type { LoadedAudioTrack } from "./core/audio-service";
 export { AudioService, audioService } from "./core/audio-service";
 export { PlaybackService, playbackService } from "./core/playback-service";
+
 // ===== Legacy Core Types =====
 export * from "./core/types";
 
-// ===== Legacy React Hooks =====
-export * from "./hooks/use-clip-inspector";
-export * from "./hooks/use-drag-interaction";
-export * from "./hooks/use-live-automation-gain";
-export * from "./hooks/use-playback-sync";
-
-// ===== Legacy State Management (Atoms) =====
-// All atoms and write atoms - this is the main export during migration
-export * from "./state";
+// ===== Legacy Audio Scheduling Constants (some may duplicate SDK) =====
+export * from "./core/audio-scheduling-constants";
 
 // ===== Legacy Utilities (Migration/Helpers) =====
+// These helpers are still used by some components
 export * from "./state/automation-migration";
+export * from "./utils/automation-migration-helpers";
+
 // ===== Legacy Type Schemas (Zod validators) =====
 export * from "./types/schemas";
-export * from "./utils/automation-migration-helpers";

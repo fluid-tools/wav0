@@ -57,7 +57,7 @@ export function createDefaultTrack(name: string, color: string): Track {
  * Default Track 1 for new projects
  * Uses stable ID to prevent mismatches with localStorage persistence
  */
-const DEFAULT_TRACK_1: Track = {
+export const DEFAULT_TRACK_1: Track = {
 	...createDefaultTrack("Track 1", "#3b82f6"),
 	id: "default-track-1",
 };
@@ -85,11 +85,10 @@ export const playbackAtom = atom<PlaybackState>({
 
 /**
  * Extended timeline state for snap granularity
+ * NOTE: TimelineState from SDK now includes these fields, but we extend here
+ * for backwards compatibility until all usages are updated
  */
-export type ExtendedTimelineState = TimelineState & {
-	snapGranularity?: "fine" | "medium" | "coarse";
-	customSnapIntervalMs?: number;
-};
+export type ExtendedTimelineState = TimelineState;
 
 /**
  * Timeline state (volatile - not persisted)

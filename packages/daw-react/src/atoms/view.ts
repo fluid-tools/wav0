@@ -1,0 +1,227 @@
+/**
+ * Viewport and derived metrics atoms
+ */
+
+"use client";
+
+import {
+	DAW_PIXELS_PER_SECOND_AT_ZOOM_1,
+	time,
+	type TimelineState,
+} from "@wav0/daw-sdk";
+import { atom } from "jotai";
+import {
+	horizontalScrollAtom,
+	playbackAtom,
+	timelineAtom,
+	totalDurationAtom,
+} from "./base";
+import { gridAtom, musicalMetadataAtom } from "./project";
+
+export type TimelineViewportMetrics = {
+	pxPerMs: number;
+	zoom: number;
+	horizontalScroll: number;
+	playheadViewportPx: number;
+	projectEndViewportPx: number;
+};
+
+export const timelineViewportAtom = atom<TimelineViewportMetrics>((get) => {
+	const timeline = get(timelineAtom);
+	const playback = get(playbackAtom);
+	const scroll = get(horizontalScrollAtom);
+	const durationMs = get(totalDurationAtom);
+
+	const pxPerMs = (DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * timeline.zoom) / 1000;
+	const clampedPxPerMs = Number.isFinite(pxPerMs) ? pxPerMs : 0;
+	const clampedScroll = Number.isFinite(scroll) ? scroll : 0;
+	const safeCurrentTime = Number.isFinite(playback.currentTime)
+		? playback.currentTime
+		: 0;
+	const safeDurationMs = Number.isFinite(durationMs) ? durationMs : 0;
+
+	return {
+		pxPerMs: clampedPxPerMs,
+		zoom: timeline.zoom,
+		horizontalScroll: clampedScroll,
+		// Use unified timeToPixel function for perfect sync with grid markers
+		playheadViewportPx: Math.round(
+			time.timeToPixel(safeCurrentTime, clampedPxPerMs, clampedScroll),
+		),
+		projectEndViewportPx: Math.round(
+			time.timeToPixel(safeDurationMs, clampedPxPerMs, clampedScroll),
+		),
+	};
+});
+
+export const timelineWidthAtom = atom((get) => {
+	const durationMs = get(totalDurationAtom);
+	const { pxPerMs, zoom } = get(timelineViewportAtom);
+	const durationPx = durationMs * pxPerMs;
+	const paddingPx = DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * zoom * 2;
+	return durationPx + paddingPx;
+});
+
+export const projectEndPositionAtom = atom((get) => {
+	const durationMs = get(totalDurationAtom);
+	const { pxPerMs } = get(timelineViewportAtom);
+	return durationMs * pxPerMs;
+});
+
+export const playheadViewportPxAtom = atom(
+	(get) => get(timelineViewportAtom).playheadViewportPx,
+);
+
+export const projectEndViewportPxAtom = atom(
+	(get) => get(timelineViewportAtom).projectEndViewportPx,
+);
+
+export const timelinePxPerMsAtom = atom(
+	(get) => get(timelineViewportAtom).pxPerMs,
+);
+
+export const playheadViewportAtom = atom((get) => {
+	const { pxPerMs, horizontalScroll } = get(timelineViewportAtom);
+	const playback = get(playbackAtom);
+	// Use unified timeToPixel function - same calculation as grid markers
+	const viewportPx = time.timeToPixel(
+		playback.currentTime,
+		pxPerMs,
+		horizontalScroll,
+	);
+	const absolutePx = playback.currentTime * pxPerMs;
+	return {
+		absolutePx,
+		// Round only at final pixel position for canvas rendering
+		viewportPx: Math.round(viewportPx),
+		ms: playback.currentTime,
+	};
+});
+
+// TimelineState now includes snapGranularity and customSnapIntervalMs from SDK
+
+// Snap interval atom - derives snap interval from grid mode, BPM, and granularity
+export const snapIntervalMsAtom = atom((get) => {
+	const grid = get(gridAtom);
+	const timeline = get(timelineAtom) ;
+	const music = get(musicalMetadataAtom);
+	const { snapGranularity, customSnapIntervalMs } = timeline;
+
+	if (snapGranularity === "custom" && customSnapIntervalMs !== undefined) {
+		return customSnapIntervalMs;
+	}
+
+	if (grid.mode === "time") {
+		// For time mode, derive from granularity
+		switch (snapGranularity) {
+			case "coarse":
+				return 1000; // 1 second
+			case "fine":
+				return 100; // 100ms
+			default:
+				return 500; // 500ms
+		}
+	}
+
+	// For bars mode, derive from grid resolution and granularity
+	const den = music.timeSignature.den;
+	const secondsPerBeat = (60 / music.tempoBpm) * (4 / den);
+	const baseDivisionBeats = time.getDivisionBeats(
+		grid.resolution,
+		music.timeSignature,
+	);
+	const subdivBeats = grid.triplet ? baseDivisionBeats / 3 : baseDivisionBeats;
+
+	switch (snapGranularity) {
+		case "coarse":
+			// Coarse: 1/4 notes (or division if larger)
+			return Math.max(
+				baseDivisionBeats * secondsPerBeat * 1000,
+				secondsPerBeat * 1000,
+			);
+		case "fine": {
+			// Fine: 1/16 of subdivision (or minimum 1/32 note)
+			const fineBeats = subdivBeats / 4;
+			return Math.max(fineBeats * secondsPerBeat * 1000, 50);
+		}
+		default:
+			// Medium: use current subdivision
+			return subdivBeats * secondsPerBeat * 1000;
+	}
+});
+
+// Cache key for time grid - uses pixel viewport instead of time viewport
+export const timeGridCacheKeyAtom = atom((get) => {
+	const pxPerMs = get(timelinePxPerMsAtom);
+	const horizontalScroll = get(horizontalScrollAtom);
+	const timelineWidth = get(timelineWidthAtom);
+	const timeline = get(timelineAtom) ;
+	const snapInterval = timeline.snapToGrid ? get(snapIntervalMsAtom) : null;
+
+	// Use exact pixel values - no rounding needed since we're using pixel viewport
+	// Round scrollLeft and width to pixels (they're already integers in practice)
+	return JSON.stringify({
+		pxPerMs: Number.isFinite(pxPerMs) ? pxPerMs : 0,
+		scrollLeft: Number.isFinite(horizontalScroll)
+			? Math.round(horizontalScroll)
+			: 0,
+		width: Number.isFinite(timelineWidth) ? Math.round(timelineWidth) : 0,
+		snapInterval,
+		snapToGrid: timeline.snapToGrid,
+	});
+});
+
+// Cached time grid atom with memoization
+const timeGridCache = new Map<
+	string,
+	ReturnType<typeof time.generateTimeGrid>
+>();
+
+export const cachedTimeGridAtom = atom((get) => {
+	const grid = get(gridAtom);
+	const timeline = get(timelineAtom) ;
+
+	// Only generate time grid if mode is "time"
+	if (grid.mode !== "time") {
+		return { majors: [], minors: [] };
+	}
+
+	const cacheKey = get(timeGridCacheKeyAtom);
+
+	// Return cached result if available
+	const cached = timeGridCache.get(cacheKey);
+	if (cached) {
+		return cached;
+	}
+
+	// Compute new time grid using pixel viewport
+	const pxPerMs = get(timelinePxPerMsAtom);
+	const horizontalScroll = get(horizontalScrollAtom);
+	const timelineWidth = get(timelineWidthAtom);
+
+	// Pass snap interval when snap is enabled to align visual grid with snap points
+	const snapIntervalMs = timeline.snapToGrid
+		? get(snapIntervalMsAtom)
+		: undefined;
+
+	const result = time.generateTimeGrid({
+		scrollLeft: horizontalScroll,
+		width: timelineWidth,
+		pxPerMs,
+		snapIntervalMs,
+	});
+
+	// Cache the result
+	timeGridCache.set(cacheKey, result);
+
+	// Limit cache size to prevent memory leaks
+	if (timeGridCache.size > 50) {
+		const firstKey = timeGridCache.keys().next().value;
+		if (firstKey) {
+			timeGridCache.delete(firstKey);
+		}
+	}
+
+	return result;
+});
+

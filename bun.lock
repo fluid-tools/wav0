@@ -103,6 +103,7 @@
         "@wav0/daw-sdk": "workspace:*",
         "idb-keyval": "^6.2.2",
         "jotai": "^2.15.0",
+        "jotai-xstate": "^0.6.1",
         "xstate": "^5.23.0",
       },
       "devDependencies": {

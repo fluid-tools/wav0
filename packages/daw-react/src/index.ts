@@ -26,6 +26,15 @@ export type {
 // Re-export utils for convenience (so components can import from one place)
 export { automation, curves, time, volume } from "@wav0/daw-sdk";
 
+// Re-export visual constants
+export {
+	DAW_PIXELS_PER_SECOND_AT_ZOOM_1,
+	DAW_TIMELINE_HEADER_HEIGHT,
+	DAW_DEFAULT_TRACK_HEIGHT,
+	DAW_MIN_TRACK_HEIGHT,
+	DAW_MAX_TRACK_HEIGHT,
+} from "@wav0/daw-sdk";
+
 // Atoms
 export * from "./atoms";
 // Bridges (for migration)

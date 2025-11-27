@@ -105,15 +105,32 @@ export function AutomationLane({
 			if (!envelope) return;
 			const updatedPoints = envelope.points.map((p) => {
 				if (p.id !== draggingPoint.pointId) return p;
-				// Also update clipRelativeTime for clip-bound points
-				const clipStartTime = p.clipId
-					? clipStartTimeMap.get(p.clipId) ?? 0
-					: 0;
+
+				// Check if clip still exists (only if point is clip-bound)
+				if (p.clipId) {
+					const clipExists = clipStartTimeMap.has(p.clipId);
+
+					// If clip was deleted, unbind the point (convert to track-level)
+					if (!clipExists) {
+						const { clipId: _, clipRelativeTime: __, ...rest } = p;
+						return { ...rest, value: newValue, time: newTime };
+					}
+
+					// Clip exists, update with clip-relative time
+					const clipStartTime = clipStartTimeMap.get(p.clipId)!;
+					return {
+						...p,
+						value: newValue,
+						time: newTime,
+						clipRelativeTime: newTime - clipStartTime,
+					};
+				}
+
+				// Track-level point (no clip binding)
 				return {
 					...p,
 					value: newValue,
 					time: newTime,
-					...(p.clipId && { clipRelativeTime: newTime - clipStartTime }),
 				};
 			});
 
@@ -154,8 +171,8 @@ export function AutomationLane({
 			const x = e.clientX - rect.left;
 			const y = e.clientY - rect.top;
 
-			// Convert pixel position to time and value
-			const time = x / pxPerMs;
+			// Convert pixel position to time and value (account for horizontal scroll)
+			const time = (x + horizontalScroll) / pxPerMs;
 			const padding = 20;
 			const usableHeight = trackHeight - padding * 2;
 			const normalizedY = (trackHeight - padding - y) / usableHeight;
@@ -175,7 +192,7 @@ export function AutomationLane({
 				volumeEnvelope: updatedEnvelope,
 			});
 		},
-		[envelope, pxPerMs, trackHeight, track.id, updateTrack],
+		[envelope, pxPerMs, trackHeight, track.id, updateTrack, horizontalScroll],
 	);
 
 	// Lock scroll while dragging automation point

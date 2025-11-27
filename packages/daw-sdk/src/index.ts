@@ -18,6 +18,15 @@ export {
 	START_GRACE_SEC,
 } from "./core/audio-scheduling-constants";
 
+// Visual/timeline constants
+export {
+	DAW_PIXELS_PER_SECOND_AT_ZOOM_1,
+	DAW_TIMELINE_HEADER_HEIGHT,
+	DAW_DEFAULT_TRACK_HEIGHT,
+	DAW_MIN_TRACK_HEIGHT,
+	DAW_MAX_TRACK_HEIGHT,
+} from "./core/visual-constants";
+
 // Core types
 export type * from "./types/core";
 export type * from "./types/schemas";

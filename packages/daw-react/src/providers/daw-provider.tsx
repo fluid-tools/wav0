@@ -11,8 +11,10 @@ import {
 	type ReactNode,
 	useContext,
 	useEffect,
+	useRef,
 	useState,
 } from "react";
+import { registerServices } from "../atoms/service-registry";
 import { AudioServiceBridge, PlaybackServiceBridge } from "../bridges";
 import { useDAW } from "../hooks/use-daw";
 import { type StorageAdapter, setStorageAdapter } from "../storage/adapter";
@@ -47,6 +49,19 @@ export function DAWProvider({
 		playback: PlaybackServiceBridge | null;
 	}>({ audio: null, playback: null });
 
+	// Track if we've registered services (survives re-renders)
+	const hasRegistered = useRef(false);
+
+	// Register services SYNCHRONOUSLY during render (before children mount)
+	// This ensures atoms can access services immediately when they render
+	if ((legacyAudioService || legacyPlaybackService) && !hasRegistered.current) {
+		registerServices({
+			audioService: legacyAudioService,
+			playbackService: legacyPlaybackService,
+		});
+		hasRegistered.current = true;
+	}
+
 	// Set storage adapter if provided
 	useEffect(() => {
 		if (storageAdapter) {
@@ -54,7 +69,7 @@ export function DAWProvider({
 		}
 	}, [storageAdapter]);
 
-	// Setup bridges if legacy services provided
+	// Setup bridges if legacy services provided (bridges need daw, but registry doesn't)
 	useEffect(() => {
 		if (!daw) return;
 
@@ -76,6 +91,17 @@ export function DAWProvider({
 			playbackBridge?.dispose();
 		};
 	}, [daw, legacyAudioService, legacyPlaybackService]);
+
+	// Cleanup registry on unmount (separate effect to handle cleanup only)
+	useEffect(() => {
+		return () => {
+			registerServices({
+				audioService: undefined,
+				playbackService: undefined,
+			});
+			hasRegistered.current = false;
+		};
+	}, []);
 
 	// Don't block render - allow children to mount even if DAW not ready
 	const contextValue: DAWContextValue | null = daw

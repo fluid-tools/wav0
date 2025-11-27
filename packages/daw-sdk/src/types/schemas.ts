@@ -111,6 +111,11 @@ export const TimelineStateSchema = z.object({
 	scrollPosition: z.number().min(0),
 	snapToGrid: z.boolean(),
 	gridSize: z.number().min(0),
+	snapGranularity: z
+		.enum(["coarse", "medium", "fine", "custom"])
+		.optional()
+		.default("medium"),
+	customSnapIntervalMs: z.number().min(1).optional(),
 });
 
 export type TimelineState = z.infer<typeof TimelineStateSchema>;

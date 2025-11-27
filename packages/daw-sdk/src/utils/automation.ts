@@ -230,6 +230,99 @@ export namespace automation {
 	}
 
 	/**
+	 * Resolve clip-relative point to absolute time
+	 */
+	export function resolveClipRelativePoint(
+		point: TrackEnvelopePoint,
+		clipStartTime: number,
+	): TrackEnvelopePoint {
+		// If clipRelativeTime is defined, use it directly
+		// Otherwise, if clip-bound, derive relative time from absolute time
+		// If not clip-bound, point.time is already absolute
+		const relativeTime =
+			point.clipRelativeTime !== undefined
+				? point.clipRelativeTime
+				: point.clipId
+					? point.time - clipStartTime // Derive relative time from absolute time
+					: point.time; // Not clip-bound: use absolute time as-is
+		return {
+			...point,
+			time: relativeTime + clipStartTime,
+			clipId: undefined,
+		};
+	}
+
+	/**
+	 * Migrate old envelope format to segment-based format
+	 * Handles legacy envelopes with curve/curveShape on points
+	 */
+	export function migrateAutomationToSegments(
+		envelope: TrackEnvelope,
+	): TrackEnvelope {
+		// Check if already migrated (has segments)
+		if (envelope.segments && envelope.segments.length > 0) {
+			return envelope; // Already migrated
+		}
+
+		// Old envelope point format with curve/curveShape on points
+		type LegacyEnvelopePoint = TrackEnvelopePoint & {
+			curve?: string;
+			curveShape?: number;
+		};
+
+		// Check if old format (points with curve/curveShape)
+		const hasOldFormat = envelope.points.some(
+			(p): p is LegacyEnvelopePoint => "curve" in p || "curveShape" in p,
+		);
+
+		if (!hasOldFormat) {
+			// New format but no segments yet - generate default linear segments
+			const segments: TrackEnvelopeSegment[] = [];
+			for (let i = 0; i < envelope.points.length - 1; i++) {
+				segments.push({
+					id: crypto.randomUUID(),
+					fromPointId: envelope.points[i].id,
+					toPointId: envelope.points[i + 1].id,
+					curve: 0, // Linear
+				});
+			}
+			return { ...envelope, segments };
+		}
+
+		// Migrate from old format
+		const cleanedPoints: TrackEnvelopePoint[] = envelope.points.map((p) => {
+			const {
+				curve: _curve,
+				curveShape: _curveShape,
+				...rest
+			} = p as LegacyEnvelopePoint;
+			return rest;
+		});
+
+		const segments: TrackEnvelopeSegment[] = [];
+		for (let i = 0; i < cleanedPoints.length - 1; i++) {
+			const p = envelope.points[i] as LegacyEnvelopePoint;
+			const nextP = cleanedPoints[i + 1];
+
+			// Convert old curveShape to new curve value (-99 to +99)
+			let curveValue = 0; // default linear
+			if (typeof p.curveShape === "number") {
+				// Old curveShape was 0-1, map to -99 to +99
+				curveValue = (p.curveShape - 0.5) * 2 * 99;
+			}
+
+			segments.push({
+				id: crypto.randomUUID(),
+				fromPointId: cleanedPoints[i].id,
+				toPointId: nextP.id,
+				curve: curveValue,
+			});
+		}
+
+		return { ...envelope, points: cleanedPoints, segments };
+	}
+
+	/**
 	 * Rebuild envelope to enforce adjacency invariant
 	 */
 	export function rebuildEnvelope(envelope: TrackEnvelope): TrackEnvelope {

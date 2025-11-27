@@ -83,6 +83,10 @@ export class Transport extends EventTarget {
 	>();
 	/** Mutex lock for atomic sync operations */
 	private syncLock: Promise<void> = Promise.resolve();
+	/** Time when playback was paused (for resume) */
+	private pausedTime = 0;
+	/** Tracks snapshot for resume */
+	private pausedTracks: Track[] = [];
 
 	constructor(
 		private audioEngine: AudioEngine,
@@ -402,19 +406,64 @@ export class Transport extends EventTarget {
 
 	pause(): void {
 		if (this.state !== "playing") return;
+
+		// Store current time for resume
+		this.pausedTime = this.getCurrentTime();
+
+		// Store tracks snapshot for resume
+		this.pausedTracks = Array.from(this.currentTracks.values());
+
 		this.state = "paused";
-		this.stop(); // For now, pause is same as stop
+
+		// Stop time update loop
+		this.stopTimeUpdateLoop();
+
+		// Stop all active nodes
+		for (const node of this.activeNodes) {
+			try {
+				node.stop();
+			} catch (e) {
+				// Ignore errors from already-stopped nodes
+			}
+		}
+		this.activeNodes.clear();
+
+		// Clean up clip states but keep track states for resume
+		for (const [, clipState] of this.clipStates) {
+			for (const source of clipState.audioSources) {
+				try {
+					source.stop();
+					source.disconnect();
+				} catch (e) {
+					// Ignore errors
+				}
+			}
+			clipState.audioSources = [];
+		}
 
 		this.dispatchEvent(
 			new CustomEvent<TransportEvent>("transport", {
 				detail: {
 					type: "pause",
 					state: "paused",
-					currentTime: this.getCurrentTime(),
-					timestamp: this.getCurrentTime(),
+					currentTime: this.pausedTime,
+					timestamp: this.pausedTime,
 				},
 			}),
 		);
+	}
+
+	/**
+	 * Resume playback from paused position
+	 */
+	async resume(): Promise<void> {
+		if (this.state !== "paused") return;
+
+		// Resume from paused time with stored tracks
+		// play() already dispatches "play" event via playClips(), no need to dispatch again
+		if (this.pausedTracks.length > 0) {
+			await this.play(this.pausedTracks, this.pausedTime);
+		}
 	}
 
 	seek(timeMs: number): void {

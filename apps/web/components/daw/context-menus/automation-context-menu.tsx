@@ -126,9 +126,14 @@ export function AutomationContextMenu({
 
 		// Account for scroll offset
 		const time = (contextMenuState.x + scrollLeft) / pxPerMs;
-		const sorted = [...track.volumeEnvelope.points].sort(
-			(a, b) => a.time - b.time,
-		);
+
+		// Resolve clip-relative points to absolute time before sorting (consistent with handleDeletePoint)
+		const sorted = [...track.volumeEnvelope.points]
+			.map((point) => {
+				const clip = track.clips?.find((c) => c.id === point.clipId);
+				return clip ? resolveClipRelativePoint(point, clip.startTime) : point;
+			})
+			.sort((a, b) => a.time - b.time);
 
 		// Find segment at cursor
 		for (let i = 0; i < sorted.length - 1; i++) {

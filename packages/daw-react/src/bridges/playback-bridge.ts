@@ -1,7 +1,6 @@
 /**
  * Playback Service Bridge
- * Wraps legacy playbackService singleton with new SDK Transport
- * Maintains bidirectional sync during migration
+ * Primary interface to SDK Transport with legacy fallback for rescheduleTrack
  */
 
 "use client";
@@ -9,8 +8,8 @@
 import type { DAW, Track } from "@wav0/daw-sdk";
 
 /**
- * Bridge between legacy playbackService and new Transport
- * Forwards method calls and syncs state
+ * Bridge between React components and SDK Transport
+ * SDK-first approach - legacy only used for features not yet in SDK
  */
 export class PlaybackServiceBridge {
 	private cleanupFns: (() => void)[] = [];
@@ -25,11 +24,10 @@ export class PlaybackServiceBridge {
 	private setupEventSync(): void {
 		const transport = this.sdk.getTransport();
 
-		// Sync Transport events → legacy service state
+		// Log Transport events for debugging
 		const handleStateChange = ((event: CustomEvent) => {
 			const { state, currentTime } = event.detail;
 			console.log("[PlaybackBridge] Transport state:", state, currentTime);
-			// Legacy service manages its own state for now
 		}) as EventListener;
 
 		transport.addEventListener("transport", handleStateChange);
@@ -39,7 +37,7 @@ export class PlaybackServiceBridge {
 	}
 
 	/**
-	 * Play - tries new SDK Transport first, falls back to legacy if error
+	 * Play tracks from specified time
 	 */
 	async play(
 		tracks: Track[],
@@ -49,50 +47,42 @@ export class PlaybackServiceBridge {
 			onPlaybackEnd?: () => void;
 		},
 	): Promise<void> {
-		try {
-			const transport = this.sdk.getTransport();
-			
-			// Initialize tracks
-			await transport.initializeWithTracks(tracks);
-			
-			// Convert startTime from seconds to milliseconds
-			const fromTime = options?.startTime ? options.startTime * 1000 : 0;
-			
-			// Play through new SDK first (this may call stop() internally)
-			await transport.play(tracks, fromTime);
-			
-			// Set up event listeners AFTER play() completes to avoid catching
-			// the initial stop event that play() dispatches internally
-			if (options?.onTimeUpdate || options?.onPlaybackEnd) {
-				const handleTimeUpdate = ((event: CustomEvent) => {
-					const { currentTime } = event.detail;
-					// Convert from milliseconds to seconds for callback
-					options?.onTimeUpdate?.(currentTime / 1000);
-				}) as EventListener;
-				
-				const handleStop = ((event: CustomEvent) => {
-					const { type } = event.detail;
-					if (type === "stop") {
-						options?.onPlaybackEnd?.();
-					}
-				}) as EventListener;
-				
-				transport.addEventListener("time-update", handleTimeUpdate);
-				transport.addEventListener("transport", handleStop);
-				
-				// Cleanup listeners after playback ends
-				const cleanup = () => {
-					transport.removeEventListener("time-update", handleTimeUpdate);
-					transport.removeEventListener("transport", handleStop);
-				};
-				
-				// Store cleanup for later
-				this.cleanupFns.push(cleanup);
-			}
-		} catch (err) {
-			console.warn("[PlaybackBridge] Using legacy playback", err);
-			// Fallback to legacy
-			await this.legacyService.play(tracks, options || {});
+		const transport = this.sdk.getTransport();
+
+		// Initialize tracks
+		await transport.initializeWithTracks(tracks);
+
+		// Convert startTime from seconds to milliseconds
+		const fromTime = options?.startTime ? options.startTime * 1000 : 0;
+
+		// Play through SDK Transport
+		await transport.play(tracks, fromTime);
+
+		// Set up event listeners for callbacks
+		if (options?.onTimeUpdate || options?.onPlaybackEnd) {
+			const handleTimeUpdate = ((event: CustomEvent) => {
+				const { currentTime } = event.detail;
+				// Convert from milliseconds to seconds for callback
+				options?.onTimeUpdate?.(currentTime / 1000);
+			}) as EventListener;
+
+			const handleStop = ((event: CustomEvent) => {
+				const { type } = event.detail;
+				if (type === "stop") {
+					options?.onPlaybackEnd?.();
+				}
+			}) as EventListener;
+
+			transport.addEventListener("time-update", handleTimeUpdate);
+			transport.addEventListener("transport", handleStop);
+
+			// Cleanup listeners after playback ends
+			const cleanup = () => {
+				transport.removeEventListener("time-update", handleTimeUpdate);
+				transport.removeEventListener("transport", handleStop);
+			};
+
+			this.cleanupFns.push(cleanup);
 		}
 	}
 
@@ -100,97 +90,71 @@ export class PlaybackServiceBridge {
 	 * Initialize tracks with playback engine (required before play)
 	 */
 	async initializeWithTracks(tracks: Track[]): Promise<void> {
-		await this.legacyService.initializeWithTracks(tracks);
+		const transport = this.sdk.getTransport();
+		await transport.initializeWithTracks(tracks);
 	}
 
 	/**
-	 * Stop playback - uses SDK Transport first, falls back to legacy
+	 * Stop playback
 	 */
 	async stop(): Promise<void> {
-		try {
-			const transport = this.sdk.getTransport();
-			transport.stop();
-		} catch (err) {
-			console.warn("[PlaybackBridge] Using legacy stop", err);
-		}
-		// Always stop legacy too for safety
-		await this.legacyService.stop();
+		const transport = this.sdk.getTransport();
+		transport.stop();
 	}
 
 	/**
-	 * Pause playback - uses SDK Transport first, falls back to legacy
+	 * Pause playback
 	 */
 	async pause(): Promise<void> {
-		try {
-			const transport = this.sdk.getTransport();
-			transport.pause();
-		} catch (err) {
-			console.warn("[PlaybackBridge] Using legacy pause", err);
-		}
-		await this.legacyService.pause();
+		const transport = this.sdk.getTransport();
+		transport.pause();
 	}
 
 	/**
-	 * Resume playback through legacy service
+	 * Resume playback from paused position
 	 */
 	async resume(): Promise<void> {
-		await this.legacyService.resume();
+		const transport = this.sdk.getTransport();
+		await transport.resume();
 	}
 
 	/**
-	 * Seek to time - uses SDK Transport first, falls back to legacy
+	 * Seek to time
 	 */
 	async seek(timeMs: number): Promise<void> {
-		try {
-			const transport = this.sdk.getTransport();
-			transport.seek(timeMs);
-		} catch (err) {
-			console.warn("[PlaybackBridge] Using legacy seek", err);
-		}
-		await this.legacyService.seek(timeMs);
+		const transport = this.sdk.getTransport();
+		transport.seek(timeMs);
 	}
 
 	/**
-	 * Get current playback time - uses SDK Transport first
+	 * Get current playback time
 	 */
 	getCurrentTime(): number {
-		try {
-			const transport = this.sdk.getTransport();
-			return transport.getCurrentTime();
-		} catch (err) {
-			return this.legacyService.getCurrentTime();
-		}
+		const transport = this.sdk.getTransport();
+		return transport.getCurrentTime();
 	}
 
 	/**
-	 * Check if playing - uses SDK Transport first
+	 * Check if playing
 	 */
 	isPlaying(): boolean {
-		try {
-			const transport = this.sdk.getTransport();
-			return transport.getState() === "playing";
-		} catch (err) {
-			return this.legacyService.isPlaying();
-		}
+		const transport = this.sdk.getTransport();
+		return transport.getState() === "playing";
 	}
 
 	/**
-	 * Update track volume - uses SDK Transport for realtime updates
+	 * Update track volume (realtime during playback)
 	 */
 	updateTrackVolume(trackId: string, volume: number): void {
-		try {
-			const transport = this.sdk.getTransport();
-			// Convert percentage to dB
-			const volumeDb = volume <= 0 ? Number.NEGATIVE_INFINITY : 20 * Math.log10(volume / 100);
-			transport.updateTrackVolumeRealtime(trackId, volumeDb);
-		} catch (err) {
-			console.warn("[PlaybackBridge] Using legacy updateTrackVolume", err);
-		}
-		this.legacyService.updateTrackVolume(trackId, volume);
+		const transport = this.sdk.getTransport();
+		// Convert percentage to dB
+		const volumeDb =
+			volume <= 0 ? Number.NEGATIVE_INFINITY : 20 * Math.log10(volume / 100);
+		transport.updateTrackVolumeRealtime(trackId, volumeDb);
 	}
 
 	/**
-	 * Update track mute state - uses SDK Transport
+	 * Update track mute state
 	 * @param trackId - Track ID to update
 	 * @param muted - Track's mute flag
 	 * @param isSoloed - Whether this track is soloed
@@ -202,73 +166,48 @@ export class PlaybackServiceBridge {
 		isSoloed: boolean,
 		soloEngaged: boolean,
 	): void {
-		try {
-			const transport = this.sdk.getTransport();
-			transport.updateTrackMute(trackId, muted, isSoloed, soloEngaged);
-		} catch (err) {
-			console.warn("[PlaybackBridge] Using legacy updateTrackMute", err);
-		}
-		// Legacy service still uses old signature (volume param unused for mute)
-		this.legacyService.updateTrackMute(trackId, muted, 75);
+		const transport = this.sdk.getTransport();
+		transport.updateTrackMute(trackId, muted, isSoloed, soloEngaged);
 	}
 
 	/**
-	 * Update solo states for all tracks - uses SDK Transport
+	 * Update solo states for all tracks
 	 */
 	updateSoloStates(tracks: Track[]): void {
-		try {
-			const transport = this.sdk.getTransport();
-			transport.updateSoloStates(tracks);
-		} catch (err) {
-			console.warn("[PlaybackBridge] Using legacy updateSoloStates", err);
-		}
-		this.legacyService.updateSoloStates(tracks);
+		const transport = this.sdk.getTransport();
+		transport.updateSoloStates(tracks);
 	}
 
 	/**
-	 * Synchronize tracks with playback engine - uses SDK Transport
+	 * Synchronize tracks with playback engine
 	 */
 	async synchronizeTracks(tracks: Track[]): Promise<void> {
-		try {
-			const transport = this.sdk.getTransport();
-			await transport.synchronizeTracks(tracks);
-		} catch (err) {
-			console.warn("[PlaybackBridge] Using legacy synchronizeTracks", err);
-		}
-		await this.legacyService.synchronizeTracks(tracks);
+		const transport = this.sdk.getTransport();
+		await transport.synchronizeTracks(tracks);
 	}
 
 	/**
 	 * Reschedule a specific track during playback
+	 * NOTE: Still uses legacy service - SDK reschedule not fully implemented
 	 */
 	async rescheduleTrack(track: Track, allTracks?: Track[]): Promise<void> {
 		await this.legacyService.rescheduleTrack(track, allTracks);
 	}
 
 	/**
-	 * Get master meter level in dB - tries SDK first, falls back to legacy
+	 * Get master meter level in dB
 	 */
 	getMasterMeterDb(): number {
-		try {
-			const transport = this.sdk.getTransport();
-			return transport.getMasterDb();
-		} catch (err) {
-			console.warn("[PlaybackBridge] Using legacy getMasterDb", err);
-			return this.legacyService.getMasterDb();
-		}
+		const transport = this.sdk.getTransport();
+		return transport.getMasterDb();
 	}
 
 	/**
-	 * Set master volume - tries SDK first, falls back to legacy
+	 * Set master volume
 	 */
 	setMasterVolume(volume: number): void {
-		try {
-			const transport = this.sdk.getTransport();
-			transport.setMasterVolume(volume);
-		} catch (err) {
-			console.warn("[PlaybackBridge] Using legacy setMasterVolume", err);
-			this.legacyService.setMasterVolume(volume);
-		}
+		const transport = this.sdk.getTransport();
+		transport.setMasterVolume(volume);
 	}
 
 	/**

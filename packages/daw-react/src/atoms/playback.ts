@@ -12,16 +12,21 @@ import { serviceRegistry } from "./service-registry";
 
 // ===== Guarded Time Update =====
 
-let lastUpdateTime = 0;
-let lastUpdateMs = 0;
-let isFirstUpdate = true;
-
+/**
+ * Creates a time update callback with isolated throttling state.
+ * Each playback session gets its own state to avoid cross-session interference.
+ */
 function createGuardedTimeUpdateCallback(get: Getter, set: Setter) {
+	// Per-instance throttling state (not shared across sessions)
+	let lastUpdateTime = 0;
+	let lastUpdateMs = 0;
+	let isFirstUpdate = true;
+
 	return (timeSeconds: number) => {
 		const currentMs = Math.max(0, timeSeconds * 1000);
 		const now = performance.now();
 
-		// Detect playback restart
+		// Detect playback restart (time jumped backwards significantly)
 		if (currentMs < lastUpdateMs - 100) {
 			isFirstUpdate = true;
 		}
@@ -29,7 +34,7 @@ function createGuardedTimeUpdateCallback(get: Getter, set: Setter) {
 		// Prevent updates if time hasn't changed meaningfully
 		if (!isFirstUpdate && Math.abs(currentMs - lastUpdateMs) < 0.01) return;
 
-		// Smart throttling
+		// Smart throttling: skip if both time and update interval are small
 		const timeDelta = Math.abs(currentMs - lastUpdateMs);
 		if (!isFirstUpdate && now - lastUpdateTime < 8 && timeDelta < 10) return;
 
@@ -51,7 +56,7 @@ function createGuardedTimeUpdateCallback(get: Getter, set: Setter) {
 			return;
 		}
 
-		// Only update if value changed
+		// Only update atom if value changed meaningfully
 		if (Math.abs(newPlayback.currentTime - currentMs) >= 0.01) {
 			set(playbackAtom, { ...newPlayback, currentTime: currentMs });
 		}
@@ -110,23 +115,20 @@ export const togglePlaybackAtom = atom(null, async (get, set) => {
 	if (playback.isPlaying) {
 		await serviceRegistry.playbackService.pause();
 		set(playbackAtom, { ...playback, isPlaying: false });
-		isFirstUpdate = true;
 		return;
 	}
 
 	const currentTimeSeconds = playback.currentTime / 1000;
 
-	isFirstUpdate = true;
-
 	await serviceRegistry.playbackService.initializeWithTracks(tracks);
 
+	// Each play() call creates a fresh callback with its own throttling state
 	await serviceRegistry.playbackService.play(tracks, {
 		startTime: currentTimeSeconds,
 		onTimeUpdate: createGuardedTimeUpdateCallback(get, set),
 		onPlaybackEnd: () => {
 			const endState = get(playbackAtom);
 			set(playbackAtom, { ...endState, isPlaying: false });
-			isFirstUpdate = true;
 		},
 	});
 
@@ -142,7 +144,6 @@ export const stopPlaybackAtom = atom(null, async (get, set) => {
 	await serviceRegistry.playbackService.stop();
 	const playback = get(playbackAtom);
 	set(playbackAtom, { ...playback, isPlaying: false });
-	isFirstUpdate = true;
 });
 
 export const setCurrentTimeAtom = atom(
@@ -157,15 +158,13 @@ export const setCurrentTimeAtom = atom(
 
 		await serviceRegistry.playbackService.pause();
 
-		isFirstUpdate = true;
-
+		// Each play() call creates a fresh callback with its own throttling state
 		await serviceRegistry.playbackService.play(tracks, {
 			startTime: timeMs / 1000,
 			onTimeUpdate: createGuardedTimeUpdateCallback(get, set),
 			onPlaybackEnd: () => {
 				const endState = get(playbackAtom);
 				set(playbackAtom, { ...endState, isPlaying: false });
-				isFirstUpdate = true;
 			},
 		});
 	},
