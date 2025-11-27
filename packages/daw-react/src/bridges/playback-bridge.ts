@@ -13,12 +13,23 @@ import type { DAW, Track } from "@wav0/daw-sdk";
  */
 export class PlaybackServiceBridge {
 	private cleanupFns: (() => void)[] = [];
+	private playbackCleanup: (() => void) | null = null;
 
 	constructor(
 		private sdk: DAW,
 		private legacyService: any,
 	) {
 		this.setupEventSync();
+	}
+
+	/**
+	 * Clean up listeners from previous playback session
+	 */
+	private cleanupPlaybackListeners(): void {
+		if (this.playbackCleanup) {
+			this.playbackCleanup();
+			this.playbackCleanup = null;
+		}
 	}
 
 	private setupEventSync(): void {
@@ -47,6 +58,9 @@ export class PlaybackServiceBridge {
 			onPlaybackEnd?: () => void;
 		},
 	): Promise<void> {
+		// Clean up listeners from previous playback session
+		this.cleanupPlaybackListeners();
+
 		const transport = this.sdk.getTransport();
 
 		// Initialize tracks
@@ -70,19 +84,19 @@ export class PlaybackServiceBridge {
 				const { type } = event.detail;
 				if (type === "stop") {
 					options?.onPlaybackEnd?.();
+					// Clean up listeners when playback ends naturally
+					this.cleanupPlaybackListeners();
 				}
 			}) as EventListener;
 
 			transport.addEventListener("time-update", handleTimeUpdate);
 			transport.addEventListener("transport", handleStop);
 
-			// Cleanup listeners after playback ends
-			const cleanup = () => {
+			// Store cleanup for this playback session
+			this.playbackCleanup = () => {
 				transport.removeEventListener("time-update", handleTimeUpdate);
 				transport.removeEventListener("transport", handleStop);
 			};
-
-			this.cleanupFns.push(cleanup);
 		}
 	}
 
@@ -214,6 +228,9 @@ export class PlaybackServiceBridge {
 	 * Cleanup bridge resources
 	 */
 	dispose(): void {
+		// Clean up playback session listeners
+		this.cleanupPlaybackListeners();
+		// Clean up persistent listeners (e.g., event sync)
 		for (const cleanup of this.cleanupFns) {
 			cleanup();
 		}

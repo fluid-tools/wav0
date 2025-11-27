@@ -1,11 +1,15 @@
 /**
  * DAW Provider - App-wide SDK access via React Context
+ *
+ * Service Registration Strategy:
+ * 1. Legacy services are registered SYNCHRONOUSLY during render (before any effects)
+ * 2. When DAW becomes available, bridges are created and RE-REGISTERED (upgrading from legacy)
+ * 3. This ensures services are always available for child effects
  */
 
 "use client";
 
 import type { DAW, DAWConfig } from "@wav0/daw-sdk";
-import { Provider as JotaiProvider } from "jotai";
 import {
 	createContext,
 	type ReactNode,
@@ -49,27 +53,29 @@ export function DAWProvider({
 		playback: PlaybackServiceBridge | null;
 	}>({ audio: null, playback: null });
 
-	// Track if we've registered services (survives re-renders)
-	const hasRegistered = useRef(false);
+	// Track if we've done initial registration to avoid redundant calls
+	const initialRegistrationDone = useRef(false);
 
-	// Register services SYNCHRONOUSLY during render (before children mount)
-	// This ensures atoms can access services immediately when they render
-	if ((legacyAudioService || legacyPlaybackService) && !hasRegistered.current) {
+	// IMMEDIATE registration of legacy services (synchronous, during render)
+	// This ensures services are available BEFORE any child effects run
+	// React effects run child-to-parent, so without this, child effects would
+	// fail with "Audio service not registered"
+	if (!initialRegistrationDone.current && legacyAudioService) {
 		registerServices({
 			audioService: legacyAudioService,
 			playbackService: legacyPlaybackService,
 		});
-		hasRegistered.current = true;
+		initialRegistrationDone.current = true;
 	}
 
-	// Set storage adapter if provided
-	useEffect(() => {
-		if (storageAdapter) {
-			setStorageAdapter(storageAdapter);
-		}
-	}, [storageAdapter]);
+	// Set storage adapter synchronously if provided (before effects)
+	if (storageAdapter) {
+		setStorageAdapter(storageAdapter);
+	}
 
-	// Setup bridges if legacy services provided (bridges need daw, but registry doesn't)
+	// Setup bridges and RE-REGISTER them to service registry
+	// Bridges wrap legacy services and provide SDK Transport integration
+	// This upgrades from legacy services to bridges when DAW becomes available
 	useEffect(() => {
 		if (!daw) return;
 
@@ -86,22 +92,25 @@ export function DAWProvider({
 
 		setBridges({ audio: audioBridge, playback: playbackBridge });
 
+		// RE-REGISTER with bridges (upgrading from legacy)
+		// Atoms calling serviceRegistry.playbackService will now get the bridge
+		// which properly converts volume to dB for SDK Transport
+		registerServices({
+			audioService: audioBridge ?? legacyAudioService,
+			playbackService: playbackBridge ?? legacyPlaybackService,
+		});
+
 		return () => {
 			audioBridge?.dispose();
 			playbackBridge?.dispose();
+			// On cleanup, fall back to legacy services (not undefined)
+			// This prevents "service not registered" errors during hot reload
+			registerServices({
+				audioService: legacyAudioService,
+				playbackService: legacyPlaybackService,
+			});
 		};
 	}, [daw, legacyAudioService, legacyPlaybackService]);
-
-	// Cleanup registry on unmount (separate effect to handle cleanup only)
-	useEffect(() => {
-		return () => {
-			registerServices({
-				audioService: undefined,
-				playbackService: undefined,
-			});
-			hasRegistered.current = false;
-		};
-	}, []);
 
 	// Don't block render - allow children to mount even if DAW not ready
 	const contextValue: DAWContextValue | null = daw

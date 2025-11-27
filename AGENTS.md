@@ -164,6 +164,10 @@ Concise rules for building accessible, fast, delightful UIs Use MUST/SHOULD/NEVE
 - SHOULD: Match browser UI to bg
 - SHOULD: Avoid gradient banding (use masks when needed)
 
+## MCP Server Instructions
+* Firecrawl MCP for crawling, scraping, and more.
+* Context7 MCP for docs - for instance, if you need up-to-date docs on the Web Audio API or React, you can use the context7 mcp to search the web for the latest docs. or if you want the latest React docs. any documentation sourcing for libs can be done with context7.
+* Use next-devtools MCP for Next.js devtools.
 
 ## Web Interface Guidelines
 - https://vercel.com/design/guidelines
@@ -180,8 +184,3 @@ For playback engine (specifically, the audio manager/context), we have chosen th
 - MEDIA BUNNY GUIDE: https://mediabunny.dev/guide/introduction
 - MEDIA BUNNY EXAMPLES: https://mediabunny.dev/examples
 - WEB AUDIO API DOCS: https://webaudio.github.io/web-audio-api/
-
-## MCP Server Instructions
-* Firecrawl MCP for crawling, scraping, and more.
-* Context7 MCP for docs - for instance, if you need up-to-date docs on the Web Audio API or React, you can use the context7 mcp to search the web for the latest docs. or if you want the latest React docs.
-

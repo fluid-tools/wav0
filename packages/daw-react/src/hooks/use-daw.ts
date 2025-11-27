@@ -5,30 +5,30 @@
 "use client";
 
 import { createDAW, type DAW, type DAWConfig } from "@wav0/daw-sdk";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export function useDAW(config?: DAWConfig): DAW | undefined {
-	const dawRef = useRef<DAW | undefined>(undefined);
+	const [daw, setDaw] = useState<DAW | undefined>(undefined);
 	const configRef = useRef(config);
 
 	useEffect(() => {
-		dawRef.current = createDAW(configRef.current || {});
+		const instance = createDAW(configRef.current || {});
+		setDaw(instance);
 
 		// Resume audio context on user interaction
 		const handleInteraction = () => {
-			dawRef.current?.resumeContext();
+			instance.resumeContext();
 		};
 
 		document.addEventListener("click", handleInteraction, { once: true });
 		document.addEventListener("keydown", handleInteraction, { once: true });
 
 		return () => {
-			dawRef.current?.dispose();
+			instance.dispose();
 			document.removeEventListener("click", handleInteraction);
 			document.removeEventListener("keydown", handleInteraction);
 		};
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
-	return dawRef.current;
+	return daw;
 }

@@ -56,8 +56,8 @@ export namespace automation {
 			if (timeMs >= p1.time && timeMs <= p2.time) {
 				const progress = (timeMs - p1.time) / (p2.time - p1.time);
 
-				// Find segment for this point pair
-				const segment = envelope.segments.find(
+				// Find segment for this point pair (segments may be undefined for legacy envelopes)
+				const segment = envelope.segments?.find(
 					(s) => s.fromPointId === p1.id && s.toPointId === p2.id,
 				);
 
@@ -248,7 +248,7 @@ export namespace automation {
 		return {
 			...point,
 			time: relativeTime + clipStartTime,
-			clipId: undefined,
+			// clipId preserved - caller may need to track original binding
 		};
 	}
 

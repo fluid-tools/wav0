@@ -11,6 +11,7 @@
 
 * Firecrawl MCP for crawling, scraping, and more.
 * Context7 MCP for docs - !! use context7 !! use ctx7
+* Use next-devtools MCP for Next.js devtools.
 
 ---
 

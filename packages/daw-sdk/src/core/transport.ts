@@ -1007,8 +1007,14 @@ export class Transport extends EventTarget {
 			});
 			return;
 		}
-		// Not playing: just apply snapshot
+
+		// Apply snapshot for stopped/paused state
 		this.applySnapshot(tracks);
+
+		// If paused, also update pausedTracks so resume() uses latest state
+		if (this.state === "paused") {
+			this.pausedTracks = tracks;
+		}
 	}
 
 	/**

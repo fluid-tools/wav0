@@ -177,10 +177,41 @@ export const removeClipAtom = atom(
 		const selectedClipId = get(selectedClipIdAtom);
 
 		const updatedTracks = tracks.map((track) => {
-			if (track.id !== trackId || !track.clips) return track;
+			if (track.id !== trackId) return track;
+
+			// Find the clip being deleted to get its start time for unbinding automation
+			const clipToDelete = track.clips?.find((c) => c.id === clipId);
+			const clipStartTime = clipToDelete?.startTime ?? 0;
+
+			// Remove the clip
+			const updatedClips =
+				track.clips?.filter((clip) => clip.id !== clipId) ?? [];
+
+			// Unbind automation points that reference this clip
+			const updatedEnvelope = track.volumeEnvelope
+				? {
+						...track.volumeEnvelope,
+						points: track.volumeEnvelope.points.map((point) => {
+							if (point.clipId !== clipId) return point;
+							// Convert to absolute time and unbind
+							const absoluteTime =
+								point.clipRelativeTime !== undefined
+									? point.clipRelativeTime + clipStartTime
+									: point.time;
+							return {
+								...point,
+								time: absoluteTime,
+								clipId: undefined,
+								clipRelativeTime: undefined,
+							};
+						}),
+					}
+				: undefined;
+
 			return {
 				...track,
-				clips: track.clips.filter((clip) => clip.id !== clipId),
+				clips: updatedClips,
+				volumeEnvelope: updatedEnvelope,
 			};
 		});
 
