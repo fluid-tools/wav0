@@ -1,3 +1,7 @@
+/**
+ * @deprecated Use useClipInspector from @wav0/daw-react/hooks instead.
+ * This file is a legacy duplicate and will be removed.
+ */
 import { useAtom } from "jotai";
 import { useEffect, useMemo, useState } from "react";
 import {

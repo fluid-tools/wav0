@@ -211,7 +211,7 @@ export const loadAudioFileAtom = atom(
 			throw new Error("Audio service not registered");
 		}
 
-		const generateId = serviceRegistry.generateTrackId ?? crypto.randomUUID;
+		const generateId = serviceRegistry.generateTrackId ?? (() => crypto.randomUUID());
 		const opfsFileId = generateId();
 		const audioInfo = await serviceRegistry.audioService.loadAudioFile(
 			file,

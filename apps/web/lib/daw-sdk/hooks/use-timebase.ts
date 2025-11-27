@@ -1,3 +1,11 @@
+/**
+ * @deprecated Use useTimebase from @wav0/daw-react/hooks instead.
+ * This file is a legacy duplicate and will be removed.
+ * 
+ * NOTE: 4 components still import directly from this file:
+ * - unified-playhead.tsx, daw-track-content.tsx, daw-timeline.tsx, marker-track.tsx
+ * Update these to import from @/lib/daw-sdk instead.
+ */
 "use client";
 import { time } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";

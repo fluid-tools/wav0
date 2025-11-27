@@ -1,3 +1,10 @@
+/**
+ * @deprecated Use usePlaybackSync from @wav0/daw-react/hooks instead.
+ * This file is a legacy duplicate with a different implementation.
+ * The daw-react version uses Transport events instead of setInterval.
+ *
+ * useDAWInitialization is also deprecated and unused.
+ */
 "use client";
 
 import { useEffect, useRef } from "react";

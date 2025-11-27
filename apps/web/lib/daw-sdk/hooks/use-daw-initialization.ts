@@ -1,3 +1,8 @@
+/**
+ * @deprecated This hook is no longer used and will be removed.
+ * DAW initialization is now handled by DAWProvider in @wav0/daw-react.
+ * Services are registered synchronously during render.
+ */
 "use client";
 
 import { useEffect, useState } from "react";

@@ -1,3 +1,7 @@
+/**
+ * @deprecated Use useLiveAutomationGain from @wav0/daw-react/hooks instead.
+ * This file is a legacy duplicate and will be removed.
+ */
 "use client";
 
 import { volume } from "@wav0/daw-sdk";

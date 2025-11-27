@@ -244,6 +244,13 @@ export function AutomationLane({
 		.sort((a, b) => a.time - b.time);
 
 	// Generate SVG path
+	// NOTE: X coordinates use absolute timeline positions (point.time * pxPerMs) WITHOUT
+	// subtracting horizontalScroll. This is intentional - the entire track content area
+	// scrolls as a unit via CSS overflow:scroll on the parent container. Elements are
+	// rendered at absolute timeline positions, and the browser's scroll mechanism moves
+	// the viewport over that content. Click handlers DO need scrollLeft to convert
+	// viewport-relative click coordinates back to absolute timeline time, but rendering
+	// positions do not. This matches how clips are positioned (clipX = clip.startTime * pixelsPerMs).
 	const generatePath = (): string => {
 		if (sorted.length === 0) return "";
 
@@ -256,6 +263,7 @@ export function AutomationLane({
 			return trackHeight - padding - normalizedValue * usableHeight;
 		};
 
+		// X coordinate: absolute timeline position (scroll handled by parent container)
 		const points = sorted.map((point) => {
 			const x = point.time * pxPerMs;
 			const y = multiplierToY(point.value);
