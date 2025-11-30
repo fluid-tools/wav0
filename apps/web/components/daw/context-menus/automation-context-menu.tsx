@@ -127,20 +127,23 @@ export function AutomationContextMenu({
 		// Account for scroll offset
 		const time = (contextMenuState.x + scrollLeft) / pxPerMs;
 
-		// Resolve clip-relative points to absolute time before sorting (consistent with handleDeletePoint)
-		const sorted = [...track.volumeEnvelope.points]
-			.map((point) => {
-				const clip = track.clips?.find((c) => c.id === point.clipId);
-				return clip ? resolveClipRelativePoint(point, clip.startTime) : point;
-			})
-			.sort((a, b) => a.time - b.time);
+		// Resolve clip-relative points to absolute time.
+		// DO NOT SORT: Maintain original order to match segment definitions (fromPointId -> toPointId)
+		const resolvedPoints = track.volumeEnvelope.points.map((point) => {
+			const clip = track.clips?.find((c) => c.id === point.clipId);
+			return clip ? resolveClipRelativePoint(point, clip.startTime) : point;
+		});
 
 		// Find segment at cursor
-		for (let i = 0; i < sorted.length - 1; i++) {
-			const p1 = sorted[i];
-			const p2 = sorted[i + 1];
+		for (let i = 0; i < resolvedPoints.length - 1; i++) {
+			const p1 = resolvedPoints[i];
+			const p2 = resolvedPoints[i + 1];
 
-			if (time >= p1.time && time <= p2.time) {
+			// Use Min/Max because resolved points might be flipped in time relative to index order
+			if (
+				time >= Math.min(p1.time, p2.time) &&
+				time <= Math.max(p1.time, p2.time)
+			) {
 				const segment = track.volumeEnvelope.segments?.find(
 					(s) => s.fromPointId === p1.id && s.toPointId === p2.id,
 				);
