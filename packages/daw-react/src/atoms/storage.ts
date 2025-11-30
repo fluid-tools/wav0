@@ -14,7 +14,7 @@ import { getStorageAdapter } from "../storage/adapter";
 export function atomWithStorage<T>(
 	key: string,
 	initialValue: T,
-): WritableAtom<T, [T], void> {
+): WritableAtom<T, [T | ((prev: T) => T)], void> {
 	const baseAtom = atom(initialValue);
 
 	// Load initial value from storage on mount
@@ -26,7 +26,12 @@ export function atomWithStorage<T>(
 			const stored = adapter.getItem(key);
 
 			// Handle sync result (string | null)
-			if (stored && typeof stored === "string" && stored !== "undefined") {
+			// Use explicit null check (not truthiness) to preserve empty strings
+			if (
+				stored !== null &&
+				typeof stored === "string" &&
+				stored !== "undefined"
+			) {
 				try {
 					const parsed = JSON.parse(stored);
 					setAtom(parsed);
@@ -48,6 +53,7 @@ export function atomWithStorage<T>(
 			if (stored instanceof Promise) {
 				stored
 					.then((value) => {
+						// Use explicit null check (consistent with sync path)
 						if (value !== null && value !== "undefined") {
 							try {
 								const parsed = JSON.parse(value);
@@ -74,9 +80,10 @@ export function atomWithStorage<T>(
 	};
 
 	// Create derived atom that syncs to storage
+	// Supports both direct values and function updaters (prev => newValue)
 	const derivedAtom = atom(
 		(get) => get(baseAtom),
-		(_get, set, update: T) => {
+		(_get, set, update: T | ((prev: T) => T)) => {
 			// Guard against undefined - don't persist undefined values
 			// JSON.stringify(undefined) returns undefined (not "undefined" string)
 			// but localStorage.setItem coerces to "undefined" string, causing parse failures
@@ -85,11 +92,27 @@ export function atomWithStorage<T>(
 				return;
 			}
 
-			set(baseAtom, update);
+			// Resolve function updaters to get the actual value
+			// This is critical: JSON.stringify(function) returns undefined,
+			// which would corrupt localStorage with the string "undefined"
+			const resolvedValue: T =
+				typeof update === "function"
+					? (update as (prev: T) => T)(_get(baseAtom))
+					: update;
 
-			// Persist to storage (fire and forget for async)
+			// Guard against resolved value being undefined (from buggy updater functions)
+			if (resolvedValue === undefined) {
+				console.error(
+					`Function updater returned undefined for storage key: ${key}`,
+				);
+				return;
+			}
+
+			set(baseAtom, resolvedValue);
+
+			// Persist the resolved value (not the function) to storage
 			const adapter = getStorageAdapter();
-			const saveResult = adapter.setItem(key, JSON.stringify(update));
+			const saveResult = adapter.setItem(key, JSON.stringify(resolvedValue));
 			if (saveResult instanceof Promise) {
 				saveResult.catch((err) => {
 					console.error(`Failed to save ${key} to storage`, err);
@@ -98,5 +121,5 @@ export function atomWithStorage<T>(
 		},
 	);
 
-	return derivedAtom as WritableAtom<T, [T], void>;
+	return derivedAtom as WritableAtom<T, [T | ((prev: T) => T)], void>;
 }
