@@ -10,8 +10,8 @@ import {
 	setCurrentTimeAtom,
 	timelineAtom,
 	timelinePxPerMsAtom,
+	useTimebase,
 } from "@/lib/daw-sdk";
-import { useTimebase } from "@/lib/daw-sdk/hooks/use-timebase";
 
 type Props = {
 	timelineHeaderHeight: number;

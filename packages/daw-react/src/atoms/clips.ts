@@ -5,7 +5,7 @@
 
 "use client";
 
-import type { Clip, Track, TrackEnvelope } from "@wav0/daw-sdk";
+import type { Clip, Track, TrackEnvelope, TrackEnvelopePoint } from "@wav0/daw-sdk";
 import { atom } from "jotai";
 import {
 	playbackAtom,
@@ -23,7 +23,7 @@ function bindEnvelopeToClips(
 ): TrackEnvelope {
 	if (!clips || clips.length === 0) return envelope;
 
-	const newPoints = envelope.points.map((point) => {
+	const newPoints = envelope.points.map((point: TrackEnvelopePoint) => {
 		// If point already has clipId, keep it
 		if (point.clipId) return point;
 
@@ -61,7 +61,7 @@ export const updateClipAtom = atom(
 
 		// Find original clip and track to detect automation movement
 		const originalTrack = tracks.find((t) => t.id === trackId);
-		const originalClip = originalTrack?.clips?.find((c) => c.id === clipId);
+		const originalClip = originalTrack?.clips?.find((c: Clip) => c.id === clipId);
 
 		// Detect clip movement for clip-bound automation
 		const clipMoved =
@@ -82,10 +82,10 @@ export const updateClipAtom = atom(
 			}
 
 			// Update clip
-			const updatedClips = track.clips.map((clip) =>
-				clip.id === clipId ? { ...clip, ...updates } : clip,
-			);
-			const nextClip = updatedClips.find((clip) => clip.id === clipId);
+		const updatedClips = track.clips.map((clip: Clip) =>
+			clip.id === clipId ? { ...clip, ...updates } : clip,
+		);
+		const nextClip = updatedClips.find((clip: Clip) => clip.id === clipId);
 			const nextStartTime =
 				nextClip?.startTime ??
 				updates.startTime ??
@@ -94,9 +94,9 @@ export const updateClipAtom = atom(
 
 			// Handle automation movement
 			if (normalizedEnvelope && originalClip && clipMoved) {
-				const shiftedPoints = normalizedEnvelope.points.map((point) => {
-					// Clip-bound automation: always move with clip
-					if (point.clipId === clipId) {
+			const shiftedPoints = normalizedEnvelope.points.map((point: TrackEnvelopePoint) => {
+				// Clip-bound automation: always move with clip
+				if (point.clipId === clipId) {
 						const derivedRelative =
 							point.clipRelativeTime !== undefined
 								? point.clipRelativeTime
@@ -179,20 +179,20 @@ export const removeClipAtom = atom(
 		const updatedTracks = tracks.map((track) => {
 			if (track.id !== trackId) return track;
 
-			// Find the clip being deleted to get its start time for unbinding automation
-			const clipToDelete = track.clips?.find((c) => c.id === clipId);
-			const clipStartTime = clipToDelete?.startTime ?? 0;
+		// Find the clip being deleted to get its start time for unbinding automation
+		const clipToDelete = track.clips?.find((c: Clip) => c.id === clipId);
+		const clipStartTime = clipToDelete?.startTime ?? 0;
 
-			// Remove the clip
-			const updatedClips =
-				track.clips?.filter((clip) => clip.id !== clipId) ?? [];
+		// Remove the clip
+		const updatedClips =
+			track.clips?.filter((clip: Clip) => clip.id !== clipId) ?? [];
 
-			// Unbind automation points that reference this clip
-			const updatedEnvelope = track.volumeEnvelope
-				? {
-						...track.volumeEnvelope,
-						points: track.volumeEnvelope.points.map((point) => {
-							if (point.clipId !== clipId) return point;
+		// Unbind automation points that reference this clip
+		const updatedEnvelope = track.volumeEnvelope
+			? {
+					...track.volumeEnvelope,
+					points: track.volumeEnvelope.points.map((point: TrackEnvelopePoint) => {
+						if (point.clipId !== clipId) return point;
 							// Convert to absolute time and unbind
 							const absoluteTime =
 								point.clipRelativeTime !== undefined
@@ -243,7 +243,7 @@ export const splitClipAtPlayheadAtom = atom(null, async (get, set) => {
 	const track = tracks.find((t) => t.id === selectedTrackId);
 	if (!track || !track.clips) return;
 
-	const clip = track.clips.find((c) => c.id === selectedClipId);
+	const clip = track.clips.find((c: Clip) => c.id === selectedClipId);
 	if (!clip) return;
 
 	const splitTimeMs = playback.currentTime;
@@ -270,7 +270,7 @@ export const splitClipAtPlayheadAtom = atom(null, async (get, set) => {
 	newLeft.fadeOut = newLeft.fadeOut ?? 15;
 	newRight.fadeIn = newRight.fadeIn ?? 15;
 
-	const updatedClips = track.clips.flatMap((c) =>
+	const updatedClips = track.clips.flatMap((c: Clip) =>
 		c.id === clip.id ? [newLeft, newRight] : c,
 	) as Clip[];
 
@@ -299,7 +299,7 @@ export const selectedClipAtom = atom((get) => {
 	if (!selectedId) return null;
 
 	for (const track of tracks) {
-		const clip = track.clips?.find((c) => c.id === selectedId);
+		const clip = track.clips?.find((c: Clip) => c.id === selectedId);
 		if (clip) return { clip, trackId: track.id };
 	}
 	return null;

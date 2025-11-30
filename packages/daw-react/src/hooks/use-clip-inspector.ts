@@ -32,7 +32,7 @@ export function useClipInspector() {
 		if (!target) return null;
 		const track = tracks.find((candidate) => candidate.id === target.trackId);
 		const clip = track?.clips?.find(
-			(candidate) => candidate.id === target.clipId,
+			(candidate: Clip) => candidate.id === target.clipId,
 		);
 		return track && clip ? { track, clip } : null;
 	}, [target, tracks]);

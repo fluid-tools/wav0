@@ -26,6 +26,10 @@ export type {
 // Re-export utils for convenience (so components can import from one place)
 export { automation, curves, time, volume } from "@wav0/daw-sdk";
 
+// Re-export looping utilities
+export type { LoopingPolicy } from "@wav0/daw-sdk";
+export { computeLoopEndMs, DEFAULT_LOOPING_POLICY } from "@wav0/daw-sdk";
+
 // Re-export visual constants
 export {
 	DAW_PIXELS_PER_SECOND_AT_ZOOM_1,

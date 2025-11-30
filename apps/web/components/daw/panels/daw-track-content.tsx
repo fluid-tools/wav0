@@ -33,8 +33,8 @@ import {
 	tracksAtom,
 	updateClipAtom,
 	updateTrackAtom,
+	useTimebase,
 } from "@/lib/daw-sdk";
-import { useTimebase } from "@/lib/daw-sdk/hooks/use-timebase";
 import { cn } from "@/lib/utils";
 
 export function DAWTrackContent() {

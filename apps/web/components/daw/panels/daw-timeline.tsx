@@ -15,8 +15,8 @@ import {
 	timelineAtom,
 	timelinePxPerMsAtom,
 	timelineWidthAtom,
+	useTimebase,
 } from "@/lib/daw-sdk";
-import { useTimebase } from "@/lib/daw-sdk/hooks/use-timebase";
 
 export function DAWTimeline() {
 	const [timeline] = useAtom(timelineAtom);

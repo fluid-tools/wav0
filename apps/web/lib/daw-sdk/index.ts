@@ -65,8 +65,28 @@ export {
 	time,
 	volume,
 };
+
+// ===== Looping Utilities from @wav0/daw-sdk =====
+import {
+	computeLoopEndMs,
+	DEFAULT_LOOPING_POLICY,
+} from "@wav0/daw-sdk";
+export type { LoopingPolicy } from "@wav0/daw-sdk";
+export { computeLoopEndMs, DEFAULT_LOOPING_POLICY };
+
+// ===== Audio Encoding from @wav0/daw-sdk =====
+export type { AudioFormat } from "@wav0/daw-sdk";
+export { encode, getFileExtension, getMimeType } from "@wav0/daw-sdk";
 // ===== Legacy Audio Scheduling Constants (some may duplicate SDK) =====
 export * from "./core/audio-scheduling-constants";
+// ===== Renderer from @wav0/daw-sdk =====
+export type { AudioBufferProvider, RenderOptions } from "@wav0/daw-sdk";
+export { renderProjectToAudioBuffer } from "@wav0/daw-sdk";
+
+// ===== Preview Player from @wav0/daw-sdk =====
+export type { PreviewPlayer } from "@wav0/daw-sdk";
+export { createPreviewPlayer } from "@wav0/daw-sdk";
+
 // ===== Legacy Services (still required during migration) =====
 export type { LoadedAudioTrack } from "./core/audio-service";
 export { AudioService, audioService } from "./core/audio-service";

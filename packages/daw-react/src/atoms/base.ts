@@ -7,6 +7,7 @@
 
 import type {
 	AutomationType,
+	Clip,
 	ClipInspectorTarget,
 	PlaybackState,
 	TimelineSection,
@@ -172,7 +173,7 @@ export const totalDurationAtom = atom((get) => {
 	const perTrackEnds = tracks.map((track) => {
 		if (track.clips && track.clips.length > 0) {
 			return Math.max(
-				...track.clips.map((clip) => {
+				...track.clips.map((clip: Clip) => {
 					const oneShotEnd =
 						clip.startTime + Math.max(0, clip.trimEnd - clip.trimStart);
 					const loopEnd = clip.loop ? (clip.loopEnd ?? oneShotEnd) : oneShotEnd;

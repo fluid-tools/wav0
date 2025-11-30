@@ -4,6 +4,7 @@ import { useAtom } from "jotai";
 import { useEffect } from "react";
 import {
 	automationViewEnabledAtom,
+	computeLoopEndMs,
 	playbackAtom,
 	projectEndOverrideAtom,
 	resetProjectAtom,
@@ -17,7 +18,6 @@ import {
 	tracksAtom,
 	updateClipAtom,
 } from "@/lib/daw-sdk";
-import { computeLoopEndMs } from "@/lib/daw-sdk/config/looping";
 
 export function GlobalShortcuts() {
 	const [playback] = useAtom(playbackAtom);

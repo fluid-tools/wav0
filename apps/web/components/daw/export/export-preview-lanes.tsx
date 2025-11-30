@@ -1,6 +1,6 @@
 "use client";
 import { useMemo } from "react";
-import type { Track } from "@/lib/daw-sdk/state/types";
+import type { Track } from "@/lib/daw-sdk";
 
 export type ExportPreviewLanesProps = {
 	width: number;
@@ -40,9 +40,10 @@ export function ExportPreviewLanes({
 					y={y}
 					width={width}
 					height={rowHeight - 2}
-					fill={
-						trackIndex % 2 === 0 ? "var(--muted)" : "var(--muted-foreground)"
-					}
+					style={{
+						fill:
+							trackIndex % 2 === 0 ? "var(--muted)" : "var(--muted-foreground)",
+					}}
 					rx={2}
 					ry={2}
 				/>,
@@ -68,7 +69,7 @@ export function ExportPreviewLanes({
 					// Find first cycle start within range
 					let firstCycleStart = clip.startTime;
 					if (range.startMs > clip.startTime) {
-						const cyclesOffset = Math.ceil(
+						const cyclesOffset = Math.floor(
 							(range.startMs - clip.startTime) / cycleLen,
 						);
 						firstCycleStart = clip.startTime + cyclesOffset * cycleLen;
@@ -95,10 +96,9 @@ export function ExportPreviewLanes({
 									y={y + 2}
 									width={w}
 									height={rowHeight - 6}
-									fill="var(--primary)"
+									style={{ fill: "var(--primary)", stroke: "var(--primary)" }}
 									rx={2}
 									ry={2}
-									stroke="var(--primary)"
 									strokeWidth={0.5}
 								/>,
 							);
@@ -112,7 +112,7 @@ export function ExportPreviewLanes({
 										y1={y + 2}
 										x2={x}
 										y2={y + rowHeight - 4}
-										stroke="var(--primary)"
+										style={{ stroke: "var(--primary)" }}
 										strokeWidth={1}
 										strokeDasharray="2,2"
 										opacity={0.3}
@@ -139,10 +139,9 @@ export function ExportPreviewLanes({
 								y={y + 2}
 								width={w}
 								height={rowHeight - 6}
-								fill="var(--primary)"
+								style={{ fill: "var(--primary)", stroke: "var(--primary)" }}
 								rx={2}
 								ry={2}
-								stroke="var(--primary)"
 								strokeWidth={0.5}
 							/>,
 						);
@@ -160,7 +159,7 @@ export function ExportPreviewLanes({
 					y={y + 12}
 					fontSize="10"
 					fontFamily="sans-serif"
-					fill="var(--muted-foreground)"
+					style={{ fill: "var(--muted-foreground)" }}
 					className="select-none"
 				>
 					Track {trackIndex + 1}
@@ -181,7 +180,7 @@ export function ExportPreviewLanes({
 					y1={0}
 					x2={x}
 					y2={height}
-					stroke="var(--border)"
+					style={{ stroke: "var(--border)" }}
 					strokeWidth={1}
 				/>,
 			);
@@ -194,7 +193,7 @@ export function ExportPreviewLanes({
 					y={12}
 					fontSize="8"
 					fontFamily="sans-serif"
-					fill="var(--muted-foreground)"
+					style={{ fill: "var(--muted-foreground)" }}
 					className="select-none"
 				>
 					{(timeMs / 1000).toFixed(1)}s
@@ -212,7 +211,7 @@ export function ExportPreviewLanes({
 						y={0}
 						width={width}
 						height={height}
-						fill="var(--muted)"
+						style={{ fill: "var(--muted)" }}
 						rx={4}
 						ry={4}
 					/>
@@ -222,7 +221,7 @@ export function ExportPreviewLanes({
 						y={height / 2 - 8}
 						fontSize="12"
 						fontFamily="sans-serif"
-						fill="var(--muted-foreground)"
+						style={{ fill: "var(--muted-foreground)" }}
 						textAnchor="middle"
 						className="select-none"
 					>
@@ -233,7 +232,7 @@ export function ExportPreviewLanes({
 						y={height / 2 + 8}
 						fontSize="10"
 						fontFamily="sans-serif"
-						fill="var(--muted-foreground)"
+						style={{ fill: "var(--muted-foreground)" }}
 						textAnchor="middle"
 						className="select-none"
 					>

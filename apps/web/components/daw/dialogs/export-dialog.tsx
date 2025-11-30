@@ -1,5 +1,5 @@
 "use client";
-import { audioBuffer } from "@wav0/daw-sdk";
+import { audioBuffer, encode } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
 import {
 	useCallback,
@@ -21,10 +21,14 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { projectNameAtom, tracksAtom } from "@/lib/daw-sdk";
-import { createPreviewPlayer } from "@/lib/daw-sdk/core/preview-player";
-import { renderProjectToAudioBuffer } from "@/lib/daw-sdk/core/render-service";
-import { loopRegionAtom } from "@/lib/daw-sdk/state/timeline";
+import {
+	audioService,
+	createPreviewPlayer,
+	loopRegionAtom,
+	projectNameAtom,
+	renderProjectToAudioBuffer,
+	tracksAtom,
+} from "@/lib/daw-sdk";
 
 type Props = { open: boolean; onOpenChange: (v: boolean) => void };
 
@@ -45,15 +49,23 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 	const [projectName] = useAtom(projectNameAtom);
 	const [loopRegion] = useAtom(loopRegionAtom);
 
+	// AudioBufferProvider wrapper for audioService
+	const audioProvider = {
+		getAudioBuffer: (opfsFileId: string, fileName: string) =>
+			audioService.getAudioBuffer(opfsFileId, fileName),
+	};
+
 	async function onPreview() {
 		try {
 			setBusy(true);
 			setProgress(null);
 			const { startMs, endMs } = getRangeMs();
-			const buffer = await renderProjectToAudioBuffer(
-				{ tracks },
-				{ startMs, endMs, sampleRate: sr, channels: ch },
-			);
+			const buffer = await renderProjectToAudioBuffer(tracks, audioProvider, {
+				startMs,
+				endMs,
+				sampleRate: sr,
+				channels: ch,
+			});
 			setPreviewBuffer(buffer);
 			if (!playerRef.current) playerRef.current = createPreviewPlayer();
 			playerRef.current.load(buffer);
@@ -102,13 +114,8 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 
 		// Set up event handler that doesn't cause effect re-runs
 		player.onended = () => onPlayerEnded();
-
-		return () => {
-			if (player.onended) {
-				player.onended = undefined;
-			}
-		};
-	}, [onPlayerEnded]);
+		// No cleanup needed - onended is on the player object itself
+	}, []);
 
 	const getRangeMs = useCallback(() => {
 		if (range === "loop" && loopRegion.enabled) {
@@ -128,15 +135,16 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 			setBusy(true);
 			setProgress(null);
 			const { startMs, endMs } = getRangeMs();
-			const buffer = await renderProjectToAudioBuffer(
-				{ tracks },
-				{ startMs, endMs, sampleRate: sr, channels: ch },
-			);
+			const buffer = await renderProjectToAudioBuffer(tracks, audioProvider, {
+				startMs,
+				endMs,
+				sampleRate: sr,
+				channels: ch,
+			});
 			const wavBytes: Uint8Array = audioBuffer.toWav(buffer, { bitDepth: 16 });
 			let bytes = wavBytes;
 			let ext = "wav";
 			if (fmt !== "wav") {
-				const { encode } = await import("@/lib/daw-sdk/core/encode-service");
 				bytes = await encode(wavBytes, fmt, (p) => setProgress(p));
 				ext = fmt === "m4a" ? "m4a" : fmt;
 			}

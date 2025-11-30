@@ -36,7 +36,7 @@ function bindEnvelopeToClips(
 ): TrackEnvelope {
 	if (!clips || clips.length === 0) return envelope;
 
-	const newPoints = envelope.points.map((point) => {
+	const newPoints = envelope.points.map((point: TrackEnvelopePoint) => {
 		// If point already has clipId, keep it
 		if (point.clipId) return point;
 
@@ -66,15 +66,15 @@ export const addTrackAtom = atom(
 		const newTrack: Track = {
 			...track,
 			id: crypto.randomUUID(),
-			volumeEnvelope: track.volumeEnvelope
-				? {
-						...track.volumeEnvelope,
-						points: track.volumeEnvelope.points.map((point) => ({
-							...point,
-							value: clampEnvelopeGain(point.value),
-						})),
-					}
-				: createDefaultEnvelope(track.volume ?? 75),
+		volumeEnvelope: track.volumeEnvelope
+			? {
+					...track.volumeEnvelope,
+					points: track.volumeEnvelope.points.map((point: TrackEnvelopePoint) => ({
+						...point,
+						value: clampEnvelopeGain(point.value),
+					})),
+				}
+			: createDefaultEnvelope(track.volume ?? 75),
 		};
 		const updatedTracks = [...tracks, newTrack];
 		set(tracksAtom, updatedTracks);
