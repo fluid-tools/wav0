@@ -55,22 +55,45 @@ export function DAWProvider({
 
 	// Track if we've done initial registration to avoid redundant calls
 	const initialRegistrationDone = useRef(false);
+	// Track the last storage adapter to avoid redundant calls on every render
+	const lastStorageAdapterRef = useRef<StorageAdapter | undefined>(undefined);
+	// Track last registered services to detect prop changes before DAW is ready
+	const lastAudioServiceRef = useRef(legacyAudioService);
+	const lastPlaybackServiceRef = useRef(legacyPlaybackService);
+
+	// Check if services changed (props updated before DAW ready)
+	const servicesChanged =
+		lastAudioServiceRef.current !== legacyAudioService ||
+		lastPlaybackServiceRef.current !== legacyPlaybackService;
 
 	// IMMEDIATE registration of legacy services (synchronous, during render)
 	// This ensures services are available BEFORE any child effects run
 	// React effects run child-to-parent, so without this, child effects would
 	// fail with "Audio service not registered"
-	if (!initialRegistrationDone.current && legacyAudioService) {
-		registerServices({
-			audioService: legacyAudioService,
-			playbackService: legacyPlaybackService,
-		});
+	// Bug fix: Check if EITHER service exists (not just audioService)
+	// Bug fix: Only register services that are actually provided (not undefined)
+	// Bug fix: Re-register if services changed before DAW is ready
+	if (
+		(!initialRegistrationDone.current || servicesChanged) &&
+		(legacyAudioService || legacyPlaybackService)
+	) {
+		const servicesToRegister: Parameters<typeof registerServices>[0] = {};
+		if (legacyAudioService) {
+			servicesToRegister.audioService = legacyAudioService;
+		}
+		if (legacyPlaybackService) {
+			servicesToRegister.playbackService = legacyPlaybackService;
+		}
+		registerServices(servicesToRegister);
 		initialRegistrationDone.current = true;
+		lastAudioServiceRef.current = legacyAudioService;
+		lastPlaybackServiceRef.current = legacyPlaybackService;
 	}
 
-	// Set storage adapter synchronously if provided (before effects)
-	if (storageAdapter) {
+	// Set storage adapter only when it changes (avoid redundant calls on every render)
+	if (storageAdapter && storageAdapter !== lastStorageAdapterRef.current) {
 		setStorageAdapter(storageAdapter);
+		lastStorageAdapterRef.current = storageAdapter;
 	}
 
 	// Setup bridges and RE-REGISTER them to service registry

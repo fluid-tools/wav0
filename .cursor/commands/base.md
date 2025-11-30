@@ -27,7 +27,7 @@ Technical Blog by Convex for hidden gems - http://stack.convex.dev/
 
 Convex Helpers - https://github.com/get-convex/convex-helpers - use these for rls, triggers, and other helpers for ergonomics + adopting clean patterns.
 
-- never fucking using convex codegen - it's not a real command anymore.
+- never using convex codegen - it's not a real command anymore.
 
 ---
 
