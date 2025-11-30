@@ -93,22 +93,22 @@ export class PlaybackServiceBridge {
 
 	/**
 	 * Resume playback from paused position
-	 * Legacy service doesn't have a dedicated resume - we restart from paused time
+	 * Note: Legacy service doesn't have resume - this updates SDK Transport state only.
+	 * For full resume with audio, use togglePlaybackAtom which re-calls play() with tracks.
 	 */
 	async resume(): Promise<void> {
-		// Legacy PlaybackService stores paused time in playbackTimeAtStart after pause()
-		// Calling play() with that time effectively resumes playback
-		// The atom-level code handles this pattern already via togglePlaybackAtom
-		console.warn("[PlaybackBridge] resume() - use togglePlaybackAtom for proper resume");
+		const transport = this.sdk.getTransport();
+		await transport.resume();
 	}
 
 	/**
 	 * Seek to time
+	 * Note: This updates playback position state. For full seek with audio re-sync,
+	 * use setCurrentTimeAtom which handles pause/play cycle with tracks.
 	 */
-	async seek(_timeMs: number): Promise<void> {
-		// Legacy service seek - requires stopping and restarting
-		// This is handled at the atom level for now
-		console.warn("[PlaybackBridge] seek() delegates to legacy service");
+	async seek(timeMs: number): Promise<void> {
+		const transport = this.sdk.getTransport();
+		transport.seek(timeMs);
 	}
 
 	/**

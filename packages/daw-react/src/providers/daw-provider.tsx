@@ -15,6 +15,7 @@ import {
 	type ReactNode,
 	useContext,
 	useEffect,
+	useMemo,
 	useRef,
 	useState,
 } from "react";
@@ -166,15 +167,15 @@ export function useBridges(): {
 	if (context === undefined) {
 		throw new Error("useBridges must be used within DAWProvider");
 	}
-	// null means DAW not ready yet - return null bridges gracefully
-	if (!context) {
-		return {
-			audio: null,
-			playback: null,
-		};
-	}
-	return {
-		audio: context.audioBridge,
-		playback: context.playbackBridge,
-	};
+	// Memoize to prevent new object reference on every render
+	// This ensures useEffect dependencies on bridges work correctly
+	const audioBridge = context?.audioBridge ?? null;
+	const playbackBridge = context?.playbackBridge ?? null;
+	return useMemo(
+		() => ({
+			audio: audioBridge,
+			playback: playbackBridge,
+		}),
+		[audioBridge, playbackBridge],
+	);
 }
