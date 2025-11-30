@@ -139,15 +139,34 @@ export const renameTrackAtom = atom(
 
 export const initializeAudioFromOPFSAtom = atom(null, async (get, _set) => {
 	const tracks = get(tracksAtom);
+	const loadedIds = new Set<string>();
+
 	for (const track of tracks) {
-		if (!track.opfsFileId || !track.audioFileName) continue;
-		try {
-			await audioService.loadTrackFromOPFS(
-				track.opfsFileId,
-				track.audioFileName,
-			);
-		} catch (error) {
-			console.error("Failed to load track from OPFS:", track.name, error);
+		// Load clip audio (primary - this is what playback uses)
+		for (const clip of track.clips ?? []) {
+			if (!clip.opfsFileId || loadedIds.has(clip.opfsFileId)) continue;
+			loadedIds.add(clip.opfsFileId);
+			try {
+				await audioService.loadTrackFromOPFS(
+					clip.opfsFileId,
+					clip.audioFileName ?? clip.name ?? "",
+				);
+			} catch (error) {
+				console.error("Failed to load clip audio:", clip.name, error);
+			}
+		}
+
+		// Backward compatibility: load track-level opfsFileId if no clips loaded it
+		if (track.opfsFileId && !loadedIds.has(track.opfsFileId)) {
+			loadedIds.add(track.opfsFileId);
+			try {
+				await audioService.loadTrackFromOPFS(
+					track.opfsFileId,
+					track.audioFileName ?? track.name ?? "",
+				);
+			} catch (error) {
+				console.error("Failed to load track audio:", track.name, error);
+			}
 		}
 	}
 });

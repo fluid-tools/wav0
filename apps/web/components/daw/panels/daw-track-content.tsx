@@ -22,10 +22,10 @@ import {
 	loadAudioFileAtom,
 	mergeAutomationPoints,
 	playbackAtom,
-	playbackService,
 	projectEndPositionAtom,
 	selectedClipIdAtom,
 	selectedTrackIdAtom,
+	serviceRegistry,
 	timelineAtom,
 	timelinePxPerMsAtom,
 	totalDurationAtom,
@@ -511,13 +511,9 @@ export function DAWTrackContent() {
 						const targetTrack = computedTargetTrack as Track;
 						const updated = computedUpdated;
 
-						if (playback.isPlaying) {
-							await playbackService.stopClip(originalTrack.id, clip.id);
-						}
-
-						if (playback.isPlaying) {
+						if (playback.isPlaying && serviceRegistry.playbackService) {
 							try {
-								await playbackService.synchronizeTracks(updated);
+								await serviceRegistry.playbackService.synchronizeTracks(updated);
 							} catch (error) {
 								console.error(
 									"Failed to synchronize tracks after clip move",
@@ -548,10 +544,8 @@ export function DAWTrackContent() {
 							dragPreview.originalStartTime !== dragPreview.previewStartTime;
 
 						if (moved && isSameTrack) {
-							if (playback.isPlaying) {
-								await playbackService.stopClip(originalTrack.id, clip.id);
-							}
-
+							// updateClipAtom internally calls serviceRegistry.playbackService.synchronizeTracks()
+							// which handles stopping the old position and rescheduling at the new position
 							await updateClip(originalTrack.id, clip.id, {
 								startTime: dragPreview.previewStartTime,
 							});

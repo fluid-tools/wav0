@@ -1,6 +1,6 @@
 "use client";
 
-import { useDAWAtomSync } from "@wav0/daw-react";
+import { useBridges, useDAWAtomSync } from "@wav0/daw-react";
 import { useAtom } from "jotai";
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
@@ -48,6 +48,7 @@ import { ClipMoveToastManager } from "./toast/clip-move-toast";
 
 export function DAWContainer() {
 	useDAWAtomSync(playbackAtom, tracksAtom);
+	const { audio: audioBridge } = useBridges();
 
 	const [timelineWidth] = useAtom(timelineWidthAtom);
 	const [tracks] = useAtom(tracksAtom);
@@ -167,9 +168,13 @@ export function DAWContainer() {
 		};
 	}, [batchScrollUpdate]);
 
+	// Re-run when audioBridge becomes available to load audio into SDK AudioEngine
+	// First run (mount): uses legacy service → loads into legacy storage
+	// Second run (bridge ready): uses AudioServiceBridge → loads into SDK + legacy
+	// biome-ignore lint/correctness/useExhaustiveDependencies: audioBridge triggers re-init when SDK is ready
 	useEffect(() => {
 		initializeAudioFromOPFS();
-	}, [initializeAudioFromOPFS]);
+	}, [initializeAudioFromOPFS, audioBridge]);
 
 	const currentTrackHeight = Math.round(
 		DAW_HEIGHTS.TRACK_ROW * trackHeightZoom,

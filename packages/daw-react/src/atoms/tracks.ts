@@ -14,7 +14,6 @@ import type {
 import { atom } from "jotai";
 import {
 	createDefaultEnvelope,
-	createDefaultTrack,
 	DEFAULT_TRACK_1,
 	playbackAtom,
 	projectEndOverrideAtom,
@@ -185,15 +184,34 @@ export const initializeAudioFromOPFSAtom = atom(null, async (get, _set) => {
 		return;
 	}
 	const tracks = get(tracksAtom);
+	const loadedIds = new Set<string>();
+
 	for (const track of tracks) {
-		if (!track.opfsFileId || !track.audioFileName) continue;
-		try {
-			await serviceRegistry.audioService.loadTrackFromOPFS(
-				track.opfsFileId,
-				track.audioFileName,
-			);
-		} catch (error) {
-			console.error("Failed to load track from OPFS:", track.name, error);
+		// Load clip audio (primary - this is what playback uses)
+		for (const clip of track.clips ?? []) {
+			if (!clip.opfsFileId || loadedIds.has(clip.opfsFileId)) continue;
+			loadedIds.add(clip.opfsFileId);
+			try {
+				await serviceRegistry.audioService.loadTrackFromOPFS(
+					clip.opfsFileId,
+					clip.audioFileName ?? clip.name ?? "",
+				);
+			} catch (error) {
+				console.error("Failed to load clip audio:", clip.name, error);
+			}
+		}
+
+		// Backward compatibility: load track-level opfsFileId if no clips loaded it
+		if (track.opfsFileId && !loadedIds.has(track.opfsFileId)) {
+			loadedIds.add(track.opfsFileId);
+			try {
+				await serviceRegistry.audioService.loadTrackFromOPFS(
+					track.opfsFileId,
+					track.audioFileName ?? track.name ?? "",
+				);
+			} catch (error) {
+				console.error("Failed to load track audio:", track.name, error);
+			}
 		}
 	}
 });
@@ -250,15 +268,18 @@ export const loadAudioFileAtom = atom(
 					clips: [...(existingTrack.clips ?? []), clip],
 				};
 
-				set(
-					tracksAtom,
-					tracks.map((t) => (t.id === existingTrackId ? updatedTrack : t)),
+				const allTracks = tracks.map((t) =>
+					t.id === existingTrackId ? updatedTrack : t,
 				);
+				set(tracksAtom, allTracks);
 
 				const playback = get(playbackAtom);
 				if (playback.isPlaying && serviceRegistry.playbackService) {
 					try {
-						await serviceRegistry.playbackService.rescheduleTrack(updatedTrack);
+						await serviceRegistry.playbackService.rescheduleTrack(
+							updatedTrack,
+							allTracks,
+						);
 					} catch (error) {
 						console.error("Failed to reschedule after adding clip", error);
 					}

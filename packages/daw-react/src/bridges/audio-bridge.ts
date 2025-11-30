@@ -108,6 +108,17 @@ export class AudioServiceBridge {
 	}
 
 	/**
+	 * Alias for loadFromOPFS to match service registry interface
+	 * Used by initializeAudioFromOPFSAtom
+	 */
+	async loadTrackFromOPFS(
+		opfsFileId: string,
+		fileName: string,
+	): Promise<void> {
+		await this.loadFromOPFS(opfsFileId, fileName);
+	}
+
+	/**
 	 * Get buffer sink - SDK primary, legacy fallback
 	 */
 	getBufferSink(trackId: string): any {

@@ -27,9 +27,9 @@ export interface BridgeMutations {
 
 	// Playback operations
 	play: (tracks: Track[], fromTime?: number) => Promise<void>;
-	stop: () => void;
-	pause: () => void;
-	seek: (timeMs: number) => void;
+	stop: () => Promise<void>;
+	pause: () => Promise<void>;
+	seek: (timeMs: number) => Promise<void>;
 }
 
 /**
@@ -126,28 +126,28 @@ export function useBridgeMutations(): BridgeMutations {
 		},
 	);
 
-	const handleStop = useEffectEvent(() => {
+	const handleStop = useEffectEvent(async () => {
 		if (!playbackBridge) {
 			console.warn("[useBridgeMutations] Playback bridge not ready");
 			return;
 		}
-		playbackBridge.stop();
+		await playbackBridge.stop();
 	});
 
-	const handlePause = useEffectEvent(() => {
+	const handlePause = useEffectEvent(async () => {
 		if (!playbackBridge) {
 			console.warn("[useBridgeMutations] Playback bridge not ready");
 			return;
 		}
-		playbackBridge.pause();
+		await playbackBridge.pause();
 	});
 
-	const handleSeek = useEffectEvent((timeMs: number) => {
+	const handleSeek = useEffectEvent(async (timeMs: number) => {
 		if (!playbackBridge) {
 			console.warn("[useBridgeMutations] Playback bridge not ready");
 			return;
 		}
-		playbackBridge.seek(timeMs);
+		await playbackBridge.seek(timeMs);
 	});
 
 	// Return stable callbacks using useCallback
