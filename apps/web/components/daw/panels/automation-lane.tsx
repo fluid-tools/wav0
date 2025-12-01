@@ -355,7 +355,6 @@ export function AutomationLane({
 			track={track}
 			trackHeight={trackHeight}
 			pxPerMs={pxPerMs}
-			scrollLeft={horizontalScroll}
 		>
 			{/* biome-ignore lint/a11y/useKeyWithClickEvents: Click requires mouse coordinates; keyboard access via context menu */}
 			<svg

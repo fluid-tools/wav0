@@ -424,6 +424,8 @@ export class PlaybackService {
 			const acStart = now + (segmentStart - currentTimeMs) / 1000;
 			// Skip segments that would start in the past - don't try to adjust them
 			// This prevents overlaps from race conditions during rapid reschedules
+			// Update lastMultiplier so next segment interpolates from correct value
+			// (cancelAndHoldAtTime removes scheduled curves, so we must track the skip)
 			if (acStart < now + schedulingEpsilon) {
 				lastTime = point.time;
 				lastMultiplier = point.value;

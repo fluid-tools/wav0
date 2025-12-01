@@ -26,7 +26,6 @@ type AutomationContextMenuProps = {
 	track: Track;
 	trackHeight: number;
 	pxPerMs: number;
-	scrollLeft?: number;
 	onAddPoint?: (point: TrackEnvelopePoint) => void;
 	children: React.ReactNode;
 };
@@ -35,7 +34,6 @@ export function AutomationContextMenu({
 	track,
 	trackHeight,
 	pxPerMs,
-	scrollLeft = 0,
 	onAddPoint,
 	children,
 }: AutomationContextMenuProps) {
@@ -61,8 +59,9 @@ export function AutomationContextMenu({
 	const handleAddPoint = () => {
 		if (!contextMenuState || !track.volumeEnvelope) return;
 
-		// Account for scroll offset
-		const time = (contextMenuState.x + scrollLeft) / pxPerMs;
+		// NOTE: Do NOT add scrollLeft - getBoundingClientRect() already accounts for scroll
+		// (rect.left becomes negative when scrolled), so contextMenuState.x is already absolute
+		const time = contextMenuState.x / pxPerMs;
 		const padding = 20;
 		const usableHeight = trackHeight - padding * 2;
 		const normalizedY =
@@ -87,8 +86,8 @@ export function AutomationContextMenu({
 	const handleDeletePoint = () => {
 		if (!contextMenuState || !track.volumeEnvelope) return;
 
-		// Find point near cursor (account for scroll offset)
-		const time = (contextMenuState.x + scrollLeft) / pxPerMs;
+		// NOTE: Do NOT add scrollLeft - getBoundingClientRect() already accounts for scroll
+		const time = contextMenuState.x / pxPerMs;
 
 		// Resolve clip-relative points to absolute time before comparison
 		const resolvedPoints = track.volumeEnvelope.points.map((point) => {
@@ -124,8 +123,8 @@ export function AutomationContextMenu({
 	const handleSetSegmentCurve = (curveValue: number) => {
 		if (!contextMenuState || !track.volumeEnvelope) return;
 
-		// Account for scroll offset
-		const time = (contextMenuState.x + scrollLeft) / pxPerMs;
+		// NOTE: Do NOT add scrollLeft - getBoundingClientRect() already accounts for scroll
+		const time = contextMenuState.x / pxPerMs;
 
 		// Resolve clip-relative points to absolute time.
 		// DO NOT SORT: Maintain original order to match segment definitions (fromPointId -> toPointId)
@@ -190,8 +189,8 @@ export function AutomationContextMenu({
 		if (!copiedAutomation || !contextMenuState) return;
 		if (copiedAutomation.points.length === 0) return;
 
-		// Account for scroll offset
-		const offset = (contextMenuState.x + scrollLeft) / pxPerMs;
+		// NOTE: Do NOT add scrollLeft - getBoundingClientRect() already accounts for scroll
+		const offset = contextMenuState.x / pxPerMs;
 		const minTime = Math.min(...copiedAutomation.points.map((p) => p.time));
 
 		// Create mapping from old point IDs to new point IDs
