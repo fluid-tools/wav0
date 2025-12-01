@@ -10,7 +10,6 @@ import type {
 } from "../types/schemas";
 import {
 	AUTOMATION_SCHEDULING_EPSILON_SEC,
-	MAX_AUTOMATION_CURVE_DURATION_SEC,
 	MIN_AUTOMATION_SEGMENT_DURATION_SEC,
 } from "./audio-scheduling-constants";
 import { audioService } from "./audio-service";
@@ -294,11 +293,9 @@ export class PlaybackService {
 		const envelopeGain = state.envelopeGainNode;
 		const now = this.audioContext.currentTime;
 
-		// Always cancel from now - MAX_CURVE_DURATION to ensure all active curves are canceled
-		// This is critical during rapid reschedules (e.g., dragging clips) - curves from previous
-		// schedules must be fully canceled regardless of their duration to prevent overlaps
-		const cancelFrom = Math.max(0, now - MAX_AUTOMATION_CURVE_DURATION_SEC);
-		envelopeGain.gain.cancelScheduledValues(cancelFrom);
+		// Cancel and hold at current time - more reliable for mid-playback changes
+		// This explicitly stops any in-progress automation and holds the current value
+		envelopeGain.gain.cancelAndHoldAtTime(now);
 
 		// Reset automation tracking to now after cancellation for clean scheduling state
 		state.lastAutomationEndTime = now;
@@ -425,14 +422,16 @@ export class PlaybackService {
 			}
 
 			const acStart = now + (segmentStart - currentTimeMs) / 1000;
+			// Skip segments that would start in the past - don't try to adjust them
+			// This prevents overlaps from race conditions during rapid reschedules
+			if (acStart < now + schedulingEpsilon) {
+				lastTime = point.time;
+				lastMultiplier = point.value;
+				continue;
+			}
 			let adjustedStart = acStart;
 			if (adjustedStart < lastScheduledEnd + schedulingEpsilon) {
 				adjustedStart = lastScheduledEnd + schedulingEpsilon;
-			}
-			// Safety check: ensure adjustedStart is >= now to prevent scheduling in the past
-			// This prevents overlaps with any curves that might not have been fully canceled
-			if (adjustedStart < now) {
-				adjustedStart = now + schedulingEpsilon;
 			}
 			const adjustedDuration = durationSec - (adjustedStart - acStart);
 			if (adjustedDuration <= schedulingEpsilon) {

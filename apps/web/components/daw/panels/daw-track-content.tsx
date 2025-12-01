@@ -28,6 +28,7 @@ import {
 	serviceRegistry,
 	timelineAtom,
 	timelinePxPerMsAtom,
+	timelineWidthAtom,
 	totalDurationAtom,
 	trackHeightZoomAtom,
 	tracksAtom,
@@ -48,6 +49,7 @@ export function DAWTrackContent() {
 	const [playback] = useAtom(playbackAtom);
 	const [timeline] = useAtom(timelineAtom);
 	const [pxPerMs] = useAtom(timelinePxPerMsAtom);
+	const [timelineWidth] = useAtom(timelineWidthAtom);
 	const [trackHeightZoom] = useAtom(trackHeightZoomAtom);
 	const [projectEndPosition] = useAtom(projectEndPositionAtom);
 	const [totalDuration] = useAtom(totalDurationAtom);
@@ -1017,9 +1019,7 @@ export function DAWTrackContent() {
 								<AutomationLane
 									track={track}
 									trackHeight={trackHeight}
-									trackWidth={
-										containerRef.current?.getBoundingClientRect().width ?? 2000
-									}
+									trackWidth={timelineWidth}
 								/>
 							</div>
 						</div>
