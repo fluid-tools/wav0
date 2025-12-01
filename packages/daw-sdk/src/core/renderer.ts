@@ -139,6 +139,10 @@ function scheduleTrackEnvelopeInRange(
 	const segs: TrackEnvelopeSegment[] = envelope.segments || [];
 	const sorted = [...points].sort((a, b) => a.time - b.time);
 
+	// Track last scheduled end time to prevent overlaps
+	const EPSILON_SEC = 0.001; // 1ms gap between curves
+	let lastScheduledEndSec = 0;
+
 	for (let i = 0; i < sorted.length - 1; i++) {
 		const a = sorted[i];
 		const b = sorted[i + 1];
@@ -152,8 +156,18 @@ function scheduleTrackEnvelopeInRange(
 		const curve = seg?.curve ?? 0;
 		const startVal = automation.evaluateEnvelopeGainAt(envelope, segStartMs);
 		const endVal = automation.evaluateEnvelopeGainAt(envelope, segEndMs);
-		const relStartSec = (segStartMs - rangeStartMs) / 1000;
-		const relDurSec = (segEndMs - segStartMs) / 1000;
+		let relStartSec = (segStartMs - rangeStartMs) / 1000;
+		let relDurSec = (segEndMs - segStartMs) / 1000;
+
+		// Ensure no overlap with previous segment
+		if (relStartSec < lastScheduledEndSec + EPSILON_SEC) {
+			const adjustment = lastScheduledEndSec + EPSILON_SEC - relStartSec;
+			relStartSec += adjustment;
+			relDurSec -= adjustment;
+		}
+
+		// Skip if duration too short after adjustment
+		if (relDurSec <= EPSILON_SEC) continue;
 
 		const samples = Math.max(16, Math.min(256, Math.floor(relDurSec * 100)));
 		const arr = new Float32Array(samples);
@@ -162,6 +176,7 @@ function scheduleTrackEnvelopeInRange(
 			arr[s] = curves.evaluateSegmentCurve(startVal, endVal, t, curve);
 		}
 		param.setValueCurveAtTime(arr, relStartSec, relDurSec);
+		lastScheduledEndSec = relStartSec + relDurSec;
 	}
 }
 

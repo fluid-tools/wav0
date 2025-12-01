@@ -67,7 +67,11 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 				channels: ch,
 			});
 			setPreviewBuffer(buffer);
-			if (!playerRef.current) playerRef.current = createPreviewPlayer();
+			if (!playerRef.current) {
+				playerRef.current = createPreviewPlayer();
+				// Set up onended handler when player is created (not in useEffect)
+				playerRef.current.onended = () => onPlayerEnded();
+			}
 			playerRef.current.load(buffer);
 			playerRef.current.setGain(previewVol);
 		} finally {
@@ -77,7 +81,11 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 
 	function playPreview() {
 		if (!previewBuffer) return;
-		if (!playerRef.current) playerRef.current = createPreviewPlayer();
+		if (!playerRef.current) {
+			playerRef.current = createPreviewPlayer();
+			// Set up onended handler when player is created (not in useEffect)
+			playerRef.current.onended = () => onPlayerEnded();
+		}
 		playerRef.current.load(previewBuffer);
 		playerRef.current.setGain(previewVol);
 		playerRef.current.play();
@@ -107,15 +115,8 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 		};
 	}, [open]);
 
-	// Set up player event handlers with useEffectEvent
-	useEffect(() => {
-		const player = playerRef.current;
-		if (!player) return;
-
-		// Set up event handler that doesn't cause effect re-runs
-		player.onended = () => onPlayerEnded();
-		// No cleanup needed - onended is on the player object itself
-	}, []);
+	// NOTE: Player event handler (onended) is set up inline when player is created
+	// in onPreview() and playPreview(), not in useEffect with empty deps []
 
 	const getRangeMs = useCallback(() => {
 		if (range === "loop" && loopRegion.enabled) {

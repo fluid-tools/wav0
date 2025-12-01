@@ -66,14 +66,17 @@ export function ExportPreviewLanes({
 					const cycleLen = clipDuration;
 					const loopEnd = clip.loopEnd || Infinity;
 
-					// Find first cycle start within range
-					let firstCycleStart = clip.startTime;
-					if (range.startMs > clip.startTime) {
-						const cyclesOffset = Math.floor(
-							(range.startMs - clip.startTime) / cycleLen,
-						);
-						firstCycleStart = clip.startTime + cyclesOffset * cycleLen;
-					}
+				// Find first cycle start within range
+				let firstCycleStart = clip.startTime;
+				if (range.startMs > clip.startTime) {
+					// Use Math.floor to find the cycle that contains or precedes range.startMs
+					// Cycles starting before the range but extending into it render with negative x,
+					// which is correctly clipped by the SVG to show only the audible portion
+					const cyclesOffset = Math.floor(
+						(range.startMs - clip.startTime) / cycleLen,
+					);
+					firstCycleStart = clip.startTime + cyclesOffset * cycleLen;
+				}
 
 					// Tile cycles across the range
 					let currentStart = firstCycleStart;

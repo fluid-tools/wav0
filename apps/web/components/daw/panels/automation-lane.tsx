@@ -167,12 +167,15 @@ export function AutomationLane({
 
 			if (!isCmdCtrlClick && !isDoubleClick) return;
 
-			const rect = svgRef.current.getBoundingClientRect();
-			const x = e.clientX - rect.left;
-			const y = e.clientY - rect.top;
+		const rect = svgRef.current.getBoundingClientRect();
+		const x = e.clientX - rect.left;
+		const y = e.clientY - rect.top;
 
-			// Convert pixel position to time and value (account for horizontal scroll)
-			const time = (x + horizontalScroll) / pxPerMs;
+		// Convert pixel position to time and value
+		// NOTE: Do NOT add horizontalScroll here - getBoundingClientRect() already
+		// accounts for scroll (rect.left becomes negative when scrolled), so
+		// x = clientX - rect.left gives the absolute position within the SVG
+		const time = x / pxPerMs;
 			const padding = 20;
 			const usableHeight = trackHeight - padding * 2;
 			const normalizedY = (trackHeight - padding - y) / usableHeight;
@@ -188,12 +191,12 @@ export function AutomationLane({
 			// Use helper to add point and generate segments
 			const updatedEnvelope = addAutomationPoint(envelope, newPoint);
 
-			updateTrack(track.id, {
-				volumeEnvelope: updatedEnvelope,
-			});
-		},
-		[envelope, pxPerMs, trackHeight, track.id, updateTrack, horizontalScroll],
-	);
+		updateTrack(track.id, {
+			volumeEnvelope: updatedEnvelope,
+		});
+	},
+	[envelope, pxPerMs, trackHeight, track.id, updateTrack],
+);
 
 	// Lock scroll while dragging automation point
 	useEffect(() => {
@@ -248,9 +251,10 @@ export function AutomationLane({
 	// subtracting horizontalScroll. This is intentional - the entire track content area
 	// scrolls as a unit via CSS overflow:scroll on the parent container. Elements are
 	// rendered at absolute timeline positions, and the browser's scroll mechanism moves
-	// the viewport over that content. Click handlers DO need scrollLeft to convert
-	// viewport-relative click coordinates back to absolute timeline time, but rendering
-	// positions do not. This matches how clips are positioned (clipX = clip.startTime * pixelsPerMs).
+	// the viewport over that content.
+	// Click handlers also don't need scroll adjustment because getBoundingClientRect()
+	// returns viewport-relative position - when scrolled, rect.left becomes negative,
+	// so (clientX - rect.left) already gives absolute position within the SVG.
 	const generatePath = (): string => {
 		if (sorted.length === 0) return "";
 
