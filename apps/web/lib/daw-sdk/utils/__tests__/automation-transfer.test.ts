@@ -1,9 +1,11 @@
+import type { Clip, Track, TrackEnvelope } from "@wav0/daw-sdk";
+import {
+	playbackAtom,
+	tracksAtom,
+	updateClipAtom,
+} from "@wav0/daw-react/atoms";
 import type { Getter, Setter } from "jotai";
 import { describe, expect, it } from "vitest";
-import { playbackAtom, tracksAtom } from "../../state/atoms";
-import { updateClipAtom } from "../../state/clips";
-import type { Clip, Track } from "../../state/types";
-import type { TrackEnvelope } from "../../types/schemas";
 import {
 	bindEnvelopeToClips,
 	computeAutomationTransfer,

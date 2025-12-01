@@ -7,7 +7,7 @@
  */
 
 import type { AudioBufferSink } from "mediabunny";
-import type { AudioFileInfo, PlaybackOptions, Track } from "../types/schemas";
+import type { AudioFileInfo, PlaybackOptions, Track } from "@wav0/daw-sdk";
 // TimeGrid type removed - use ReturnType<typeof time.generateTimeGrid> instead
 
 // ===== Audio Provider Interface =====

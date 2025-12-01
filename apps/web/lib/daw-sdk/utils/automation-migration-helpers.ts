@@ -3,59 +3,19 @@
  * Used by components for clip-relative automation, range operations, etc.
  */
 
-import { automation } from "@wav0/daw-sdk";
-import type {
-	Clip,
-	Track,
-	TrackEnvelope,
-	TrackEnvelopePoint,
-	TrackEnvelopeSegment,
-} from "../types/schemas";
+import {
+	automation,
+	type Clip,
+	type Track,
+	type TrackEnvelope,
+	type TrackEnvelopePoint,
+	type TrackEnvelopeSegment,
+} from "@wav0/daw-sdk";
 
 // Re-export SDK automation functions for backward compatibility
 export const addAutomationPoint = automation.addAutomationPoint;
 export const removeAutomationPoint = automation.removeAutomationPoint;
 export const updateSegmentCurve = automation.updateSegmentCurve;
-
-/**
- * Convert absolute automation point to clip-relative
- */
-export function makePointClipRelative(
-	point: TrackEnvelopePoint,
-	clipId: string,
-	clipStartTime: number,
-): TrackEnvelopePoint {
-	const relativeTime = point.time - clipStartTime;
-	return {
-		...point,
-		time: relativeTime,
-		clipRelativeTime: relativeTime,
-		clipId,
-	};
-}
-
-/**
- * Resolve clip-relative point to absolute time
- */
-export function resolveClipRelativePoint(
-	point: TrackEnvelopePoint,
-	clipStartTime: number,
-): TrackEnvelopePoint {
-	// If clipRelativeTime is defined, use it directly
-	// Otherwise, if clip-bound, derive relative time from absolute time
-	// If not clip-bound, point.time is already absolute
-	const relativeTime =
-		point.clipRelativeTime !== undefined
-			? point.clipRelativeTime
-			: point.clipId
-				? point.time - clipStartTime // Derive relative time from absolute time
-				: point.time; // Not clip-bound: use absolute time as-is
-	return {
-		...point,
-		time: relativeTime + clipStartTime,
-		clipId: undefined,
-	};
-}
 
 /**
  * Options for automation transfer

@@ -77,8 +77,16 @@ export { computeLoopEndMs, DEFAULT_LOOPING_POLICY };
 // ===== Audio Encoding from @wav0/daw-sdk =====
 export type { AudioFormat } from "@wav0/daw-sdk";
 export { encode, getFileExtension, getMimeType } from "@wav0/daw-sdk";
-// ===== Legacy Audio Scheduling Constants (some may duplicate SDK) =====
-export * from "./core/audio-scheduling-constants";
+
+// ===== Audio Scheduling Constants from @wav0/daw-sdk =====
+export {
+	AUTOMATION_CANCEL_LOOKAHEAD_SEC,
+	AUTOMATION_SCHEDULING_EPSILON_SEC,
+	MIN_AUTOMATION_SEGMENT_DURATION_SEC,
+	MAX_AUTOMATION_CURVE_DURATION_SEC,
+	START_GRACE_SEC,
+} from "@wav0/daw-sdk";
+
 // ===== Renderer from @wav0/daw-sdk =====
 export type { AudioBufferProvider, RenderOptions } from "@wav0/daw-sdk";
 export { renderProjectToAudioBuffer } from "@wav0/daw-sdk";
@@ -99,8 +107,6 @@ export * from "./core/types";
 export const { migrateAutomationToSegments, resolveClipRelativePoint } =
 	automation;
 
-// ===== Legacy Type Schemas (Zod validators) =====
-export * from "./types/schemas";
 // ===== Legacy Utilities (still used by some components) =====
 // TODO: Migrate consumers to use automation.* directly then remove these
 export {

@@ -7,8 +7,8 @@ import {
 	Input,
 	type InputAudioTrack,
 } from "mediabunny";
+import { AudioFileInfoSchema, type AudioFileInfo } from "@wav0/daw-sdk";
 import { opfsManager } from "../../storage/opfs";
-import { type AudioFileInfo, AudioFileInfoSchema } from "../types/schemas";
 
 /**
  * Loaded audio track with MediaBunny references

@@ -126,23 +126,22 @@ export function AutomationContextMenu({
 		// NOTE: Do NOT add scrollLeft - getBoundingClientRect() already accounts for scroll
 		const time = contextMenuState.x / pxPerMs;
 
-		// Resolve clip-relative points to absolute time.
-		// DO NOT SORT: Maintain original order to match segment definitions (fromPointId -> toPointId)
-		const resolvedPoints = track.volumeEnvelope.points.map((point) => {
-			const clip = track.clips?.find((c) => c.id === point.clipId);
-			return clip ? resolveClipRelativePoint(point, clip.startTime) : point;
-		});
+		// Resolve clip-relative points to absolute time, then sort by time.
+		// Segments are defined between time-adjacent points (see generateSegmentsFromPoints),
+		// so we must iterate in time order to match segment definitions.
+		const resolvedPoints = track.volumeEnvelope.points
+			.map((point) => {
+				const clip = track.clips?.find((c) => c.id === point.clipId);
+				return clip ? resolveClipRelativePoint(point, clip.startTime) : point;
+			})
+			.sort((a, b) => a.time - b.time);
 
-		// Find segment at cursor
+		// Find segment at cursor (time-sorted order matches segment fromPointId -> toPointId)
 		for (let i = 0; i < resolvedPoints.length - 1; i++) {
 			const p1 = resolvedPoints[i];
 			const p2 = resolvedPoints[i + 1];
 
-			// Use Min/Max because resolved points might be flipped in time relative to index order
-			if (
-				time >= Math.min(p1.time, p2.time) &&
-				time <= Math.max(p1.time, p2.time)
-			) {
+			if (time >= p1.time && time <= p2.time) {
 				const segment = track.volumeEnvelope.segments?.find(
 					(s) => s.fromPointId === p1.id && s.toPointId === p2.id,
 				);

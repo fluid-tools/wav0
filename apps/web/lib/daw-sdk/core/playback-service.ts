@@ -1,17 +1,17 @@
 "use client";
 
-import { automation, volume } from "@wav0/daw-sdk";
-import { z } from "zod";
-import type {
-	Clip,
-	PlaybackOptions,
-	Track,
-	TrackEnvelope,
-} from "../types/schemas";
 import {
+	automation,
 	AUTOMATION_SCHEDULING_EPSILON_SEC,
 	MIN_AUTOMATION_SEGMENT_DURATION_SEC,
-} from "./audio-scheduling-constants";
+	START_GRACE_SEC,
+	volume,
+	type Clip,
+	type PlaybackOptions,
+	type Track,
+	type TrackEnvelope,
+} from "@wav0/daw-sdk";
+import { z } from "zod";
 import { audioService } from "./audio-service";
 
 type ClipPlaybackState = {
@@ -76,7 +76,6 @@ export class PlaybackService {
 	// Serialization mutex for all sync operations
 	private syncLock: Promise<void> = Promise.resolve();
 	private lastScheduleLeadMs = 0;
-	private static readonly START_GRACE_SEC = 0.0125;
 
 	private constructor() {}
 
@@ -809,7 +808,7 @@ export class PlaybackService {
 			timeIntoClip = Math.max(0, timelineSec - clipStartSec);
 		}
 
-		if (timeIntoClip > 0 && timeIntoClip < PlaybackService.START_GRACE_SEC) {
+		if (timeIntoClip > 0 && timeIntoClip < START_GRACE_SEC) {
 			timeIntoClip = 0;
 		}
 
@@ -904,7 +903,7 @@ export class PlaybackService {
 				const currentTl = this.getPlaybackTime();
 				let leadSec = timelinePos - currentTl;
 				if (leadSec >= 0) {
-					leadSec = Math.max(leadSec, PlaybackService.START_GRACE_SEC);
+					leadSec = Math.max(leadSec, START_GRACE_SEC);
 				}
 				this.lastScheduleLeadMs = leadSec * 1000;
 				const startAt = now + leadSec;
