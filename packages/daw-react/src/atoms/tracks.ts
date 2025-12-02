@@ -180,7 +180,7 @@ export const renameTrackAtom = atom(
 
 export const initializeAudioFromOPFSAtom = atom(null, async (get, _set) => {
 	if (!serviceRegistry.audioService) {
-		console.warn("Audio service not registered");
+		// Expected on first render - will retry when AudioServiceBridge is ready
 		return;
 	}
 	const tracks = get(tracksAtom);
