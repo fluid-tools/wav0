@@ -12,9 +12,11 @@ import {
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AutomationContextMenu } from "@/components/daw/context-menus/automation-context-menu";
-import { addAutomationPoint } from "@/lib/daw-sdk";
-
-const { migrateAutomationToSegments, resolveClipRelativePoint } = automation;
+const {
+	addAutomationPoint,
+	migrateAutomationToSegments,
+	resolveClipRelativePoint,
+} = automation;
 
 type AutomationLaneProps = {
 	track: Track;

@@ -1,8 +1,8 @@
 "use client";
 
+import { serviceRegistry } from "@wav0/daw-react";
 import { volume } from "@wav0/daw-sdk";
 import { useEffect, useState } from "react";
-import { playbackService } from "@/lib/daw-sdk";
 import { cn } from "@/lib/utils";
 
 export function MasterMeter() {
@@ -10,7 +10,9 @@ export function MasterMeter() {
 
 	useEffect(() => {
 		const interval = setInterval(() => {
-			const currentDb = playbackService.getMasterDb();
+			const currentDb =
+				serviceRegistry.playbackService?.getMasterDb() ??
+				Number.NEGATIVE_INFINITY;
 			setDb(currentDb);
 		}, 50); // Update UI at 20Hz
 

@@ -8,6 +8,7 @@
 import type { PlaybackState, Track } from "@wav0/daw-sdk";
 import { atom, type Getter, type Setter } from "jotai";
 import { playbackAtom, totalDurationAtom, tracksAtom } from "./base";
+import { loopRegionAtom } from "./project";
 import { serviceRegistry } from "./service-registry";
 
 // ===== Guarded Time Update =====
@@ -15,14 +16,27 @@ import { serviceRegistry } from "./service-registry";
 /**
  * Creates a time update callback with isolated throttling state.
  * Each playback session gets its own state to avoid cross-session interference.
+ *
+ * Handles:
+ * - Global project looping (playbackAtom.looping)
+ * - Loop region (loopRegionAtom with enabled, startMs, endMs)
+ * - End-of-project detection
  */
-function createGuardedTimeUpdateCallback(get: Getter, set: Setter) {
+function createGuardedTimeUpdateCallback(
+	get: Getter,
+	set: Setter,
+	restartPlayback: () => Promise<void>,
+) {
 	// Per-instance throttling state (not shared across sessions)
 	let lastUpdateTime = 0;
 	let lastUpdateMs = 0;
 	let isFirstUpdate = true;
+	let isRestarting = false;
 
-	return (timeSeconds: number) => {
+	return async (timeSeconds: number) => {
+		// Prevent re-entrancy during restart
+		if (isRestarting) return;
+
 		const currentMs = Math.max(0, timeSeconds * 1000);
 		const now = performance.now();
 
@@ -49,9 +63,42 @@ function createGuardedTimeUpdateCallback(get: Getter, set: Setter) {
 			return;
 		}
 
+		// Get loop region state (read fresh each time to detect runtime changes)
+		const loopRegion = get(loopRegionAtom);
 		const total = get(totalDurationAtom) as number;
 
-		if (currentMs >= total) {
+		// Determine effective loop boundary
+		let loopEndMs = total;
+		let loopStartMs = 0;
+
+		if (loopRegion.enabled && loopRegion.endMs > loopRegion.startMs) {
+			// Loop region is enabled - use its boundaries
+			loopEndMs = loopRegion.endMs;
+			loopStartMs = loopRegion.startMs;
+		}
+
+		// Check if we've reached the loop end (or project end)
+		if (currentMs >= loopEndMs) {
+			// Check looping flag (read fresh to detect runtime toggle)
+			const currentPlayback = get(playbackAtom) as PlaybackState;
+
+			if (currentPlayback.looping) {
+				// Loop back to start
+				isRestarting = true;
+				try {
+					set(playbackAtom, {
+						...currentPlayback,
+						currentTime: loopStartMs,
+					});
+					// Restart playback from loop start
+					await restartPlayback();
+				} finally {
+					isRestarting = false;
+				}
+				return;
+			}
+
+			// Not looping - stop playback
 			set(playbackAtom, { ...newPlayback, currentTime: 0, isPlaying: false });
 			return;
 		}
@@ -122,10 +169,27 @@ export const togglePlaybackAtom = atom(null, async (get, set) => {
 
 	await serviceRegistry.playbackService.initializeWithTracks(tracks);
 
+	// Create restart function for looping support
+	const restartPlayback = async () => {
+		const currentTracks = get(tracksAtom) as Track[];
+		const loopRegion = get(loopRegionAtom);
+		const startMs = loopRegion.enabled ? loopRegion.startMs : 0;
+
+		await serviceRegistry.playbackService?.pause();
+		await serviceRegistry.playbackService?.play(currentTracks, {
+			startTime: startMs / 1000,
+			onTimeUpdate: createGuardedTimeUpdateCallback(get, set, restartPlayback),
+			onPlaybackEnd: () => {
+				const endState = get(playbackAtom);
+				set(playbackAtom, { ...endState, isPlaying: false });
+			},
+		});
+	};
+
 	// Each play() call creates a fresh callback with its own throttling state
 	await serviceRegistry.playbackService.play(tracks, {
 		startTime: currentTimeSeconds,
-		onTimeUpdate: createGuardedTimeUpdateCallback(get, set),
+		onTimeUpdate: createGuardedTimeUpdateCallback(get, set, restartPlayback),
 		onPlaybackEnd: () => {
 			const endState = get(playbackAtom);
 			set(playbackAtom, { ...endState, isPlaying: false });
@@ -158,10 +222,27 @@ export const setCurrentTimeAtom = atom(
 
 		await serviceRegistry.playbackService.pause();
 
+		// Create restart function for looping support
+		const restartPlayback = async () => {
+			const currentTracks = get(tracksAtom) as Track[];
+			const loopRegion = get(loopRegionAtom);
+			const startMs = loopRegion.enabled ? loopRegion.startMs : 0;
+
+			await serviceRegistry.playbackService?.pause();
+			await serviceRegistry.playbackService?.play(currentTracks, {
+				startTime: startMs / 1000,
+				onTimeUpdate: createGuardedTimeUpdateCallback(get, set, restartPlayback),
+				onPlaybackEnd: () => {
+					const endState = get(playbackAtom);
+					set(playbackAtom, { ...endState, isPlaying: false });
+				},
+			});
+		};
+
 		// Each play() call creates a fresh callback with its own throttling state
 		await serviceRegistry.playbackService.play(tracks, {
 			startTime: timeMs / 1000,
-			onTimeUpdate: createGuardedTimeUpdateCallback(get, set),
+			onTimeUpdate: createGuardedTimeUpdateCallback(get, set, restartPlayback),
 			onPlaybackEnd: () => {
 				const endState = get(playbackAtom);
 				set(playbackAtom, { ...endState, isPlaying: false });

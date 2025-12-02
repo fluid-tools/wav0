@@ -27,7 +27,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { audioService } from "@/lib/daw-sdk";
+import { serviceRegistry } from "@wav0/daw-react";
 
 type Props = { open: boolean; onOpenChange: (v: boolean) => void };
 
@@ -48,10 +48,11 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 	const [projectName] = useAtom(projectNameAtom);
 	const [loopRegion] = useAtom(loopRegionAtom);
 
-	// AudioBufferProvider wrapper for audioService
+	// AudioBufferProvider wrapper for service registry
 	const audioProvider = {
 		getAudioBuffer: (opfsFileId: string, fileName: string) =>
-			audioService.getAudioBuffer(opfsFileId, fileName),
+			serviceRegistry.audioService?.getAudioBuffer(opfsFileId, fileName) ??
+			Promise.resolve(null),
 	};
 
 	async function onPreview() {

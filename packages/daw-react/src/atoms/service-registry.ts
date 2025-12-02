@@ -9,6 +9,10 @@ export interface ServiceRegistry {
 	audioService?: {
 		loadAudioFile: (file: File, opfsFileId: string) => Promise<any>;
 		loadTrackFromOPFS: (opfsFileId: string, fileName: string) => Promise<void>;
+		getAudioBuffer: (
+			opfsFileId: string,
+			fileName: string,
+		) => Promise<AudioBuffer | null>;
 	};
 	playbackService?: {
 		play: (
@@ -24,6 +28,7 @@ export interface ServiceRegistry {
 		synchronizeTracks: (tracks: Track[]) => Promise<void>;
 		rescheduleTrack: (track: Track, allTracks?: Track[]) => Promise<void>;
 		updateTrackVolume: (trackId: string, volume: number) => void;
+		updateTrackVolumeRealtime: (trackId: string, volumeDb: number) => void;
 		updateTrackMute: (
 			trackId: string,
 			muted: boolean,
@@ -32,6 +37,7 @@ export interface ServiceRegistry {
 		) => void;
 		updateSoloStates: (tracks: Track[]) => void;
 		initializeWithTracks: (tracks: Track[]) => Promise<void>;
+		getMasterDb: () => number;
 	};
 	generateTrackId?: () => string;
 }

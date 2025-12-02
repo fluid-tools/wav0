@@ -90,8 +90,8 @@ export function DAWControls() {
 	const findSelectedClip = () => {
 		if (!selectedTrackId || !selectedClipId)
 			return null as {
-				track: import("@/lib/daw-sdk").Track;
-				clip: import("@/lib/daw-sdk").Clip;
+				track: import("@wav0/daw-sdk").Track;
+				clip: import("@wav0/daw-sdk").Clip;
 			} | null;
 		const track = tracks.find((t) => t.id === selectedTrackId);
 		if (!track || !track.clips) return null;

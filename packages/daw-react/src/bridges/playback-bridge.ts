@@ -207,7 +207,7 @@ export class PlaybackServiceBridge {
 	}
 
 	/**
-	 * Update track volume (realtime during playback)
+	 * Update track volume
 	 */
 	updateTrackVolume(trackId: string, volumeDb: number): void {
 		if (USE_LEGACY_PLAYBACK) {
@@ -217,6 +217,20 @@ export class PlaybackServiceBridge {
 
 		const transport = this.sdk.getTransport();
 		transport.updateTrackVolume(trackId, volumeDb);
+	}
+
+	/**
+	 * Update track volume during playback without disrupting automation
+	 * Scales the base volume that automation multiplies against
+	 */
+	updateTrackVolumeRealtime(trackId: string, volumeDb: number): void {
+		if (USE_LEGACY_PLAYBACK) {
+			this.legacyService.updateTrackVolumeRealtime(trackId, volumeDb);
+			return;
+		}
+
+		const transport = this.sdk.getTransport();
+		transport.updateTrackVolumeRealtime(trackId, volumeDb);
 	}
 
 	/**
@@ -294,6 +308,13 @@ export class PlaybackServiceBridge {
 
 		const transport = this.sdk.getTransport();
 		return transport.getMasterDb();
+	}
+
+	/**
+	 * Alias for getMasterMeterDb for service registry compatibility
+	 */
+	getMasterDb(): number {
+		return this.getMasterMeterDb();
 	}
 
 	/**

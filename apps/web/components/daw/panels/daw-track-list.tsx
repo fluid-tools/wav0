@@ -44,7 +44,7 @@ import {
 	DAW_SPACING,
 	DAW_TEXT,
 } from "@/lib/constants/daw-design";
-import { playbackService } from "@/lib/daw-sdk";
+import { serviceRegistry } from "@wav0/daw-react";
 import { cn } from "@/lib/utils";
 
 export function DAWTrackList() {
@@ -91,8 +91,8 @@ export function DAWTrackList() {
 		updateTrack(trackId, { volume: volumePercent, volumeDb });
 
 		// If playing, use realtime update to avoid disrupting automation
-		if (playback.isPlaying) {
-			playbackService.updateTrackVolumeRealtime(trackId, volumeDb);
+		if (playback.isPlaying && serviceRegistry.playbackService) {
+			serviceRegistry.playbackService.updateTrackVolumeRealtime(trackId, volumeDb);
 		}
 	};
 

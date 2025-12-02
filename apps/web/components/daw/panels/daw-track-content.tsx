@@ -37,7 +37,7 @@ import { DAW_HEIGHTS } from "@/lib/constants/daw-design";
 import {
 	computeAutomationTransfer,
 	mergeAutomationPoints,
-} from "@/lib/daw-sdk";
+} from "@/lib/utils/automation-helpers";
 import { cn } from "@/lib/utils";
 
 export function DAWTrackContent() {

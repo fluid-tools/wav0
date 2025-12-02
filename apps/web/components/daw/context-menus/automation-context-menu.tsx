@@ -16,13 +16,12 @@ import {
 	ContextMenuSeparator,
 	ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import {
+const {
 	addAutomationPoint,
 	removeAutomationPoint,
 	updateSegmentCurve,
-} from "@/lib/daw-sdk";
-
-const { resolveClipRelativePoint } = automation;
+	resolveClipRelativePoint,
+} = automation;
 
 type AutomationContextMenuProps = {
 	track: Track;
