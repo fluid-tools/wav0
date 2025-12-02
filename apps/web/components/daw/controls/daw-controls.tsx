@@ -1,6 +1,5 @@
 "use client";
 
-import { computeLoopEndMs, time } from "@wav0/daw-sdk";
 import {
 	playbackAtom,
 	selectedClipIdAtom,
@@ -16,6 +15,7 @@ import {
 	tracksAtom,
 	updateClipAtom,
 } from "@wav0/daw-react";
+import { computeLoopEndMs, time } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
 import {
 	ChevronsUpDown,
@@ -38,7 +38,7 @@ import {
 } from "@/lib/constants/daw-design";
 import { MasterMeter } from "./master-meter";
 
-export function DAWControls() {
+function DAWControls() {
 	const [playback] = useAtom(playbackAtom);
 	const [timeline] = useAtom(timelineAtom);
 	const [trackHeightZoom] = useAtom(trackHeightZoomAtom);
@@ -304,3 +304,5 @@ export function DAWControls() {
 		</div>
 	);
 }
+
+export { DAWControls };

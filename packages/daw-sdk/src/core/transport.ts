@@ -403,10 +403,16 @@ export class Transport extends EventTarget {
 			this.activeNodes.add(node);
 			clipState.audioSources.push(node);
 			node.onended = () => {
+				node.onended = null; // Break circular reference
 				this.activeNodes.delete(node);
 				const idx = clipState.audioSources.indexOf(node);
 				if (idx >= 0) {
 					clipState.audioSources.splice(idx, 1);
+				}
+				try {
+					node.disconnect();
+				} catch {
+					// Already disconnected
 				}
 			};
 		}
@@ -443,20 +449,14 @@ export class Transport extends EventTarget {
 		// Stop time update loop
 		this.stopTimeUpdateLoop();
 
-		// Stop all active nodes
-		for (const node of this.activeNodes) {
-			try {
-				node.stop();
-			} catch (e) {
-				// Ignore errors from already-stopped nodes
-			}
-		}
+		// Clear activeNodes tracking (actual cleanup happens via clipStates)
 		this.activeNodes.clear();
 
-		// Clean up clip states
+		// Clean up clip states (authoritative source for audio nodes)
 		for (const [, clipState] of this.clipStates) {
 			for (const source of clipState.audioSources) {
 				try {
+					source.onended = null;
 					source.stop();
 					source.disconnect();
 				} catch (e) {
@@ -494,20 +494,14 @@ export class Transport extends EventTarget {
 		// Stop time update loop
 		this.stopTimeUpdateLoop();
 
-		// Stop all active nodes
-		for (const node of this.activeNodes) {
-			try {
-				node.stop();
-			} catch (e) {
-				// Ignore errors from already-stopped nodes
-			}
-		}
+		// Clear activeNodes tracking (actual cleanup happens via clipStates)
 		this.activeNodes.clear();
 
 		// Clean up clip states but keep track states for resume
 		for (const [, clipState] of this.clipStates) {
 			for (const source of clipState.audioSources) {
 				try {
+					source.onended = null;
 					source.stop();
 					source.disconnect();
 				} catch (e) {
@@ -947,6 +941,7 @@ export class Transport extends EventTarget {
 		// Stop all sources
 		for (const source of clipState.audioSources) {
 			try {
+				source.onended = null;
 				source.stop();
 				source.disconnect();
 			} catch (e) {

@@ -82,6 +82,7 @@ export function createPreviewPlayer(): PreviewPlayer {
 
 	function cleanupSource(): void {
 		if (src) {
+			src.onended = null;
 			try {
 				src.stop();
 			} catch {

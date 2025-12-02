@@ -118,7 +118,8 @@ export default function ChatBotDemo() {
 		sendMessage(
 			{
 				text: message.text || "Sent with attachments",
-				files: message.files,
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				files: message.files as any,
 			},
 			{
 				body: {
