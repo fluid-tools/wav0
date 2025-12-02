@@ -1,6 +1,6 @@
 "use client";
+import type { Track } from "@wav0/daw-sdk";
 import { useMemo } from "react";
-import type { Track } from "@/lib/daw-sdk";
 
 export type ExportPreviewLanesProps = {
 	width: number;

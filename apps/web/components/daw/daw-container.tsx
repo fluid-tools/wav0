@@ -1,6 +1,24 @@
 "use client";
 
-import { useBridges, useDAWAtomSync } from "@wav0/daw-react";
+import {
+	addTrackAtom,
+	horizontalScrollAtom,
+	initializeAudioFromOPFSAtom,
+	playbackAtom,
+	playheadAutoFollowEnabledAtom,
+	playheadDraggingAtom,
+	playheadViewportAtom,
+	setTimelineZoomAtom,
+	timelineAtom,
+	timelineViewportAtom,
+	timelineWidthAtom,
+	trackHeightZoomAtom,
+	tracksAtom,
+	useBridges,
+	useDAWAtomSync,
+	userIsManuallyScrollingAtom,
+	verticalScrollAtom,
+} from "@wav0/daw-react";
 import { useAtom } from "jotai";
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
@@ -17,23 +35,6 @@ import {
 	DAW_SPACING,
 	DAW_TEXT,
 } from "@/lib/constants/daw-design";
-import {
-	addTrackAtom,
-	horizontalScrollAtom,
-	initializeAudioFromOPFSAtom,
-	playbackAtom,
-	playheadAutoFollowEnabledAtom,
-	playheadDraggingAtom,
-	playheadViewportAtom,
-	setTimelineZoomAtom,
-	timelineAtom,
-	timelineViewportAtom,
-	timelineWidthAtom,
-	trackHeightZoomAtom,
-	tracksAtom,
-	userIsManuallyScrollingAtom,
-	verticalScrollAtom,
-} from "@/lib/daw-sdk";
 import { DAWControls } from "./controls/daw-controls";
 import { DAWToolbar } from "./controls/daw-toolbar";
 import { GlobalShortcuts } from "./controls/global-shortcuts";

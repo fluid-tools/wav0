@@ -1,5 +1,12 @@
 "use client";
 
+import { updateTrackAtom } from "@wav0/daw-react";
+import type {
+	Track,
+	TrackEnvelopePoint,
+	TrackEnvelopeSegment,
+} from "@wav0/daw-sdk";
+import { automation } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
 import { useState } from "react";
 import {
@@ -9,18 +16,13 @@ import {
 	ContextMenuSeparator,
 	ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import type {
-	Track,
-	TrackEnvelopePoint,
-	TrackEnvelopeSegment,
-} from "@/lib/daw-sdk";
 import {
 	addAutomationPoint,
 	removeAutomationPoint,
-	resolveClipRelativePoint,
 	updateSegmentCurve,
-	updateTrackAtom,
 } from "@/lib/daw-sdk";
+
+const { resolveClipRelativePoint } = automation;
 
 type AutomationContextMenuProps = {
 	track: Track;

@@ -1,8 +1,8 @@
 "use client";
 
+import { playbackAtom, useLiveAutomationGain } from "@wav0/daw-react";
 import { volume } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
-import { playbackAtom, useLiveAutomationGain } from "@/lib/daw-sdk";
 
 type LiveAutomationBadgeProps = {
 	trackId: string;

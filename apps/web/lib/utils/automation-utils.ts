@@ -1,4 +1,4 @@
-import type { Track, TrackEnvelopePoint } from "@/lib/daw-sdk";
+import type { Track, TrackEnvelopePoint } from "@wav0/daw-sdk";
 
 /**
  * Count automation points within a given time range

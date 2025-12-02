@@ -1,9 +1,9 @@
 "use client";
 
+import { timelineWidthAtom } from "@wav0/daw-react";
 import { useAtom } from "jotai";
 import { memo, useEffect, useRef, useState } from "react";
 import { TrackGridLines } from "@/components/daw/panels/track-grid-lines";
-import { timelineWidthAtom } from "@/lib/daw-sdk";
 
 /**
  * TrackGridCanvas - Renders synchronized grid lines in track content area

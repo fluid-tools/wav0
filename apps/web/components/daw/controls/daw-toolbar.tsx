@@ -1,7 +1,17 @@
 "use client";
 
+import {
+	automationViewEnabledAtom,
+	eventListOpenAtom,
+	musicalMetadataAtom,
+	projectNameAtom,
+	setCustomSnapIntervalAtom,
+	setSnapGranularityAtom,
+	snapIntervalMsAtom,
+	timelineAtom,
+	toggleSnapToGridAtom,
+} from "@wav0/daw-react";
 import { useAtom } from "jotai";
-// jotai imported elsewhere; remove duplicate import per linter
 import {
 	Activity,
 	Download,
@@ -40,17 +50,6 @@ import {
 } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
 import { DAW_HEIGHTS, DAW_ICONS, DAW_TEXT } from "@/lib/constants/daw-design";
-import {
-	automationViewEnabledAtom,
-	eventListOpenAtom,
-	musicalMetadataAtom,
-	projectNameAtom,
-	setCustomSnapIntervalAtom,
-	setSnapGranularityAtom,
-	snapIntervalMsAtom,
-	timelineAtom,
-	toggleSnapToGridAtom,
-} from "@/lib/daw-sdk";
 
 function SnapGranularityControls() {
 	const [timeline] = useAtom(timelineAtom);

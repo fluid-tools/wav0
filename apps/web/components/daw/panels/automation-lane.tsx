@@ -1,20 +1,20 @@
 "use client";
 
-import { curves, volume } from "@wav0/daw-sdk";
+import type { Track, TrackEnvelopePoint } from "@wav0/daw-sdk";
+import { automation, curves, volume } from "@wav0/daw-sdk";
+import {
+	automationViewEnabledAtom,
+	horizontalScrollAtom,
+	playbackAtom,
+	timelinePxPerMsAtom,
+	updateTrackAtom,
+} from "@wav0/daw-react";
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AutomationContextMenu } from "@/components/daw/context-menus/automation-context-menu";
-import type { Track, TrackEnvelopePoint } from "@/lib/daw-sdk";
-import {
-	addAutomationPoint,
-	automationViewEnabledAtom,
-	horizontalScrollAtom,
-	migrateAutomationToSegments,
-	playbackAtom,
-	resolveClipRelativePoint,
-	timelinePxPerMsAtom,
-	updateTrackAtom,
-} from "@/lib/daw-sdk";
+import { addAutomationPoint } from "@/lib/daw-sdk";
+
+const { migrateAutomationToSegments, resolveClipRelativePoint } = automation;
 
 type AutomationLaneProps = {
 	track: Track;
@@ -31,7 +31,7 @@ export function AutomationLane({
 	const [playback] = useAtom(playbackAtom);
 	const [, updateTrack] = useAtom(updateTrackAtom);
 	const [automationViewEnabled] = useAtom(automationViewEnabledAtom);
-	const [horizontalScroll] = useAtom(horizontalScrollAtom);
+	const [_horizontalScroll] = useAtom(horizontalScrollAtom);
 	const [draggingPoint, setDraggingPoint] = useState<{
 		pointId: string;
 		startX: number;

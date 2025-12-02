@@ -1,8 +1,8 @@
 "use client";
 
+import { projectEndViewportPxAtom } from "@wav0/daw-react";
 import { useAtom } from "jotai";
 import { memo } from "react";
-import { projectEndViewportPxAtom } from "@/lib/daw-sdk";
 
 export const UnifiedOverlay = memo(function UnifiedOverlay() {
 	const [projectEndX] = useAtom(projectEndViewportPxAtom);

@@ -1,9 +1,9 @@
 "use client";
 
+import { clipMoveHistoryAtom, tracksAtom } from "@wav0/daw-react";
 import { useAtom } from "jotai";
 import { useEffect } from "react";
 import { toast } from "sonner";
-import { clipMoveHistoryAtom, tracksAtom } from "@/lib/daw-sdk";
 
 export function ClipMoveToastManager() {
 	const [moveHistory] = useAtom(clipMoveHistoryAtom);

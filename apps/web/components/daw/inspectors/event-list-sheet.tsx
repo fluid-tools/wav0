@@ -1,5 +1,12 @@
 "use client";
 
+import {
+	clipInspectorOpenAtom,
+	clipInspectorTargetAtom,
+	eventListOpenAtom,
+	tracksAtom,
+} from "@wav0/daw-react";
+import type { Clip, Track } from "@wav0/daw-sdk";
 import { time } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
 import { useMemo, useState } from "react";
@@ -22,13 +29,6 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from "@/components/ui/sheet";
-import type { Clip, Track } from "@/lib/daw-sdk";
-import {
-	clipInspectorOpenAtom,
-	clipInspectorTargetAtom,
-	eventListOpenAtom,
-	tracksAtom,
-} from "@/lib/daw-sdk";
 
 type EventRow = {
 	trackId: string;

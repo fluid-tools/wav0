@@ -7,20 +7,12 @@ import type {
 	TrackEnvelopeSegment,
 } from "@wav0/daw-sdk";
 import { time } from "@wav0/daw-sdk";
-import { useAtom } from "jotai";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { ClipContextMenu } from "@/components/daw/context-menus/clip-context-menu";
-import { ClipFadeHandles } from "@/components/daw/controls/clip-fade-handles";
-import { AutomationLane } from "@/components/daw/panels/automation-lane";
-import { DAW_HEIGHTS } from "@/lib/constants/daw-design";
 import {
 	activeToolAtom,
 	clipMoveHistoryAtom,
-	computeAutomationTransfer,
 	dragMachineAtom,
 	dragPreviewAtom,
 	loadAudioFileAtom,
-	mergeAutomationPoints,
 	playbackAtom,
 	projectEndPositionAtom,
 	selectedClipIdAtom,
@@ -35,6 +27,16 @@ import {
 	updateClipAtom,
 	updateTrackAtom,
 	useTimebase,
+} from "@wav0/daw-react";
+import { useAtom } from "jotai";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ClipContextMenu } from "@/components/daw/context-menus/clip-context-menu";
+import { ClipFadeHandles } from "@/components/daw/controls/clip-fade-handles";
+import { AutomationLane } from "@/components/daw/panels/automation-lane";
+import { DAW_HEIGHTS } from "@/lib/constants/daw-design";
+import {
+	computeAutomationTransfer,
+	mergeAutomationPoints,
 } from "@/lib/daw-sdk";
 import { cn } from "@/lib/utils";
 

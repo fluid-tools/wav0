@@ -1,8 +1,5 @@
 "use client";
 
-import { time } from "@wav0/daw-sdk";
-import { useAtom } from "jotai";
-import { memo, useCallback, useLayoutEffect, useRef } from "react";
 import {
 	horizontalScrollAtom,
 	playbackAtom,
@@ -11,7 +8,10 @@ import {
 	timelineAtom,
 	timelinePxPerMsAtom,
 	useTimebase,
-} from "@/lib/daw-sdk";
+} from "@wav0/daw-react";
+import { time } from "@wav0/daw-sdk";
+import { useAtom } from "jotai";
+import { memo, useCallback, useLayoutEffect, useRef } from "react";
 
 type Props = {
 	timelineHeaderHeight: number;

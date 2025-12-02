@@ -1,10 +1,8 @@
 "use client";
 
-import { useAtom } from "jotai";
-import { useEffect } from "react";
+import { computeLoopEndMs } from "@wav0/daw-sdk";
 import {
 	automationViewEnabledAtom,
-	computeLoopEndMs,
 	playbackAtom,
 	projectEndOverrideAtom,
 	resetProjectAtom,
@@ -17,7 +15,9 @@ import {
 	totalDurationAtom,
 	tracksAtom,
 	updateClipAtom,
-} from "@/lib/daw-sdk";
+} from "@wav0/daw-react";
+import { useAtom } from "jotai";
+import { useEffect } from "react";
 
 export function GlobalShortcuts() {
 	const [playback] = useAtom(playbackAtom);

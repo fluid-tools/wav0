@@ -1,6 +1,18 @@
 "use client";
 
+import type { AutomationType } from "@wav0/daw-sdk";
 import { volume } from "@wav0/daw-sdk";
+import {
+	automationViewEnabledAtom,
+	playbackAtom,
+	removeTrackAtom,
+	selectedTrackIdAtom,
+	setTrackHeightZoomAtom,
+	trackAutomationTypeAtom,
+	trackHeightZoomAtom,
+	tracksAtom,
+	updateTrackAtom,
+} from "@wav0/daw-react";
 import { useAtom } from "jotai";
 import { GripHorizontal, MoreVertical, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -32,19 +44,7 @@ import {
 	DAW_SPACING,
 	DAW_TEXT,
 } from "@/lib/constants/daw-design";
-import type { AutomationType } from "@/lib/daw-sdk";
-import {
-	automationViewEnabledAtom,
-	playbackAtom,
-	playbackService,
-	removeTrackAtom,
-	selectedTrackIdAtom,
-	setTrackHeightZoomAtom,
-	trackAutomationTypeAtom,
-	trackHeightZoomAtom,
-	tracksAtom,
-	updateTrackAtom,
-} from "@/lib/daw-sdk";
+import { playbackService } from "@/lib/daw-sdk";
 import { cn } from "@/lib/utils";
 
 export function DAWTrackList() {

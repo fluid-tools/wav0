@@ -1,5 +1,6 @@
 "use client";
 
+import { useClipInspector } from "@wav0/daw-react";
 import { time } from "@wav0/daw-sdk";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,6 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from "@/components/ui/sheet";
-import { useClipInspector } from "@/lib/daw-sdk";
 import { EnvelopeEditor } from "./envelope-editor";
 import { InspectorCard, InspectorSection } from "./inspector-section";
 

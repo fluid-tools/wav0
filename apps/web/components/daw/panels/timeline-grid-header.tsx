@@ -1,11 +1,11 @@
 "use client";
-import { useAtom } from "jotai";
-import { useLayoutEffect, useRef } from "react";
 import {
 	cachedTimeGridAtom,
 	horizontalScrollAtom,
 	timelinePxPerMsAtom,
-} from "@/lib/daw-sdk";
+} from "@wav0/daw-react";
+import { useAtom } from "jotai";
+import { useLayoutEffect, useRef } from "react";
 
 type Props = {
 	width: number;

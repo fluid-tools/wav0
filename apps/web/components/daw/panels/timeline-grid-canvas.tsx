@@ -1,11 +1,11 @@
 "use client";
-import { useAtom } from "jotai";
-import { memo, useLayoutEffect, useMemo, useRef } from "react";
 import {
 	cachedTimeGridAtom,
 	horizontalScrollAtom,
 	timelinePxPerMsAtom,
-} from "@/lib/daw-sdk";
+} from "@wav0/daw-react";
+import { useAtom } from "jotai";
+import { memo, useLayoutEffect, useMemo, useRef } from "react";
 import { TimelineGridHeader } from "./timeline-grid-header";
 
 type Props = {

@@ -1,10 +1,10 @@
 "use client";
 
+import type { TrackEnvelope } from "@wav0/daw-sdk";
 import { automation, curves, time, volume } from "@wav0/daw-sdk";
 import { MoveVertical, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { TrackEnvelope } from "@/lib/daw-sdk";
 import { SegmentCurvePreview } from "../controls/segment-curve-preview";
 
 type EnvelopeEditorProps = {

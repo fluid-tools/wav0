@@ -1,10 +1,5 @@
 "use client";
 
-import { useAtom } from "jotai";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { MarkerTrack } from "@/components/daw/panels/marker-track";
-import { TimelineGridCanvas } from "@/components/daw/panels/timeline-grid-canvas";
-import { UnifiedOverlay } from "@/components/daw/unified-overlay";
 import {
 	addMarkerAtom,
 	horizontalScrollAtom,
@@ -16,7 +11,12 @@ import {
 	timelinePxPerMsAtom,
 	timelineWidthAtom,
 	useTimebase,
-} from "@/lib/daw-sdk";
+} from "@wav0/daw-react";
+import { useAtom } from "jotai";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { MarkerTrack } from "@/components/daw/panels/marker-track";
+import { TimelineGridCanvas } from "@/components/daw/panels/timeline-grid-canvas";
+import { UnifiedOverlay } from "@/components/daw/unified-overlay";
 
 export function DAWTimeline() {
 	const [timeline] = useAtom(timelineAtom);

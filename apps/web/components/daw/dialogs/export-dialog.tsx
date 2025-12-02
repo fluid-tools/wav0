@@ -1,5 +1,11 @@
 "use client";
-import { audioBuffer, encode } from "@wav0/daw-sdk";
+import {
+	audioBuffer,
+	createPreviewPlayer,
+	encode,
+	renderProjectToAudioBuffer,
+} from "@wav0/daw-sdk";
+import { loopRegionAtom, projectNameAtom, tracksAtom } from "@wav0/daw-react";
 import { useAtom } from "jotai";
 import {
 	useCallback,
@@ -21,14 +27,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import {
-	audioService,
-	createPreviewPlayer,
-	loopRegionAtom,
-	projectNameAtom,
-	renderProjectToAudioBuffer,
-	tracksAtom,
-} from "@/lib/daw-sdk";
+import { audioService } from "@/lib/daw-sdk";
 
 type Props = { open: boolean; onOpenChange: (v: boolean) => void };
 

@@ -1,5 +1,14 @@
 "use client";
 
+import {
+	automationViewEnabledAtom,
+	clipInspectorOpenAtom,
+	clipInspectorTargetAtom,
+	removeClipAtom,
+	renameClipAtom,
+	selectedClipIdAtom,
+	selectedTrackIdAtom,
+} from "@wav0/daw-react";
 import { useAtom } from "jotai";
 import { useState } from "react";
 import {
@@ -10,15 +19,6 @@ import {
 	ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { Input } from "@/components/ui/input";
-import {
-	automationViewEnabledAtom,
-	clipInspectorOpenAtom,
-	clipInspectorTargetAtom,
-	removeClipAtom,
-	renameClipAtom,
-	selectedClipIdAtom,
-	selectedTrackIdAtom,
-} from "@/lib/daw-sdk";
 
 type ClipContextMenuProps = {
 	trackId: string;

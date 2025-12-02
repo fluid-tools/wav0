@@ -1,8 +1,8 @@
 "use client";
 
+import type { Clip } from "@wav0/daw-sdk";
 import { curves, time } from "@wav0/daw-sdk";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import type { Clip } from "@/lib/daw-sdk";
 import { cn } from "@/lib/utils";
 
 type ClipFadeHandlesProps = {

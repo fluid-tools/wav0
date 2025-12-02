@@ -1,6 +1,21 @@
 "use client";
 
-import { time } from "@wav0/daw-sdk";
+import { computeLoopEndMs, time } from "@wav0/daw-sdk";
+import {
+	playbackAtom,
+	selectedClipIdAtom,
+	selectedTrackIdAtom,
+	setCurrentTimeAtom,
+	setTimelineZoomAtom,
+	setTrackHeightZoomAtom,
+	stopPlaybackAtom,
+	timelineAtom,
+	togglePlaybackAtom,
+	totalDurationAtom,
+	trackHeightZoomAtom,
+	tracksAtom,
+	updateClipAtom,
+} from "@wav0/daw-react";
 import { useAtom } from "jotai";
 import {
 	ChevronsUpDown,
@@ -15,29 +30,12 @@ import {
 	ZoomOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-// import { DAW_PIXELS_PER_SECOND_AT_ZOOM_1 } from "@/lib/constants";
 import {
 	DAW_BUTTONS,
 	DAW_HEIGHTS,
 	DAW_ICONS,
 	DAW_TEXT,
 } from "@/lib/constants/daw-design";
-import {
-	computeLoopEndMs,
-	playbackAtom,
-	selectedClipIdAtom,
-	selectedTrackIdAtom,
-	setCurrentTimeAtom,
-	setTimelineZoomAtom,
-	setTrackHeightZoomAtom,
-	stopPlaybackAtom,
-	timelineAtom,
-	togglePlaybackAtom,
-	totalDurationAtom,
-	trackHeightZoomAtom,
-	tracksAtom,
-	updateClipAtom,
-} from "@/lib/daw-sdk";
 import { MasterMeter } from "./master-meter";
 
 export function DAWControls() {

@@ -1,7 +1,7 @@
 "use client";
+import { markersAtom, updateMarkerAtom, useTimebase } from "@wav0/daw-react";
 import { useAtom } from "jotai";
 import { useRef, useState } from "react";
-import { markersAtom, updateMarkerAtom, useTimebase } from "@/lib/daw-sdk";
 
 type MarkerTrackProps = {
 	pxPerMs: number;
