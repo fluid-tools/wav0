@@ -1,7 +1,7 @@
 /**
  * Audio Service Bridge
- * Wraps legacy audioService singleton with new SDK AudioEngine
- * SDK AudioEngine is the PRIMARY source, legacy is fallback
+ * Wraps SDK AudioEngine for service registry compatibility
+ * SDK AudioEngine is the ONLY source - no legacy fallback
  */
 
 "use client";
@@ -9,16 +9,13 @@
 import type { AudioData, DAW } from "@wav0/daw-sdk";
 
 /**
- * Bridge between legacy audioService and new AudioEngine
- * SDK is primary, legacy is fallback for backward compatibility
+ * Bridge between service registry and SDK AudioEngine
+ * Provides compatibility layer for atoms expecting legacy interface
  */
 export class AudioServiceBridge {
 	private cleanupFns: (() => void)[] = [];
 
-	constructor(
-		private sdk: DAW,
-		private legacyService: any,
-	) {
+	constructor(private sdk: DAW) {
 		this.setupEventSync();
 	}
 
@@ -38,12 +35,12 @@ export class AudioServiceBridge {
 	}
 
 	/**
-	 * Load audio file - SDK primary, legacy fallback
+	 * Load audio file - SDK only
 	 */
-	async loadAudioFile(file: File, id: string): Promise<AudioData> {
+	async loadAudioFile(file: File, id: string): Promise<AudioData & { fileName: string; fileType: string }> {
 		const audioEngine = this.sdk.getAudioEngine();
 
-		// Load through SDK (primary)
+		// Load through SDK
 		const audioData = await audioEngine.loadAudio(file, id);
 
 		// Save to OPFS via SDK
@@ -54,57 +51,23 @@ export class AudioServiceBridge {
 			console.warn("[AudioBridge] OPFS save failed:", error);
 		}
 
-		// Also load in legacy service for backward compatibility
-		try {
-			await this.legacyService.loadAudioFile(file, id);
-		} catch (error) {
-			console.warn("[AudioBridge] Legacy service load failed:", error);
-		}
-
-		// Return SDK format with additional properties legacy expects
+		// Return SDK format with additional properties atoms expect
 		return {
 			...audioData,
 			fileName: file.name,
 			fileType: file.type,
-		} as AudioData & { fileName: string; fileType: string };
+		};
 	}
 
 	/**
-	 * Load audio from OPFS - SDK primary, legacy fallback
+	 * Load audio from OPFS - SDK only
 	 */
 	async loadFromOPFS(
 		opfsFileId: string,
 		fileName: string,
 	): Promise<AudioData | null> {
 		const audioEngine = this.sdk.getAudioEngine();
-
-		// Try SDK OPFS first (primary)
-		try {
-			const audioData = await audioEngine.loadFromOPFS(opfsFileId, fileName);
-			if (audioData) {
-				console.log("[AudioBridge] Loaded from SDK OPFS:", opfsFileId);
-
-				// Also load via legacy service for backward compatibility
-				try {
-					await this.legacyService.loadTrackFromOPFS(opfsFileId, fileName);
-				} catch (error) {
-					console.warn("[AudioBridge] Legacy OPFS load failed:", error);
-				}
-
-				return audioData;
-			}
-		} catch (error) {
-			console.warn("[AudioBridge] SDK OPFS load failed:", error);
-		}
-
-		// Fallback to legacy only
-		try {
-			await this.legacyService.loadTrackFromOPFS(opfsFileId, fileName);
-			return null; // Legacy doesn't return AudioData
-		} catch (error) {
-			console.error("[AudioBridge] Both OPFS loads failed:", error);
-			throw error;
-		}
+		return audioEngine.loadFromOPFS(opfsFileId, fileName);
 	}
 
 	/**
@@ -119,13 +82,12 @@ export class AudioServiceBridge {
 	}
 
 	/**
-	 * Get buffer sink - SDK primary, legacy fallback
+	 * Get buffer sink - SDK only
+	 * Returns MediaBunny AudioBufferSink for iterator access
 	 */
-	getBufferSink(trackId: string): any {
+	getBufferSink(trackId: string): unknown {
 		const audioEngine = this.sdk.getAudioEngine();
-		const sink = audioEngine.getBufferSink(trackId);
-		if (sink) return sink;
-		return this.legacyService.getBufferSink(trackId);
+		return audioEngine.getBufferSink(trackId);
 	}
 
 	/**
@@ -140,40 +102,27 @@ export class AudioServiceBridge {
 	}
 
 	/**
-	 * Check if track is loaded - SDK primary
+	 * Check if track is loaded - SDK only
 	 */
 	isTrackLoaded(trackId: string): boolean {
 		const audioEngine = this.sdk.getAudioEngine();
-		if (audioEngine.isTrackLoaded(trackId)) return true;
-		return this.legacyService.isTrackLoaded(trackId);
+		return audioEngine.isTrackLoaded(trackId);
 	}
 
 	/**
-	 * Unload track from both systems
+	 * Unload track - SDK only
 	 */
 	unloadTrack(trackId: string): void {
 		const audioEngine = this.sdk.getAudioEngine();
 		audioEngine.unloadTrack(trackId);
-		this.legacyService.unloadTrack(trackId);
 	}
 
 	/**
-	 * Delete track from OPFS - both systems
+	 * Delete track from OPFS - SDK only
 	 */
 	async deleteFromOPFS(trackId: string): Promise<void> {
 		const audioEngine = this.sdk.getAudioEngine();
-
-		try {
-			await audioEngine.deleteFromOPFS(trackId);
-		} catch (error) {
-			console.warn("[AudioBridge] SDK OPFS delete failed:", error);
-		}
-
-		try {
-			await this.legacyService.deleteTrackFromOPFS(trackId);
-		} catch (error) {
-			console.warn("[AudioBridge] Legacy OPFS delete failed:", error);
-		}
+		await audioEngine.deleteFromOPFS(trackId);
 	}
 
 	/**

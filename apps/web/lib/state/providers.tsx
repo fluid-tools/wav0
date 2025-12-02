@@ -8,7 +8,7 @@ import NextTopLoader from "nextjs-toploader";
 import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
-import { audioService, playbackService } from "@/lib/daw-sdk";
+import { playbackService } from "@/lib/daw-sdk";
 import { jotaiStore as store } from "./jotai-store";
 
 let browserQueryClient: QueryClient | undefined;
@@ -37,21 +37,16 @@ function getQueryClient() {
 /**
  * DAW Initialization - Non-blocking background init
  * useEffect guarantees client-only execution (no SSR/prerender)
+ * Audio service is now handled by SDK AudioEngine via DAWProvider
  */
 function DAWInitializer({ children }: { children: ReactNode }) {
 	useEffect(() => {
-		// Initialize audio services in browser
-		audioService.getAudioContext().catch((err) => {
-			console.error("[DAW] Init failed:", err);
-		});
-
+		// Legacy playback service cleanup only
+		// Audio service cleanup handled by SDK AudioEngine
 		return () => {
-			// Cleanup on unmount
-			Promise.all([audioService.cleanup(), playbackService.cleanup()]).catch(
-				(err) => {
-					console.error("[DAW] Cleanup failed:", err);
-				},
-			);
+			playbackService.cleanup().catch((err) => {
+				console.error("[DAW] Playback cleanup failed:", err);
+			});
 		};
 	}, []);
 
@@ -72,7 +67,6 @@ export function BaseProviders({ children }: { children: ReactNode }) {
 				<JotaiProvider store={store}>
 					<DAWProvider
 						storageAdapter={browserAdapter}
-						legacyAudioService={audioService}
 						legacyPlaybackService={playbackService}
 					>
 						<DAWInitializer>

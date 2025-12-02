@@ -36,8 +36,8 @@ export interface DAWProviderProps {
 	children: ReactNode;
 	config?: DAWConfig;
 	storageAdapter?: StorageAdapter;
-	/** Legacy services for bridge pattern during migration */
-	legacyAudioService?: any;
+	/** Legacy playback service - still required during migration (Phase 3/4) */
+	// biome-ignore lint/suspicious/noExplicitAny: Legacy service interface during migration
 	legacyPlaybackService?: any;
 }
 
@@ -45,7 +45,6 @@ export function DAWProvider({
 	children,
 	config,
 	storageAdapter,
-	legacyAudioService,
 	legacyPlaybackService,
 }: DAWProviderProps) {
 	const daw = useDAW(config);
@@ -58,36 +57,25 @@ export function DAWProvider({
 	const initialRegistrationDone = useRef(false);
 	// Track the last storage adapter to avoid redundant calls on every render
 	const lastStorageAdapterRef = useRef<StorageAdapter | undefined>(undefined);
-	// Track last registered services to detect prop changes before DAW is ready
-	const lastAudioServiceRef = useRef(legacyAudioService);
+	// Track last registered playback service to detect prop changes before DAW is ready
 	const lastPlaybackServiceRef = useRef(legacyPlaybackService);
 
-	// Check if services changed (props updated before DAW ready)
-	const servicesChanged =
-		lastAudioServiceRef.current !== legacyAudioService ||
-		lastPlaybackServiceRef.current !== legacyPlaybackService;
+	// Check if playback service changed (props updated before DAW ready)
+	const servicesChanged = lastPlaybackServiceRef.current !== legacyPlaybackService;
 
-	// IMMEDIATE registration of legacy services (synchronous, during render)
-	// This ensures services are available BEFORE any child effects run
+	// IMMEDIATE registration of legacy playback service (synchronous, during render)
+	// This ensures playback service is available BEFORE any child effects run
+	// Audio service is SDK-only and will be registered when DAW becomes available
 	// React effects run child-to-parent, so without this, child effects would
-	// fail with "Audio service not registered"
-	// Bug fix: Check if EITHER service exists (not just audioService)
-	// Bug fix: Only register services that are actually provided (not undefined)
-	// Bug fix: Re-register if services changed before DAW is ready
+	// fail with "Playback service not registered"
 	if (
 		(!initialRegistrationDone.current || servicesChanged) &&
-		(legacyAudioService || legacyPlaybackService)
+		legacyPlaybackService
 	) {
-		const servicesToRegister: Parameters<typeof registerServices>[0] = {};
-		if (legacyAudioService) {
-			servicesToRegister.audioService = legacyAudioService;
-		}
-		if (legacyPlaybackService) {
-			servicesToRegister.playbackService = legacyPlaybackService;
-		}
-		registerServices(servicesToRegister);
+		registerServices({
+			playbackService: legacyPlaybackService,
+		});
 		initialRegistrationDone.current = true;
-		lastAudioServiceRef.current = legacyAudioService;
 		lastPlaybackServiceRef.current = legacyPlaybackService;
 	}
 
@@ -98,17 +86,14 @@ export function DAWProvider({
 	}
 
 	// Setup bridges and RE-REGISTER them to service registry
-	// Bridges wrap legacy services and provide SDK Transport integration
-	// This upgrades from legacy services to bridges when DAW becomes available
+	// AudioBridge uses SDK exclusively (no legacy fallback)
+	// PlaybackBridge still uses legacy during migration (Phase 3/4)
 	useEffect(() => {
 		if (!daw) return;
 
-		let audioBridge: AudioServiceBridge | null = null;
+		// AudioBridge: SDK-only, no legacy dependency
+		const audioBridge = new AudioServiceBridge(daw);
 		let playbackBridge: PlaybackServiceBridge | null = null;
-
-		if (legacyAudioService) {
-			audioBridge = new AudioServiceBridge(daw, legacyAudioService);
-		}
 
 		if (legacyPlaybackService) {
 			playbackBridge = new PlaybackServiceBridge(daw, legacyPlaybackService);
@@ -116,25 +101,25 @@ export function DAWProvider({
 
 		setBridges({ audio: audioBridge, playback: playbackBridge });
 
-		// RE-REGISTER with bridges (upgrading from legacy)
-		// Atoms calling serviceRegistry.playbackService will now get the bridge
-		// which properly converts volume to dB for SDK Transport
+		// RE-REGISTER with bridges
+		// AudioBridge is always SDK-only
+		// PlaybackBridge falls back to legacy if bridge not available
 		registerServices({
-			audioService: audioBridge ?? legacyAudioService,
+			audioService: audioBridge,
 			playbackService: playbackBridge ?? legacyPlaybackService,
 		});
 
 		return () => {
 			audioBridge?.dispose();
 			playbackBridge?.dispose();
-			// On cleanup, fall back to legacy services (not undefined)
-			// This prevents "service not registered" errors during hot reload
+			// On cleanup, fall back to legacy playback service only
+			// Audio service is always SDK bridge (no legacy fallback)
 			registerServices({
-				audioService: legacyAudioService,
+				audioService: audioBridge, // Keep SDK bridge even on cleanup
 				playbackService: legacyPlaybackService,
 			});
 		};
-	}, [daw, legacyAudioService, legacyPlaybackService]);
+	}, [daw, legacyPlaybackService]);
 
 	// Don't block render - allow children to mount even if DAW not ready
 	const contextValue: DAWContextValue | null = daw
