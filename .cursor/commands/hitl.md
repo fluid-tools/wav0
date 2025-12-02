@@ -1,0 +1,2 @@
+- stop for human manual testing and confirmation after each solid milestone for manual confirmation.
+- provide a summary of the changes and the manual testing steps to be taken.

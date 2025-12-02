@@ -4,11 +4,13 @@
  */
 
 // Re-export useful types from SDK for convenience
+// Re-export looping utilities
 export type {
 	AudioData,
 	AutomationType,
 	Clip,
 	ClipInspectorTarget,
+	LoopingPolicy,
 	PlaybackOptions,
 	PlaybackState,
 	ProjectMarker,
@@ -22,21 +24,20 @@ export type {
 	TransportEvent,
 	TransportState,
 } from "@wav0/daw-sdk";
-
 // Re-export utils for convenience (so components can import from one place)
-export { automation, curves, time, volume } from "@wav0/daw-sdk";
-
-// Re-export looping utilities
-export type { LoopingPolicy } from "@wav0/daw-sdk";
-export { computeLoopEndMs, DEFAULT_LOOPING_POLICY } from "@wav0/daw-sdk";
-
 // Re-export visual constants
 export {
+	automation,
+	computeLoopEndMs,
+	curves,
+	DAW_DEFAULT_TRACK_HEIGHT,
+	DAW_MAX_TRACK_HEIGHT,
+	DAW_MIN_TRACK_HEIGHT,
 	DAW_PIXELS_PER_SECOND_AT_ZOOM_1,
 	DAW_TIMELINE_HEADER_HEIGHT,
-	DAW_DEFAULT_TRACK_HEIGHT,
-	DAW_MIN_TRACK_HEIGHT,
-	DAW_MAX_TRACK_HEIGHT,
+	DEFAULT_LOOPING_POLICY,
+	time,
+	volume,
 } from "@wav0/daw-sdk";
 
 // Atoms

@@ -313,6 +313,46 @@ export class Transport extends EventTarget {
 			console.warn("Failed to schedule clip fades", e);
 		}
 
+		// Run the audio iterator loop with loop continuation support
+		await this.runClipAudioLoop(
+			clip,
+			clipState,
+			thisGeneration,
+			clipStartSec,
+			clipTrimStartSec,
+			clipTrimEndSec,
+			clipDurationSec,
+			cycleOffsetSec,
+			loopUntilSec,
+			clipStartInPlayback,
+			timeIntoClip, // Pass offset for mid-playback scheduling
+		);
+	}
+
+	/**
+	 * Run the audio iterator loop with loop continuation
+	 * Handles MediaBunny buffer iteration and recursive looping
+	 *
+	 * @param timeIntoClipSec - Offset into trimmed region for first cycle (0 for subsequent cycles)
+	 */
+	private async runClipAudioLoop(
+		clip: Clip,
+		clipState: ClipScheduleState,
+		generation: number,
+		clipStartSec: number,
+		clipTrimStartSec: number,
+		clipTrimEndSec: number,
+		clipDurationSec: number,
+		cycleOffsetSec: number,
+		loopUntilSec: number,
+		clipStartInPlayback: number,
+		timeIntoClipSec: number,
+	): Promise<void> {
+		// Calculate audio file read position for this cycle
+		// First invocation uses timeIntoClipSec to skip to current position
+		// Subsequent loop cycles pass 0 to start from trim start
+		const audioFileReadStart = clipTrimStartSec + timeIntoClipSec;
+
 		// Get buffer iterator from audio engine
 		const iterator = await this.audioEngine.getBufferIterator(
 			clip.opfsFileId,
@@ -323,7 +363,7 @@ export class Transport extends EventTarget {
 		// MediaBunny-inspired playback loop
 		for await (const { buffer, timestamp } of iterator) {
 			// Check generation token - abort if clip was rescheduled
-			if (thisGeneration !== clipState.generation) {
+			if (generation !== clipState.generation) {
 				break;
 			}
 
@@ -335,18 +375,29 @@ export class Transport extends EventTarget {
 			// Connect to clip gain node
 			node.connect(clipState.clipGainNode);
 
-			// Calculate precise start time
-			const bufferStartInClip = timestamp * 1000 - clip.trimStart;
+			// Calculate precise start time including cycle offset
+			const timeInTrimmed = timestamp - clipTrimStartSec;
+			const timelinePos = clipStartSec + cycleOffsetSec + timeInTrimmed;
+
+			// Stop if we've reached or passed the loop boundary
+			if (timelinePos >= loopUntilSec) break;
+
+			// Calculate AudioContext start time for this buffer
+			const bufferOffsetMs = (cycleOffsetSec + timeInTrimmed) * 1000;
 			const startTime =
-				this.contextStartTime +
-				(clipStartInPlayback + bufferStartInClip) / 1000;
+				this.contextStartTime + (clipStartInPlayback + bufferOffsetMs) / 1000;
 
 			if (startTime >= this.audioContext.currentTime) {
 				node.start(startTime);
 			} else {
 				// Start immediately with offset
 				const offset = this.audioContext.currentTime - startTime;
-				node.start(this.audioContext.currentTime, offset);
+				if (offset < buffer.duration) {
+					node.start(this.audioContext.currentTime, offset);
+				} else {
+					// Buffer already passed, skip it
+					continue;
+				}
 			}
 
 			this.activeNodes.add(node);
@@ -358,6 +409,31 @@ export class Transport extends EventTarget {
 					clipState.audioSources.splice(idx, 1);
 				}
 			};
+		}
+
+		// Handle loop continuation
+		if (
+			this.state === "playing" &&
+			clip.loop &&
+			generation === clipState.generation
+		) {
+			const nextCycleStart = clipStartSec + cycleOffsetSec + clipDurationSec;
+			if (nextCycleStart < loopUntilSec) {
+				// Continue to next loop cycle
+				await this.runClipAudioLoop(
+					clip,
+					clipState,
+					generation,
+					clipStartSec,
+					clipTrimStartSec,
+					clipTrimEndSec,
+					clipDurationSec,
+					cycleOffsetSec + clipDurationSec, // Increment cycle offset
+					loopUntilSec,
+					clipStartInPlayback,
+					0, // Subsequent cycles always start from trim start
+				);
+			}
 		}
 	}
 
