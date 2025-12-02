@@ -202,7 +202,7 @@ export function formatBytes(bytes: number): string {
 	return `${parseFloat((bytes / k ** i).toFixed(2))} ${sizes[i]}`;
 }
 
-// formatDuration moved to @/lib/daw-sdk/utils/time-utils.ts
+// formatDuration moved to @wav0/daw-sdk/utils/time
 
 // Export singleton instance
 export const opfsManager = OPFSManager.getInstance();

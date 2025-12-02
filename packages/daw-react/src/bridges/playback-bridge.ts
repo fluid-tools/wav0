@@ -1,29 +1,21 @@
 /**
  * Playback Service Bridge
- * SDK Transport is the PRIMARY playback engine
- * Legacy service kept only for emergency fallback via USE_LEGACY_PLAYBACK flag
+ * SDK Transport is the playback engine
  */
 
 "use client";
 
 import type { DAW, Track } from "@wav0/daw-sdk";
 
-/** Feature flag: set to true to use legacy PlaybackService instead of SDK Transport */
-const USE_LEGACY_PLAYBACK = false;
-
 /**
  * Bridge between React components and SDK Transport
- * SDK-first: Transport handles all playback, loop continuation, automation
+ * SDK Transport handles all playback, loop continuation, automation
  */
 export class PlaybackServiceBridge {
 	private cleanupFns: (() => void)[] = [];
 	private playbackCleanup: (() => void) | null = null;
 
-	constructor(
-		private sdk: DAW,
-		// biome-ignore lint/suspicious/noExplicitAny: Legacy service type varies, will be removed after migration
-		private legacyService: any,
-	) {
+	constructor(private sdk: DAW) {
 		this.setupEventSync();
 	}
 
@@ -67,15 +59,6 @@ export class PlaybackServiceBridge {
 		// Clean up listeners from previous playback session
 		this.cleanupPlaybackListeners();
 
-		if (USE_LEGACY_PLAYBACK) {
-			await this.legacyService.play(tracks, {
-				startTime: options?.startTime ?? 0,
-				onTimeUpdate: options?.onTimeUpdate,
-				onPlaybackEnd: options?.onPlaybackEnd,
-			});
-			return;
-		}
-
 		const transport = this.sdk.getTransport();
 
 		// Set up event listeners for callbacks
@@ -118,11 +101,6 @@ export class PlaybackServiceBridge {
 	 * Initialize tracks with playback engine (required before play)
 	 */
 	async initializeWithTracks(tracks: Track[]): Promise<void> {
-		if (USE_LEGACY_PLAYBACK) {
-			await this.legacyService.initializeWithTracks(tracks);
-			return;
-		}
-
 		const transport = this.sdk.getTransport();
 		await transport.initializeWithTracks(tracks);
 	}
@@ -131,11 +109,6 @@ export class PlaybackServiceBridge {
 	 * Stop playback
 	 */
 	async stop(): Promise<void> {
-		if (USE_LEGACY_PLAYBACK) {
-			await this.legacyService.stop();
-			return;
-		}
-
 		const transport = this.sdk.getTransport();
 		transport.stop();
 	}
@@ -144,11 +117,6 @@ export class PlaybackServiceBridge {
 	 * Pause playback
 	 */
 	async pause(): Promise<void> {
-		if (USE_LEGACY_PLAYBACK) {
-			await this.legacyService.pause();
-			return;
-		}
-
 		const transport = this.sdk.getTransport();
 		transport.pause();
 	}
@@ -157,12 +125,6 @@ export class PlaybackServiceBridge {
 	 * Resume playback from paused position
 	 */
 	async resume(): Promise<void> {
-		if (USE_LEGACY_PLAYBACK) {
-			// Legacy service doesn't have resume - re-play from current position
-			// This is handled by togglePlaybackAtom which calls play() with tracks
-			return;
-		}
-
 		const transport = this.sdk.getTransport();
 		await transport.resume();
 	}
@@ -171,12 +133,6 @@ export class PlaybackServiceBridge {
 	 * Seek to time
 	 */
 	async seek(timeMs: number): Promise<void> {
-		if (USE_LEGACY_PLAYBACK) {
-			// Legacy service doesn't have seek - handled by setCurrentTimeAtom
-			// which pauses, updates state, and re-plays
-			return;
-		}
-
 		const transport = this.sdk.getTransport();
 		transport.seek(timeMs);
 	}
@@ -185,10 +141,6 @@ export class PlaybackServiceBridge {
 	 * Get current playback time (in seconds, for legacy compatibility)
 	 */
 	getCurrentTime(): number {
-		if (USE_LEGACY_PLAYBACK) {
-			return this.legacyService.getCurrentTime();
-		}
-
 		const transport = this.sdk.getTransport();
 		// SDK Transport returns ms, convert to seconds for legacy API
 		return transport.getCurrentTime() / 1000;
@@ -198,10 +150,6 @@ export class PlaybackServiceBridge {
 	 * Check if playing
 	 */
 	isPlaying(): boolean {
-		if (USE_LEGACY_PLAYBACK) {
-			return this.legacyService.getIsPlaying();
-		}
-
 		const transport = this.sdk.getTransport();
 		return transport.getState() === "playing";
 	}
@@ -210,11 +158,6 @@ export class PlaybackServiceBridge {
 	 * Update track volume
 	 */
 	updateTrackVolume(trackId: string, volumeDb: number): void {
-		if (USE_LEGACY_PLAYBACK) {
-			this.legacyService.updateTrackVolume(trackId, volumeDb);
-			return;
-		}
-
 		const transport = this.sdk.getTransport();
 		transport.updateTrackVolume(trackId, volumeDb);
 	}
@@ -224,11 +167,6 @@ export class PlaybackServiceBridge {
 	 * Scales the base volume that automation multiplies against
 	 */
 	updateTrackVolumeRealtime(trackId: string, volumeDb: number): void {
-		if (USE_LEGACY_PLAYBACK) {
-			this.legacyService.updateTrackVolumeRealtime(trackId, volumeDb);
-			return;
-		}
-
 		const transport = this.sdk.getTransport();
 		transport.updateTrackVolumeRealtime(trackId, volumeDb);
 	}
@@ -246,11 +184,6 @@ export class PlaybackServiceBridge {
 		isSoloed: boolean,
 		soloEngaged: boolean,
 	): void {
-		if (USE_LEGACY_PLAYBACK) {
-			this.legacyService.updateTrackMute(trackId, muted, isSoloed, soloEngaged);
-			return;
-		}
-
 		const transport = this.sdk.getTransport();
 		transport.updateTrackMute(trackId, muted, isSoloed, soloEngaged);
 	}
@@ -259,11 +192,6 @@ export class PlaybackServiceBridge {
 	 * Update solo states for all tracks
 	 */
 	updateSoloStates(tracks: Track[]): void {
-		if (USE_LEGACY_PLAYBACK) {
-			this.legacyService.updateSoloStates(tracks);
-			return;
-		}
-
 		const transport = this.sdk.getTransport();
 		transport.updateSoloStates(tracks);
 	}
@@ -273,11 +201,6 @@ export class PlaybackServiceBridge {
 	 * SDK Transport handles clip rescheduling internally via synchronizeClipsGlobal
 	 */
 	async synchronizeTracks(tracks: Track[]): Promise<void> {
-		if (USE_LEGACY_PLAYBACK) {
-			await this.legacyService.synchronizeTracks(tracks);
-			return;
-		}
-
 		const transport = this.sdk.getTransport();
 		await transport.synchronizeTracks(tracks);
 	}
@@ -287,11 +210,6 @@ export class PlaybackServiceBridge {
 	 * SDK Transport handles this via synchronizeTracks - pass all tracks for proper diff
 	 */
 	async rescheduleTrack(track: Track, allTracks?: Track[]): Promise<void> {
-		if (USE_LEGACY_PLAYBACK) {
-			await this.legacyService.rescheduleTrack(track, allTracks);
-			return;
-		}
-
 		// SDK Transport uses synchronizeTracks for all rescheduling
 		// Pass allTracks if available, otherwise just the single track
 		const transport = this.sdk.getTransport();
@@ -302,10 +220,6 @@ export class PlaybackServiceBridge {
 	 * Get master meter level in dB
 	 */
 	getMasterMeterDb(): number {
-		if (USE_LEGACY_PLAYBACK) {
-			return this.legacyService.getMasterDb?.() ?? -60;
-		}
-
 		const transport = this.sdk.getTransport();
 		return transport.getMasterDb();
 	}
@@ -321,11 +235,6 @@ export class PlaybackServiceBridge {
 	 * Set master volume (linear gain 0-1)
 	 */
 	setMasterVolume(linearGain: number): void {
-		if (USE_LEGACY_PLAYBACK) {
-			this.legacyService.updateMasterVolume?.(linearGain);
-			return;
-		}
-
 		const transport = this.sdk.getTransport();
 		transport.setMasterVolume(linearGain);
 	}

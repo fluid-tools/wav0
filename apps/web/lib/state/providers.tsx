@@ -6,9 +6,7 @@ import { Provider as JotaiProvider } from "jotai";
 import { ThemeProvider } from "next-themes";
 import NextTopLoader from "nextjs-toploader";
 import type { ReactNode } from "react";
-import { useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
-import { playbackService } from "@/lib/daw-sdk";
 import { jotaiStore as store } from "./jotai-store";
 
 let browserQueryClient: QueryClient | undefined;
@@ -40,16 +38,6 @@ function getQueryClient() {
  * Audio service is now handled by SDK AudioEngine via DAWProvider
  */
 function DAWInitializer({ children }: { children: ReactNode }) {
-	useEffect(() => {
-		// Legacy playback service cleanup only
-		// Audio service cleanup handled by SDK AudioEngine
-		return () => {
-			playbackService.cleanup().catch((err) => {
-				console.error("[DAW] Playback cleanup failed:", err);
-			});
-		};
-	}, []);
-
 	return <>{children}</>;
 }
 
@@ -65,10 +53,7 @@ export function BaseProviders({ children }: { children: ReactNode }) {
 				disableTransitionOnChange
 			>
 				<JotaiProvider store={store}>
-					<DAWProvider
-						storageAdapter={browserAdapter}
-						legacyPlaybackService={playbackService}
-					>
+					<DAWProvider storageAdapter={browserAdapter}>
 						<DAWInitializer>
 							<NextTopLoader
 								color="hsl(var(--primary))"
