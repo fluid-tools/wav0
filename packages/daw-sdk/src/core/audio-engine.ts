@@ -29,9 +29,11 @@ export class AudioEngine extends EventTarget {
 	private loadedTracks = new Map<string, LoadedTrack>();
 	/** Cached full AudioBuffers for export/offline rendering */
 	private audioBufferCache = new Map<string, AudioBuffer>();
+	/** Maximum number of cached AudioBuffers before eviction */
+	private static readonly MAX_CACHE_SIZE = 20;
 
 	constructor(
-		private audioContext: AudioContext,
+		private _audioContext: AudioContext,
 		private opfsManager?: OPFSManager,
 	) {
 		super();
@@ -136,8 +138,17 @@ export class AudioEngine extends EventTarget {
 		const result =
 			buffers.length === 1 ? buffers[0] : this.concatenateBuffers(buffers);
 
-		// Cache the result
+		// Cache the result with LRU eviction
 		this.audioBufferCache.set(opfsFileId, result);
+		
+		// Evict oldest entry if cache exceeds max size
+		if (this.audioBufferCache.size > AudioEngine.MAX_CACHE_SIZE) {
+			const oldest = this.audioBufferCache.keys().next().value;
+			if (oldest) {
+				this.audioBufferCache.delete(oldest);
+			}
+		}
+		
 		return result;
 	}
 
@@ -200,7 +211,7 @@ export class AudioEngine extends EventTarget {
 
 	async loadFromOPFS(
 		audioId: string,
-		fileName: string,
+		_fileName: string,
 	): Promise<AudioData | null> {
 		if (!this.opfsManager) {
 			throw new Error("OPFS manager not configured");

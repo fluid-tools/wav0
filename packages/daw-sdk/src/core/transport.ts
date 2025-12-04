@@ -211,7 +211,7 @@ export class Transport extends EventTarget {
 			try {
 				source.stop();
 				source.disconnect();
-			} catch (e) {
+			} catch {
 				// Ignore errors from already-stopped nodes
 			}
 		}
@@ -459,7 +459,7 @@ export class Transport extends EventTarget {
 					source.onended = null;
 					source.stop();
 					source.disconnect();
-				} catch (e) {
+				} catch {
 					// Ignore errors
 				}
 			}
@@ -504,7 +504,7 @@ export class Transport extends EventTarget {
 					source.onended = null;
 					source.stop();
 					source.disconnect();
-				} catch (e) {
+				} catch {
 					// Ignore errors
 				}
 			}
@@ -729,7 +729,7 @@ export class Transport extends EventTarget {
 		if (prevPoint && nextPoint && currentTimeMs < nextPoint.time) {
 			const segment = envelope.segments?.find(
 				(seg) =>
-					seg.fromPointId === prevPoint!.id && seg.toPointId === nextPoint!.id,
+					seg.fromPointId === prevPoint.id && seg.toPointId === nextPoint.id,
 			);
 			const t =
 				(currentTimeMs - prevPoint.time) / (nextPoint.time - prevPoint.time);
@@ -919,7 +919,7 @@ export class Transport extends EventTarget {
 	 */
 	private async queueSync(fn: () => Promise<void>): Promise<void> {
 		const prev = this.syncLock;
-		let release: () => void;
+		let release: (() => void) | undefined;
 		this.syncLock = new Promise((r) => {
 			release = r;
 		});
@@ -927,7 +927,9 @@ export class Transport extends EventTarget {
 		try {
 			await fn();
 		} finally {
-			release!();
+			if (release) {
+				release();
+			}
 		}
 	}
 
@@ -944,7 +946,7 @@ export class Transport extends EventTarget {
 				source.onended = null;
 				source.stop();
 				source.disconnect();
-			} catch (e) {
+			} catch {
 				// Ignore already-stopped nodes
 			}
 		}

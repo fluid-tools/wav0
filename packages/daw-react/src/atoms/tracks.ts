@@ -12,6 +12,7 @@ import type {
 	TrackEnvelopePoint,
 } from "@wav0/daw-sdk";
 import { atom } from "jotai";
+import { bindEnvelopeToClips } from "../utils/envelope-helpers";
 import {
 	createDefaultEnvelope,
 	DEFAULT_TRACK_1,
@@ -30,33 +31,6 @@ export function clampEnvelopeGain(value: number): number {
 	return Math.max(0, Math.min(4, value));
 }
 
-function bindEnvelopeToClips(
-	envelope: TrackEnvelope,
-	clips?: Clip[],
-): TrackEnvelope {
-	if (!clips || clips.length === 0) return envelope;
-
-	const newPoints = envelope.points.map((point: TrackEnvelopePoint) => {
-		// If point already has clipId, keep it
-		if (point.clipId) return point;
-
-		// Try to find a clip that contains this point's time
-		for (const clip of clips) {
-			const clipEnd = clip.startTime + clip.sourceDurationMs;
-			if (point.time >= clip.startTime && point.time <= clipEnd) {
-				return {
-					...point,
-					clipId: clip.id,
-					clipRelativeTime: point.time - clip.startTime,
-				};
-			}
-		}
-		return point;
-	});
-
-	return { ...envelope, points: newPoints };
-}
-
 // ===== Write Atoms =====
 
 export const addTrackAtom = atom(
@@ -66,15 +40,17 @@ export const addTrackAtom = atom(
 		const newTrack: Track = {
 			...track,
 			id: crypto.randomUUID(),
-		volumeEnvelope: track.volumeEnvelope
-			? {
-					...track.volumeEnvelope,
-					points: track.volumeEnvelope.points.map((point: TrackEnvelopePoint) => ({
-						...point,
-						value: clampEnvelopeGain(point.value),
-					})),
-				}
-			: createDefaultEnvelope(track.volume ?? 75),
+			volumeEnvelope: track.volumeEnvelope
+				? {
+						...track.volumeEnvelope,
+						points: track.volumeEnvelope.points.map(
+							(point: TrackEnvelopePoint) => ({
+								...point,
+								value: clampEnvelopeGain(point.value),
+							}),
+						),
+					}
+				: createDefaultEnvelope(track.volume ?? 75),
 		};
 		const updatedTracks = [...tracks, newTrack];
 		set(tracksAtom, updatedTracks);
@@ -229,7 +205,8 @@ export const loadAudioFileAtom = atom(
 			throw new Error("Audio service not registered");
 		}
 
-		const generateId = serviceRegistry.generateTrackId ?? (() => crypto.randomUUID());
+		const generateId =
+			serviceRegistry.generateTrackId ?? (() => crypto.randomUUID());
 		const opfsFileId = generateId();
 		const audioInfo = await serviceRegistry.audioService.loadAudioFile(
 			file,

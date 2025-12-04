@@ -5,8 +5,9 @@
 
 "use client";
 
-import type { Clip, Track, TrackEnvelope, TrackEnvelopePoint } from "@wav0/daw-sdk";
+import type { Clip, Track, TrackEnvelopePoint } from "@wav0/daw-sdk";
 import { atom } from "jotai";
+import { bindEnvelopeToClips } from "../utils/envelope-helpers";
 import {
 	playbackAtom,
 	selectedClipIdAtom,
@@ -14,35 +15,6 @@ import {
 	tracksAtom,
 } from "./base";
 import { serviceRegistry } from "./service-registry";
-
-// ===== Helper Functions =====
-
-function bindEnvelopeToClips(
-	envelope: TrackEnvelope,
-	clips?: Clip[],
-): TrackEnvelope {
-	if (!clips || clips.length === 0) return envelope;
-
-	const newPoints = envelope.points.map((point: TrackEnvelopePoint) => {
-		// If point already has clipId, keep it
-		if (point.clipId) return point;
-
-		// Try to find a clip that contains this point's time
-		for (const clip of clips) {
-			const clipEnd = clip.startTime + clip.sourceDurationMs;
-			if (point.time >= clip.startTime && point.time <= clipEnd) {
-				return {
-					...point,
-					clipId: clip.id,
-					clipRelativeTime: point.time - clip.startTime,
-				};
-			}
-		}
-		return point;
-	});
-
-	return { ...envelope, points: newPoints };
-}
 
 // ===== Write Atoms =====
 
@@ -61,7 +33,9 @@ export const updateClipAtom = atom(
 
 		// Find original clip and track to detect automation movement
 		const originalTrack = tracks.find((t) => t.id === trackId);
-		const originalClip = originalTrack?.clips?.find((c: Clip) => c.id === clipId);
+		const originalClip = originalTrack?.clips?.find(
+			(c: Clip) => c.id === clipId,
+		);
 
 		// Detect clip movement for clip-bound automation
 		const clipMoved =
@@ -82,10 +56,10 @@ export const updateClipAtom = atom(
 			}
 
 			// Update clip
-		const updatedClips = track.clips.map((clip: Clip) =>
-			clip.id === clipId ? { ...clip, ...updates } : clip,
-		);
-		const nextClip = updatedClips.find((clip: Clip) => clip.id === clipId);
+			const updatedClips = track.clips.map((clip: Clip) =>
+				clip.id === clipId ? { ...clip, ...updates } : clip,
+			);
+			const nextClip = updatedClips.find((clip: Clip) => clip.id === clipId);
 			const nextStartTime =
 				nextClip?.startTime ??
 				updates.startTime ??
@@ -94,24 +68,26 @@ export const updateClipAtom = atom(
 
 			// Handle automation movement
 			if (normalizedEnvelope && originalClip && clipMoved) {
-			const shiftedPoints = normalizedEnvelope.points.map((point: TrackEnvelopePoint) => {
-				// Clip-bound automation: always move with clip
-				if (point.clipId === clipId) {
-						const derivedRelative =
-							point.clipRelativeTime !== undefined
-								? point.clipRelativeTime
-								: point.time - originalClip.startTime;
-						const relativeTime = Math.max(0, derivedRelative);
-						return {
-							...point,
-							time: nextStartTime + relativeTime,
-							clipRelativeTime: relativeTime,
-							clipId, // Keep clipId bound
-						};
-					}
+				const shiftedPoints = normalizedEnvelope.points.map(
+					(point: TrackEnvelopePoint) => {
+						// Clip-bound automation: always move with clip
+						if (point.clipId === clipId) {
+							const derivedRelative =
+								point.clipRelativeTime !== undefined
+									? point.clipRelativeTime
+									: point.time - originalClip.startTime;
+							const relativeTime = Math.max(0, derivedRelative);
+							return {
+								...point,
+								time: nextStartTime + relativeTime,
+								clipRelativeTime: relativeTime,
+								clipId, // Keep clipId bound
+							};
+						}
 
-					return point;
-				});
+						return point;
+					},
+				);
 
 				const movedEnvelope = {
 					...normalizedEnvelope,
@@ -179,32 +155,34 @@ export const removeClipAtom = atom(
 		const updatedTracks = tracks.map((track) => {
 			if (track.id !== trackId) return track;
 
-		// Find the clip being deleted to get its start time for unbinding automation
-		const clipToDelete = track.clips?.find((c: Clip) => c.id === clipId);
-		const clipStartTime = clipToDelete?.startTime ?? 0;
+			// Find the clip being deleted to get its start time for unbinding automation
+			const clipToDelete = track.clips?.find((c: Clip) => c.id === clipId);
+			const clipStartTime = clipToDelete?.startTime ?? 0;
 
-		// Remove the clip
-		const updatedClips =
-			track.clips?.filter((clip: Clip) => clip.id !== clipId) ?? [];
+			// Remove the clip
+			const updatedClips =
+				track.clips?.filter((clip: Clip) => clip.id !== clipId) ?? [];
 
-		// Unbind automation points that reference this clip
-		const updatedEnvelope = track.volumeEnvelope
-			? {
-					...track.volumeEnvelope,
-					points: track.volumeEnvelope.points.map((point: TrackEnvelopePoint) => {
-						if (point.clipId !== clipId) return point;
-							// Convert to absolute time and unbind
-							const absoluteTime =
-								point.clipRelativeTime !== undefined
-									? point.clipRelativeTime + clipStartTime
-									: point.time;
-							return {
-								...point,
-								time: absoluteTime,
-								clipId: undefined,
-								clipRelativeTime: undefined,
-							};
-						}),
+			// Unbind automation points that reference this clip
+			const updatedEnvelope = track.volumeEnvelope
+				? {
+						...track.volumeEnvelope,
+						points: track.volumeEnvelope.points.map(
+							(point: TrackEnvelopePoint) => {
+								if (point.clipId !== clipId) return point;
+								// Convert to absolute time and unbind
+								const absoluteTime =
+									point.clipRelativeTime !== undefined
+										? point.clipRelativeTime + clipStartTime
+										: point.time;
+								return {
+									...point,
+									time: absoluteTime,
+									clipId: undefined,
+									clipRelativeTime: undefined,
+								};
+							},
+						),
 					}
 				: undefined;
 
@@ -304,4 +282,3 @@ export const selectedClipAtom = atom((get) => {
 	}
 	return null;
 });
-

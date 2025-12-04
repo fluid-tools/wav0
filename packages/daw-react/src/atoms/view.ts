@@ -7,7 +7,6 @@
 import {
 	DAW_PIXELS_PER_SECOND_AT_ZOOM_1,
 	time,
-	type TimelineState,
 } from "@wav0/daw-sdk";
 import { atom } from "jotai";
 import {
@@ -26,31 +25,60 @@ export type TimelineViewportMetrics = {
 	projectEndViewportPx: number;
 };
 
-export const timelineViewportAtom = atom<TimelineViewportMetrics>((get) => {
+// Static metrics (only changes on zoom/scroll, not during playback)
+export const timelineStaticMetricsAtom = atom<{
+	pxPerMs: number;
+	zoom: number;
+	horizontalScroll: number;
+}>((get) => {
 	const timeline = get(timelineAtom);
-	const playback = get(playbackAtom);
 	const scroll = get(horizontalScrollAtom);
-	const durationMs = get(totalDurationAtom);
 
 	const pxPerMs = (DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * timeline.zoom) / 1000;
 	const clampedPxPerMs = Number.isFinite(pxPerMs) ? pxPerMs : 0;
 	const clampedScroll = Number.isFinite(scroll) ? scroll : 0;
-	const safeCurrentTime = Number.isFinite(playback.currentTime)
-		? playback.currentTime
-		: 0;
-	const safeDurationMs = Number.isFinite(durationMs) ? durationMs : 0;
 
 	return {
 		pxPerMs: clampedPxPerMs,
 		zoom: timeline.zoom,
 		horizontalScroll: clampedScroll,
-		// Use unified timeToPixel function for perfect sync with grid markers
-		playheadViewportPx: Math.round(
-			time.timeToPixel(safeCurrentTime, clampedPxPerMs, clampedScroll),
-		),
-		projectEndViewportPx: Math.round(
-			time.timeToPixel(safeDurationMs, clampedPxPerMs, clampedScroll),
-		),
+	};
+});
+
+// Playhead position (changes frequently during playback, but isolated)
+export const playheadPositionAtom = atom<number>((get) => {
+	const { pxPerMs, horizontalScroll } = get(timelineStaticMetricsAtom);
+	const playback = get(playbackAtom);
+	const safeCurrentTime = Number.isFinite(playback.currentTime)
+		? playback.currentTime
+		: 0;
+
+	return Math.round(
+		time.timeToPixel(safeCurrentTime, pxPerMs, horizontalScroll),
+	);
+});
+
+// Project end position (changes when duration changes)
+export const projectEndPositionViewportAtom = atom<number>((get) => {
+	const { pxPerMs, horizontalScroll } = get(timelineStaticMetricsAtom);
+	const durationMs = get(totalDurationAtom);
+	const safeDurationMs = Number.isFinite(durationMs) ? durationMs : 0;
+
+	return Math.round(
+		time.timeToPixel(safeDurationMs, pxPerMs, horizontalScroll),
+	);
+});
+
+// Backward compatibility: combined atom for components that need all metrics
+export const timelineViewportAtom = atom<TimelineViewportMetrics>((get) => {
+	const staticMetrics = get(timelineStaticMetricsAtom);
+	const playheadPx = get(playheadPositionAtom);
+	const projectEndPx = get(projectEndPositionViewportAtom);
+
+	return {
+		...staticMetrics,
+		playheadViewportPx: playheadPx,
+		projectEndViewportPx: projectEndPx,
 	};
 });
 
@@ -68,20 +96,18 @@ export const projectEndPositionAtom = atom((get) => {
 	return durationMs * pxPerMs;
 });
 
-export const playheadViewportPxAtom = atom(
-	(get) => get(timelineViewportAtom).playheadViewportPx,
-);
+export const playheadViewportPxAtom = atom((get) => get(playheadPositionAtom));
 
-export const projectEndViewportPxAtom = atom(
-	(get) => get(timelineViewportAtom).projectEndViewportPx,
+export const projectEndViewportPxAtom = atom((get) =>
+	get(projectEndPositionViewportAtom),
 );
 
 export const timelinePxPerMsAtom = atom(
-	(get) => get(timelineViewportAtom).pxPerMs,
+	(get) => get(timelineStaticMetricsAtom).pxPerMs,
 );
 
 export const playheadViewportAtom = atom((get) => {
-	const { pxPerMs, horizontalScroll } = get(timelineViewportAtom);
+	const { pxPerMs, horizontalScroll } = get(timelineStaticMetricsAtom);
 	const playback = get(playbackAtom);
 	// Use unified timeToPixel function - same calculation as grid markers
 	const viewportPx = time.timeToPixel(

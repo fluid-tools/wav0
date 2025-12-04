@@ -5,7 +5,6 @@
 
 "use client";
 
-import type { PlaybackState, Track } from "@wav0/daw-sdk";
 import { atom, type Getter, type Setter } from "jotai";
 import { playbackAtom, totalDurationAtom, tracksAtom } from "./base";
 import { loopRegionAtom } from "./project";
@@ -56,7 +55,7 @@ function createGuardedTimeUpdateCallback(
 		lastUpdateTime = now;
 		lastUpdateMs = currentMs;
 
-		const newPlayback = get(playbackAtom) as PlaybackState;
+		const newPlayback = get(playbackAtom);
 
 		// Check if playback is still active
 		if (!newPlayback.isPlaying) {
@@ -65,7 +64,7 @@ function createGuardedTimeUpdateCallback(
 
 		// Get loop region state (read fresh each time to detect runtime changes)
 		const loopRegion = get(loopRegionAtom);
-		const total = get(totalDurationAtom) as number;
+		const total = get(totalDurationAtom);
 
 		// Determine effective loop boundary
 		let loopEndMs = total;
@@ -80,7 +79,7 @@ function createGuardedTimeUpdateCallback(
 		// Check if we've reached the loop end (or project end)
 		if (currentMs >= loopEndMs) {
 			// Check looping flag (read fresh to detect runtime toggle)
-			const currentPlayback = get(playbackAtom) as PlaybackState;
+			const currentPlayback = get(playbackAtom);
 
 			if (currentPlayback.looping) {
 				// Loop back to start
@@ -151,7 +150,7 @@ export const loopingAtom = atom(
 // ===== Write Atoms =====
 
 export const togglePlaybackAtom = atom(null, async (get, set) => {
-	const tracks = get(tracksAtom) as Track[];
+	const tracks = get(tracksAtom);
 	const playback = get(playbackAtom);
 
 	if (!serviceRegistry.playbackService) {
@@ -169,16 +168,24 @@ export const togglePlaybackAtom = atom(null, async (get, set) => {
 
 	await serviceRegistry.playbackService.initializeWithTracks(tracks);
 
+	// Hoist callback creation to prevent accumulation on loop restarts
+	const restartPlaybackRef = { current: null as (() => Promise<void>) | null };
+	
+	// Create callback once, reuse for all restarts
+	const guardedCallback = createGuardedTimeUpdateCallback(get, set, () => {
+		return restartPlaybackRef.current?.() ?? Promise.resolve();
+	});
+
 	// Create restart function for looping support
-	const restartPlayback = async () => {
-		const currentTracks = get(tracksAtom) as Track[];
+	restartPlaybackRef.current = async () => {
+		const currentTracks = get(tracksAtom);
 		const loopRegion = get(loopRegionAtom);
 		const startMs = loopRegion.enabled ? loopRegion.startMs : 0;
 
 		await serviceRegistry.playbackService?.pause();
 		await serviceRegistry.playbackService?.play(currentTracks, {
 			startTime: startMs / 1000,
-			onTimeUpdate: createGuardedTimeUpdateCallback(get, set, restartPlayback),
+			onTimeUpdate: guardedCallback,
 			onPlaybackEnd: () => {
 				const endState = get(playbackAtom);
 				set(playbackAtom, { ...endState, isPlaying: false });
@@ -186,10 +193,10 @@ export const togglePlaybackAtom = atom(null, async (get, set) => {
 		});
 	};
 
-	// Each play() call creates a fresh callback with its own throttling state
+	// Use the same callback for initial play
 	await serviceRegistry.playbackService.play(tracks, {
 		startTime: currentTimeSeconds,
-		onTimeUpdate: createGuardedTimeUpdateCallback(get, set, restartPlayback),
+		onTimeUpdate: guardedCallback,
 		onPlaybackEnd: () => {
 			const endState = get(playbackAtom);
 			set(playbackAtom, { ...endState, isPlaying: false });
@@ -214,7 +221,7 @@ export const setCurrentTimeAtom = atom(
 	null,
 	async (get, set, timeMs: number) => {
 		const playback = get(playbackAtom);
-		const tracks = get(tracksAtom) as Track[];
+		const tracks = get(tracksAtom);
 
 		set(playbackAtom, { ...playback, currentTime: timeMs });
 
@@ -222,16 +229,24 @@ export const setCurrentTimeAtom = atom(
 
 		await serviceRegistry.playbackService.pause();
 
+		// Hoist callback creation to prevent accumulation on loop restarts
+		const restartPlaybackRef = { current: null as (() => Promise<void>) | null };
+		
+		// Create callback once, reuse for all restarts
+		const guardedCallback = createGuardedTimeUpdateCallback(get, set, () => {
+			return restartPlaybackRef.current?.() ?? Promise.resolve();
+		});
+
 		// Create restart function for looping support
-		const restartPlayback = async () => {
-			const currentTracks = get(tracksAtom) as Track[];
+		restartPlaybackRef.current = async () => {
+			const currentTracks = get(tracksAtom);
 			const loopRegion = get(loopRegionAtom);
 			const startMs = loopRegion.enabled ? loopRegion.startMs : 0;
 
 			await serviceRegistry.playbackService?.pause();
 			await serviceRegistry.playbackService?.play(currentTracks, {
 				startTime: startMs / 1000,
-				onTimeUpdate: createGuardedTimeUpdateCallback(get, set, restartPlayback),
+				onTimeUpdate: guardedCallback,
 				onPlaybackEnd: () => {
 					const endState = get(playbackAtom);
 					set(playbackAtom, { ...endState, isPlaying: false });
@@ -239,10 +254,10 @@ export const setCurrentTimeAtom = atom(
 			});
 		};
 
-		// Each play() call creates a fresh callback with its own throttling state
+		// Use the same callback for initial play
 		await serviceRegistry.playbackService.play(tracks, {
 			startTime: timeMs / 1000,
-			onTimeUpdate: createGuardedTimeUpdateCallback(get, set, restartPlayback),
+			onTimeUpdate: guardedCallback,
 			onPlaybackEnd: () => {
 				const endState = get(playbackAtom);
 				set(playbackAtom, { ...endState, isPlaying: false });
