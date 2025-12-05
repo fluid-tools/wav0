@@ -2,7 +2,6 @@
 
 import {
 	automationViewEnabledAtom,
-	computeLoopEndMs,
 	playbackAtom,
 	projectEndOverrideAtom,
 	resetProjectAtom,
@@ -16,6 +15,7 @@ import {
 	tracksAtom,
 	updateClipAtom,
 } from "@wav0/daw-react";
+import { computeLoopEndMs } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
 import { useEffect } from "react";
 

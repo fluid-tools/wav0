@@ -9,19 +9,19 @@
 
 "use client";
 
-import { useEffect, useEffectEvent } from "react";
-import { useAtom } from "jotai";
+import type { PlaybackState, Track, TransportEvent } from "@wav0/daw-sdk";
 import type { WritableAtom } from "jotai";
+import { useAtom } from "jotai";
+import { useEffect, useEffectEvent } from "react";
 import { useDAWContext } from "../providers/daw-provider";
-import type { TransportEvent } from "@wav0/daw-sdk";
 
 /**
  * Sync playback atom with Transport events
  * Updates isPlaying and currentTime based on SDK Transport state
  * Preserves other playback properties (bpm, duration, looping)
  */
-export function usePlaybackAtomSync(
-	playbackAtom: WritableAtom<any, [any], void>,
+export function usePlaybackAtomSync<T extends { currentTime: number }>(
+	playbackAtom: WritableAtom<T, [T | ((prev: T) => T)], void>,
 ) {
 	const [playback, setPlayback] = useAtom(playbackAtom);
 	const daw = useDAWContext();
@@ -49,42 +49,68 @@ export function usePlaybackAtomSync(
 			"transport",
 			handleTransportEvent as EventListener,
 		);
+		const handleTimeUpdate = ((event: CustomEvent<{ currentTime: number }>) => {
+			setPlayback(
+				(prev: T) =>
+					({
+						...prev,
+						currentTime: event.detail.currentTime,
+					}) as T,
+			);
+		}) as EventListener;
+		transport.addEventListener("time-update", handleTimeUpdate);
 
 		return () => {
 			transport.removeEventListener(
 				"transport",
 				handleTransportEvent as EventListener,
 			);
+			transport.removeEventListener("time-update", handleTimeUpdate);
 		};
-	}, [daw, handleTransportEvent]);
+	}, [daw, handleTransportEvent, setPlayback]);
 }
 
 /**
  * Sync tracks atom with AudioEngine events
  * Updates track metadata when audio is loaded
  */
-export function useTrackAtomSync(tracksAtom: WritableAtom<any, [any], void>) {
+type TrackLoadedDetail = {
+	id: string;
+	duration: number;
+	sampleRate: number;
+	numberOfChannels: number;
+};
+
+export function useTrackAtomSync(
+	tracksAtom: WritableAtom<
+		Track[],
+		[Track[] | ((prev: Track[]) => Track[])],
+		void
+	>,
+) {
 	const [tracks, setTracks] = useAtom(tracksAtom);
 	const daw = useDAWContext();
 
 	// Non-reactive track loaded handler
-	const handleTrackLoaded = useEffectEvent((event: CustomEvent<any>) => {
-		const { id, duration, sampleRate, numberOfChannels } = event.detail;
+	const handleTrackLoaded = useEffectEvent(
+		(event: CustomEvent<TrackLoadedDetail>) => {
+			const { id, duration, sampleRate, numberOfChannels } = event.detail;
 
-		// Update tracks atom with new audio info
-		const updatedTracks = tracks.map((track: any) =>
-			track.id === id
-				? {
-						...track,
-						duration,
-						sampleRate,
-						numberOfChannels,
-					}
-				: track,
-		);
+			// Update tracks atom with new audio info
+			const updatedTracks = tracks.map((track: Track) =>
+				track.id === id
+					? {
+							...track,
+							duration,
+							sampleRate,
+							numberOfChannels,
+						}
+					: track,
+			);
 
-		setTracks(updatedTracks);
-	});
+			setTracks(updatedTracks);
+		},
+	);
 
 	useEffect(() => {
 		if (!daw) return;
@@ -110,8 +136,16 @@ export function useTrackAtomSync(tracksAtom: WritableAtom<any, [any], void>) {
  * Convenience hook to enable both syncs at once
  */
 export function useDAWAtomSync(
-	playbackAtom: WritableAtom<any, [any], void>,
-	tracksAtom: WritableAtom<any, [any], void>,
+	playbackAtom: WritableAtom<
+		PlaybackState,
+		[PlaybackState | ((prev: PlaybackState) => PlaybackState)],
+		void
+	>,
+	tracksAtom: WritableAtom<
+		Track[],
+		[Track[] | ((prev: Track[]) => Track[])],
+		void
+	>,
 ) {
 	usePlaybackAtomSync(playbackAtom);
 	useTrackAtomSync(tracksAtom);
