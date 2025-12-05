@@ -23,6 +23,7 @@ export interface ServiceRegistry {
 				onPlaybackEnd?: () => void;
 			},
 		) => Promise<void>;
+		seek: (timeMs: number) => Promise<void>;
 		pause: () => Promise<void>;
 		stop: () => Promise<void>;
 		synchronizeTracks: (tracks: Track[]) => Promise<void>;

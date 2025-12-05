@@ -1,7 +1,6 @@
 "use client";
 
 import {
-	currentTimeAtom,
 	isPlayingAtom,
 	selectedClipIdAtom,
 	selectedTrackIdAtom,
@@ -15,6 +14,7 @@ import {
 	trackHeightZoomAtom,
 	tracksAtom,
 	updateClipAtom,
+	useDAWContext,
 } from "@wav0/daw-react";
 import { computeLoopEndMs, time } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
@@ -30,7 +30,7 @@ import {
 	ZoomIn,
 	ZoomOut,
 } from "lucide-react";
-import { useDeferredValue } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	DAW_BUTTONS,
@@ -41,10 +41,7 @@ import {
 import { MasterMeter } from "./master-meter";
 
 function DAWControls() {
-	// Use fine-grained atoms + deferred value for non-critical time display
 	const [isPlaying] = useAtom(isPlayingAtom);
-	const [currentTime] = useAtom(currentTimeAtom);
-	const deferredTime = useDeferredValue(currentTime);
 	const [timeline] = useAtom(timelineAtom);
 	const [trackHeightZoom] = useAtom(trackHeightZoomAtom);
 	const [, togglePlayback] = useAtom(togglePlaybackAtom);
@@ -53,6 +50,33 @@ function DAWControls() {
 	const [, setTimelineZoom] = useAtom(setTimelineZoomAtom);
 	const [, setTrackHeightZoom] = useAtom(setTrackHeightZoomAtom);
 	const [totalDuration] = useAtom(totalDurationAtom);
+
+	// Throttled time display - polls Transport at 10Hz instead of subscribing to atom
+	const daw = useDAWContext();
+	const [displayTime, setDisplayTime] = useState(0);
+	const displayTimeRef = useRef(0);
+
+	useEffect(() => {
+		if (!daw) return;
+
+		const transport = daw.getTransport();
+
+		// Initial sync
+		displayTimeRef.current = transport.getCurrentTime();
+		setDisplayTime(displayTimeRef.current);
+
+		// Update display at 10Hz (100ms) for non-critical time readout
+		const interval = setInterval(() => {
+			const newTime = transport.getCurrentTime();
+			// Only update React state if time changed significantly (>10ms)
+			if (Math.abs(newTime - displayTimeRef.current) > 10) {
+				displayTimeRef.current = newTime;
+				setDisplayTime(newTime);
+			}
+		}, 100);
+
+		return () => clearInterval(interval);
+	}, [daw]);
 
 	// Selection and clip update atoms
 	const [selectedTrackId] = useAtom(selectedTrackIdAtom);
@@ -131,8 +155,9 @@ function DAWControls() {
 		}
 		// If playhead is past computed loopEnd, extend to include current position
 		const clipDuration = clip.trimEnd - clip.trimStart;
-		if (clipDuration > 0 && currentTime >= loopEnd) {
-			const pastEnd = currentTime - clip.startTime;
+		const transportTime = daw?.getTransport().getCurrentTime() ?? 0;
+		if (clipDuration > 0 && transportTime >= loopEnd) {
+			const pastEnd = transportTime - clip.startTime;
 			const cycles = Math.ceil(pastEnd / clipDuration);
 			loopEnd = clip.startTime + clipDuration * (cycles + 2);
 		}
@@ -189,21 +214,21 @@ function DAWControls() {
 				>
 					{/* Use deferred time for non-critical visual display */}
 					<span className={`${DAW_TEXT.MONO_TIME} min-w-14`}>
-						{time.formatDuration(deferredTime)}
+						{time.formatDuration(displayTime)}
 					</span>
 					<div className="relative flex-1">
 						<input
 							type="range"
 							min={0}
 							max={totalDuration}
-							value={deferredTime}
+							value={displayTime}
 							onChange={handleTimeChange}
 							className="w-48 h-1.5 bg-muted/50 rounded-full appearance-none cursor-pointer slider"
 							style={{
 								background: `linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) ${
-									(deferredTime / totalDuration) * 100
+									(displayTime / totalDuration) * 100
 								}%, hsl(var(--muted)) ${
-									(deferredTime / totalDuration) * 100
+									(displayTime / totalDuration) * 100
 								}%, hsl(var(--muted)) 100%)`,
 							}}
 						/>

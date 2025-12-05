@@ -45,29 +45,21 @@ export function usePlaybackAtomSync<T extends { currentTime: number }>(
 
 		const transport = daw.getTransport();
 
+		// Only sync on transport state changes (play/pause/stop/seek)
+		// NOT on time-update - that would cause 60fps re-renders
+		// Components that need continuous time subscribe directly to Transport
 		transport.addEventListener(
 			"transport",
 			handleTransportEvent as EventListener,
 		);
-		const handleTimeUpdate = ((event: CustomEvent<{ currentTime: number }>) => {
-			setPlayback(
-				(prev: T) =>
-					({
-						...prev,
-						currentTime: event.detail.currentTime,
-					}) as T,
-			);
-		}) as EventListener;
-		transport.addEventListener("time-update", handleTimeUpdate);
 
 		return () => {
 			transport.removeEventListener(
 				"transport",
 				handleTransportEvent as EventListener,
 			);
-			transport.removeEventListener("time-update", handleTimeUpdate);
 		};
-	}, [daw, handleTransportEvent, setPlayback]);
+	}, [daw, handleTransportEvent]);
 }
 
 /**

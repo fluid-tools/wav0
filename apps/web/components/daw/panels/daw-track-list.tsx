@@ -1,21 +1,22 @@
 "use client";
 
-import type { AutomationType } from "@wav0/daw-sdk";
-import { volume } from "@wav0/daw-sdk";
 import {
 	automationViewEnabledAtom,
-	playbackAtom,
+	isPlayingAtom,
 	removeTrackAtom,
 	selectedTrackIdAtom,
+	serviceRegistry,
 	setTrackHeightZoomAtom,
 	trackAutomationTypeAtom,
 	trackHeightZoomAtom,
 	tracksAtom,
 	updateTrackAtom,
 } from "@wav0/daw-react";
+import type { AutomationType, Track } from "@wav0/daw-sdk";
+import { volume } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
 import { GripHorizontal, MoreVertical, Volume2, VolumeX } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
 	TrackContextMenu,
 	TrackMenuOptions,
@@ -44,9 +45,312 @@ import {
 	DAW_SPACING,
 	DAW_TEXT,
 } from "@/lib/constants/daw-design";
-import { serviceRegistry } from "@wav0/daw-react";
 import { cn } from "@/lib/utils";
 
+// ===== Memoized Track List Row Component =====
+type TrackListRowProps = {
+	track: Track;
+	trackHeight: number;
+	isSelected: boolean;
+	isEditing: boolean;
+	editingName: string;
+	automationViewEnabled: boolean;
+	automationType: AutomationType;
+	onSelect: (trackId: string) => void;
+	onStartEdit: (trackId: string, name: string) => void;
+	onFinishEdit: (trackId: string) => void;
+	onCancelEdit: () => void;
+	onEditNameChange: (name: string) => void;
+	onToggleMute: (trackId: string, muted: boolean) => void;
+	onToggleSolo: (trackId: string, soloed: boolean) => void;
+	onVolumeChange: (trackId: string, volume: number) => void;
+	onSetVolumeDb: (trackId: string, db: number) => void;
+	onResetVolume: (trackId: string) => void;
+	onDeleteTrack: (trackId: string) => void;
+	onAutomationTypeChange: (trackId: string, type: AutomationType) => void;
+	onResizeStart: (e: React.MouseEvent) => void;
+};
+
+const TrackListRow = memo(function TrackListRow({
+	track,
+	trackHeight,
+	isSelected,
+	isEditing,
+	editingName,
+	automationViewEnabled,
+	automationType,
+	onSelect,
+	onStartEdit,
+	onFinishEdit,
+	onCancelEdit,
+	onEditNameChange,
+	onToggleMute,
+	onToggleSolo,
+	onVolumeChange,
+	onSetVolumeDb,
+	onResetVolume,
+	onDeleteTrack,
+	onAutomationTypeChange,
+	onResizeStart,
+}: TrackListRowProps) {
+	const trackVolume = track.volume ?? 75;
+	const dbValue = volume.volumeToDb(trackVolume);
+	const volumeLabel =
+		trackVolume <= 0 || track.muted ? "Muted" : volume.formatDb(dbValue);
+
+	// Create stable handlers that reference track.id
+	const handleSelect = useCallback(() => {
+		onSelect(track.id);
+	}, [onSelect, track.id]);
+
+	const handleStartEdit = useCallback(() => {
+		onStartEdit(track.id, track.name);
+	}, [onStartEdit, track.id, track.name]);
+
+	const handleFinishEdit = useCallback(() => {
+		onFinishEdit(track.id);
+	}, [onFinishEdit, track.id]);
+
+	const handleToggleMute = useCallback(() => {
+		onToggleMute(track.id, track.muted);
+	}, [onToggleMute, track.id, track.muted]);
+
+	const handleToggleSolo = useCallback(() => {
+		onToggleSolo(track.id, track.soloed);
+	}, [onToggleSolo, track.id, track.soloed]);
+
+	const handleVolumeChange = useCallback(
+		(e: React.ChangeEvent<HTMLInputElement>) => {
+			onVolumeChange(track.id, Number.parseInt(e.target.value, 10));
+		},
+		[onVolumeChange, track.id],
+	);
+
+	const handleSetVolumeDb = useCallback(
+		(db: number) => {
+			onSetVolumeDb(track.id, db);
+		},
+		[onSetVolumeDb, track.id],
+	);
+
+	const handleResetVolume = useCallback(() => {
+		onResetVolume(track.id);
+	}, [onResetVolume, track.id]);
+
+	const handleDeleteTrack = useCallback(() => {
+		onDeleteTrack(track.id);
+	}, [onDeleteTrack, track.id]);
+
+	const handleRequestRename = useCallback(() => {
+		onStartEdit(track.id, track.name);
+	}, [onStartEdit, track.id, track.name]);
+
+	const handleAutomationTypeChange = useCallback(
+		(value: AutomationType) => {
+			onAutomationTypeChange(track.id, value);
+		},
+		[onAutomationTypeChange, track.id],
+	);
+
+	return (
+		<TrackContextMenu
+			trackName={track.name}
+			isMuted={track.muted}
+			isSoloed={track.soloed}
+			currentDb={dbValue}
+			onRequestRename={handleRequestRename}
+			onToggleSolo={handleToggleSolo}
+			onToggleMute={handleToggleMute}
+			onResetVolume={handleResetVolume}
+			onSetVolumeDb={handleSetVolumeDb}
+			onDeleteTrack={handleDeleteTrack}
+			onSelectTrack={handleSelect}
+		>
+			<div
+				className={`w-full transition-colors ${DAW_COLORS.BORDER_DEFAULT} border-b ${
+					isSelected
+						? DAW_COLORS.SELECTED_BG
+						: `bg-background hover:${DAW_COLORS.HOVER_BG}`
+				} relative`}
+				style={{
+					height: trackHeight,
+					padding: `${DAW_SPACING.TRACK_PADDING}px`,
+					display: "flex",
+					flexDirection: "column",
+					justifyContent: "space-between",
+				}}
+			>
+				{/* Track Header */}
+				<div className="flex items-center justify-between">
+					<button
+						type="button"
+						className={`flex items-center gap-2 flex-1 min-w-0 cursor-pointer ${DAW_BUTTONS.TRANSPARENT} text-left`}
+						onClick={handleSelect}
+						onDoubleClick={handleStartEdit}
+					>
+						<div
+							className={`${DAW_ICONS.XS} rounded-full flex-shrink-0`}
+							style={{ backgroundColor: track.color }}
+						/>
+						{isEditing ? (
+							<input
+								value={editingName}
+								onChange={(e) => onEditNameChange(e.target.value)}
+								onBlur={handleFinishEdit}
+								onKeyDown={(e) => {
+									if (e.key === "Enter") {
+										handleFinishEdit();
+									} else if (e.key === "Escape") {
+										onCancelEdit();
+									}
+								}}
+								className="h-6 text-sm px-1 border border-primary rounded"
+								onClick={(e) => e.stopPropagation()}
+							/>
+						) : (
+							<span className={`${DAW_TEXT.TRACK_NAME} select-none`}>
+								{track.name}
+							</span>
+						)}
+					</button>
+
+					<DropdownMenu>
+						<DropdownMenuTrigger asChild>
+							<Button variant="ghost" size="icon" className="h-7 w-7">
+								<MoreVertical className={DAW_ICONS.XS} />
+							</Button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="end" className="w-64">
+							<TrackMenuOptions
+								trackName={track.name}
+								isMuted={track.muted}
+								isSoloed={track.soloed}
+								currentDb={dbValue}
+								onRequestRename={handleRequestRename}
+								onToggleSolo={handleToggleSolo}
+								onToggleMute={handleToggleMute}
+								onResetVolume={handleResetVolume}
+								onSetVolumeDb={handleSetVolumeDb}
+								onDeleteTrack={handleDeleteTrack}
+								MenuItem={({ children, ...props }) => (
+									<DropdownMenuItem {...props}>{children}</DropdownMenuItem>
+								)}
+								MenuSeparator={(props) => <DropdownMenuSeparator {...props} />}
+							/>
+						</DropdownMenuContent>
+					</DropdownMenu>
+				</div>
+
+				{/* Track Controls - Redesigned for breathing room */}
+				<div className="mt-2 flex items-center gap-3">
+					<Button
+						variant={track.muted ? "default" : "ghost"}
+						size="sm"
+						className="h-7 w-7 p-0 flex-shrink-0"
+						onClick={(e) => {
+							e.stopPropagation();
+							handleToggleMute();
+						}}
+					>
+						{track.muted ? (
+							<VolumeX className={DAW_ICONS.XS} />
+						) : (
+							<Volume2 className={DAW_ICONS.XS} />
+						)}
+					</Button>
+
+					<button
+						type="button"
+						className={cn(
+							"h-7 w-7 rounded-sm text-xs font-semibold transition-colors",
+							track.soloed
+								? "bg-amber-400 text-black"
+								: "bg-muted/40 text-muted-foreground hover:bg-muted/70",
+						)}
+						onClick={(e) => {
+							e.stopPropagation();
+							handleToggleSolo();
+						}}
+						aria-pressed={track.soloed}
+						aria-label={track.soloed ? "Unsolo track" : "Solo track"}
+					>
+						S
+					</button>
+
+					{/* Automation Type Selector - Only show when automation view enabled */}
+					{automationViewEnabled && (
+						<Select
+							value={automationType}
+							onValueChange={handleAutomationTypeChange}
+						>
+							<SelectTrigger
+								className="h-7 w-20 text-xs"
+								aria-label="Automation type"
+							>
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="volume">Vol</SelectItem>
+								<SelectItem value="pan" disabled>
+									Pan
+								</SelectItem>
+							</SelectContent>
+						</Select>
+					)}
+
+					{/* Volume Controls - More spacious layout */}
+					<div className="flex flex-1 items-center gap-2">
+						<div className="flex-1 min-w-0">
+							<input
+								type="range"
+								min={0}
+								max={100}
+								value={track.volume}
+								onChange={handleVolumeChange}
+								onClick={(e) => e.stopPropagation()}
+								className="w-full h-1.5 cursor-pointer appearance-none rounded-lg bg-muted hover:bg-muted/80 transition-colors"
+								title={
+									track.volumeEnvelope?.enabled
+										? `Base volume: ${volumeLabel} (envelope active)`
+										: `Volume: ${volumeLabel}`
+								}
+							/>
+						</div>
+
+						<div className="flex items-center gap-1.5 min-w-[80px]">
+							<span
+								className="text-xs font-mono text-muted-foreground tabular-nums"
+								title={
+									track.volumeEnvelope?.enabled ? "Base level" : "Track volume"
+								}
+							>
+								{volumeLabel}
+							</span>
+							{track.volumeEnvelope?.enabled && (
+								<LiveAutomationBadge trackId={track.id} />
+							)}
+						</div>
+					</div>
+				</div>
+
+				{/* Resize Handle - adjusts global zoom */}
+				<button
+					type="button"
+					className="absolute bottom-0 left-0 right-0 h-1 cursor-ns-resize hover:bg-primary/50 opacity-0 hover:opacity-100 transition-opacity"
+					onMouseDown={onResizeStart}
+					title="Resize all tracks height"
+					aria-label="Resize all tracks height"
+				>
+					<div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-8 h-1 bg-border rounded-t">
+						<GripHorizontal className="w-3 h-3 mx-auto -mt-1 text-muted-foreground" />
+					</div>
+				</button>
+			</div>
+		</TrackContextMenu>
+	);
+});
+
+// ===== Main DAWTrackList Component =====
 export function DAWTrackList() {
 	const [tracks] = useAtom(tracksAtom);
 	const [selectedTrackId, setSelectedTrackId] = useAtom(selectedTrackIdAtom);
@@ -58,7 +362,12 @@ export function DAWTrackList() {
 	const [trackAutomationTypes, setTrackAutomationTypes] = useAtom(
 		trackAutomationTypeAtom,
 	);
-	const [playback] = useAtom(playbackAtom);
+	// Use isPlayingAtom instead of playbackAtom to avoid re-renders on currentTime changes
+	const [isPlaying] = useAtom(isPlayingAtom);
+	// Ref to read isPlaying in callbacks without adding to deps (prevents callback recreation on play/pause)
+	const isPlayingRef = useRef(isPlaying);
+	isPlayingRef.current = isPlaying;
+
 	const [editingTrackId, setEditingTrackId] = useState<string | null>(null);
 	const [editingTrackName, setEditingTrackName] = useState<string>("");
 	const [resizingTrack, setResizingTrack] = useState<{
@@ -66,49 +375,112 @@ export function DAWTrackList() {
 		startZoom: number;
 	} | null>(null);
 
-	const startEditingTrack = (trackId: string, currentName: string) => {
-		setEditingTrackId(trackId);
-		setEditingTrackName(currentName);
-	};
+	// Compute track height once
+	const trackHeight = Math.round(DAW_HEIGHTS.TRACK_ROW * trackHeightZoom);
 
-	const finishEditingTrack = (trackId: string) => {
-		if (editingTrackName.trim()) {
-			updateTrack(trackId, { name: editingTrackName.trim() });
-		}
+	// ===== Stable Callbacks =====
+	const handleSelect = useCallback(
+		(trackId: string) => {
+			setSelectedTrackId(trackId);
+		},
+		[setSelectedTrackId],
+	);
+
+	const handleStartEdit = useCallback((trackId: string, name: string) => {
+		setEditingTrackId(trackId);
+		setEditingTrackName(name);
+	}, []);
+
+	const handleFinishEdit = useCallback(
+		(trackId: string) => {
+			if (editingTrackName.trim()) {
+				updateTrack(trackId, { name: editingTrackName.trim() });
+			}
+			setEditingTrackId(null);
+			setEditingTrackName("");
+		},
+		[editingTrackName, updateTrack],
+	);
+
+	const handleCancelEdit = useCallback(() => {
 		setEditingTrackId(null);
 		setEditingTrackName("");
-	};
+	}, []);
 
-	const handleVolumeChange = (trackId: string, volumePercent: number) => {
-		// Convert volume percentage to dB
-		const volumeDb = volume.volumeToDb(volumePercent);
+	const handleEditNameChange = useCallback((name: string) => {
+		setEditingTrackName(name);
+	}, []);
 
-		// Check if track exists
-		const track = tracks.find((t) => t.id === trackId);
-		if (!track) return;
+	const handleToggleMute = useCallback(
+		(trackId: string, _currentMuted: boolean) => {
+			updateTrack(trackId, { muted: !_currentMuted });
+		},
+		[updateTrack],
+	);
 
-		// Update state
-		updateTrack(trackId, { volume: volumePercent, volumeDb });
+	const handleToggleSolo = useCallback(
+		(trackId: string, currentSoloed: boolean) => {
+			updateTrack(trackId, { soloed: !currentSoloed });
+		},
+		[updateTrack],
+	);
 
-		// If playing, use realtime update to avoid disrupting automation
-		if (playback.isPlaying && serviceRegistry.playbackService) {
-			serviceRegistry.playbackService.updateTrackVolumeRealtime(trackId, volumeDb);
-		}
-	};
+	const handleVolumeChange = useCallback(
+		(trackId: string, volumePercent: number) => {
+			const volumeDb = volume.volumeToDb(volumePercent);
+			updateTrack(trackId, { volume: volumePercent, volumeDb });
 
-	const toggleMute = (trackId: string, currentMuted: boolean) => {
-		updateTrack(trackId, { muted: !currentMuted });
-	};
+			// If playing, use realtime update to avoid disrupting automation
+			// Read from ref to avoid callback recreation on play/pause state changes
+			if (isPlayingRef.current && serviceRegistry.playbackService) {
+				serviceRegistry.playbackService.updateTrackVolumeRealtime(
+					trackId,
+					volumeDb,
+				);
+			}
+		},
+		[updateTrack],
+	);
 
-	const toggleSolo = (trackId: string, currentSoloed: boolean) => {
-		updateTrack(trackId, { soloed: !currentSoloed });
-	};
+	const handleSetVolumeDb = useCallback(
+		(trackId: string, db: number) => {
+			const volumeValue = volume.dbToVolume(db);
+			updateTrack(trackId, {
+				volume: volumeValue,
+				muted: volumeValue <= 0,
+			});
+		},
+		[updateTrack],
+	);
+
+	const handleResetVolume = useCallback(
+		(trackId: string) => {
+			const volumeValue = volume.dbToVolume(0);
+			updateTrack(trackId, { volume: volumeValue });
+		},
+		[updateTrack],
+	);
+
+	const handleDeleteTrack = useCallback(
+		(trackId: string) => {
+			removeTrack(trackId);
+		},
+		[removeTrack],
+	);
+
+	const handleAutomationTypeChange = useCallback(
+		(trackId: string, type: AutomationType) => {
+			const newMap = new Map(trackAutomationTypes);
+			newMap.set(trackId, type);
+			setTrackAutomationTypes(newMap);
+		},
+		[trackAutomationTypes, setTrackAutomationTypes],
+	);
 
 	const handleResizeStart = useCallback(
 		(e: React.MouseEvent) => {
 			e.preventDefault();
 			e.stopPropagation();
-
 			setResizingTrack({
 				startY: e.clientY,
 				startZoom: trackHeightZoom,
@@ -122,7 +494,7 @@ export function DAWTrackList() {
 			if (!resizingTrack) return;
 
 			const deltaY = e.clientY - resizingTrack.startY;
-			const deltaZoom = deltaY / DAW_HEIGHTS.TRACK_ROW; // Convert pixels to zoom multiplier
+			const deltaZoom = deltaY / DAW_HEIGHTS.TRACK_ROW;
 			const newZoom = resizingTrack.startZoom + deltaZoom;
 
 			setTrackHeightZoom(newZoom);
@@ -153,248 +525,31 @@ export function DAWTrackList() {
 		<div className="w-full">
 			{/* Track List */}
 			<div>
-				{tracks.map((track) => {
-					const trackHeight = Math.round(
-						DAW_HEIGHTS.TRACK_ROW * trackHeightZoom,
-					);
-					const trackVolume = track.volume ?? 75;
-					const dbValue = volume.volumeToDb(trackVolume);
-					const volumeLabel =
-						trackVolume <= 0 || track.muted
-							? "Muted"
-							: volume.formatDb(dbValue);
-					const setVolumeFromDb = (db: number) => {
-						const volumeValue = volume.dbToVolume(db);
-						updateTrack(track.id, {
-							volume: volumeValue,
-							muted: volumeValue <= 0 ? true : track.muted && volumeValue === 0,
-						});
-					};
-					const resetVolume = () => {
-						setVolumeFromDb(0);
-					};
-					const toggleMuteAction = () => toggleMute(track.id, track.muted);
-					const toggleSoloAction = () => toggleSolo(track.id, track.soloed);
-					const selectTrack = () => setSelectedTrackId(track.id);
-
-					return (
-						<TrackContextMenu
-							key={track.id}
-							trackName={track.name}
-							isMuted={track.muted}
-							isSoloed={track.soloed}
-							currentDb={dbValue}
-							onRequestRename={() => setEditingTrackId(track.id)}
-							onToggleSolo={toggleSoloAction}
-							onToggleMute={toggleMuteAction}
-							onResetVolume={resetVolume}
-							onSetVolumeDb={setVolumeFromDb}
-							onDeleteTrack={() => removeTrack(track.id)}
-							onSelectTrack={selectTrack}
-						>
-							<div
-								className={`w-full transition-colors ${DAW_COLORS.BORDER_DEFAULT} border-b ${
-									selectedTrackId === track.id
-										? DAW_COLORS.SELECTED_BG
-										: `bg-background hover:${DAW_COLORS.HOVER_BG}`
-								} relative`}
-								style={{
-									height: trackHeight,
-									padding: `${DAW_SPACING.TRACK_PADDING}px`,
-									display: "flex",
-									flexDirection: "column",
-									justifyContent: "space-between",
-								}}
-							>
-								{/* Track Header */}
-								<div className="flex items-center justify-between">
-									<button
-										type="button"
-										className={`flex items-center gap-2 flex-1 min-w-0 cursor-pointer ${DAW_BUTTONS.TRANSPARENT} text-left`}
-										onClick={selectTrack}
-										onDoubleClick={() =>
-											startEditingTrack(track.id, track.name)
-										}
-									>
-										<div
-											className={`${DAW_ICONS.XS} rounded-full flex-shrink-0`}
-											style={{ backgroundColor: track.color }}
-										/>
-										{editingTrackId === track.id ? (
-											<input
-												value={editingTrackName}
-												onChange={(e) => setEditingTrackName(e.target.value)}
-												onBlur={() => finishEditingTrack(track.id)}
-												onKeyDown={(e) => {
-													if (e.key === "Enter") {
-														finishEditingTrack(track.id);
-													} else if (e.key === "Escape") {
-														setEditingTrackId(null);
-														setEditingTrackName("");
-													}
-												}}
-												className="h-6 text-sm px-1 border border-primary rounded"
-												onClick={(e) => e.stopPropagation()}
-											/>
-										) : (
-											<span className={`${DAW_TEXT.TRACK_NAME} select-none`}>
-												{track.name}
-											</span>
-										)}
-									</button>
-
-									<DropdownMenu>
-										<DropdownMenuTrigger asChild>
-											<Button variant="ghost" size="icon" className="h-7 w-7">
-												<MoreVertical className={DAW_ICONS.XS} />
-											</Button>
-										</DropdownMenuTrigger>
-										<DropdownMenuContent align="end" className="w-64">
-											<TrackMenuOptions
-												trackName={track.name}
-												isMuted={track.muted}
-												isSoloed={track.soloed}
-												currentDb={dbValue}
-												onRequestRename={() =>
-													startEditingTrack(track.id, track.name)
-												}
-												onToggleSolo={toggleSoloAction}
-												onToggleMute={toggleMuteAction}
-												onResetVolume={resetVolume}
-												onSetVolumeDb={setVolumeFromDb}
-												onDeleteTrack={() => removeTrack(track.id)}
-												MenuItem={({ children, ...props }) => (
-													<DropdownMenuItem {...props}>
-														{children}
-													</DropdownMenuItem>
-												)}
-												MenuSeparator={(props) => (
-													<DropdownMenuSeparator {...props} />
-												)}
-											/>
-										</DropdownMenuContent>
-									</DropdownMenu>
-								</div>
-
-								{/* Track Controls - Redesigned for breathing room */}
-								<div className="mt-2 flex items-center gap-3">
-									<Button
-										variant={track.muted ? "default" : "ghost"}
-										size="sm"
-										className="h-7 w-7 p-0 flex-shrink-0"
-										onClick={(e) => {
-											e.stopPropagation();
-											toggleMute(track.id, track.muted);
-										}}
-									>
-										{track.muted ? (
-											<VolumeX className={DAW_ICONS.XS} />
-										) : (
-											<Volume2 className={DAW_ICONS.XS} />
-										)}
-									</Button>
-
-									<button
-										type="button"
-										className={cn(
-											"h-7 w-7 rounded-sm text-xs font-semibold transition-colors",
-											track.soloed
-												? "bg-amber-400 text-black"
-												: "bg-muted/40 text-muted-foreground hover:bg-muted/70",
-										)}
-										onClick={(e) => {
-											e.stopPropagation();
-											toggleSoloAction();
-										}}
-										aria-pressed={track.soloed}
-										aria-label={track.soloed ? "Unsolo track" : "Solo track"}
-									>
-										S
-									</button>
-
-									{/* Automation Type Selector - Only show when automation view enabled */}
-									{automationViewEnabled && (
-										<Select
-											value={trackAutomationTypes.get(track.id) || "volume"}
-											onValueChange={(value: AutomationType) => {
-												const newMap = new Map(trackAutomationTypes);
-												newMap.set(track.id, value);
-												setTrackAutomationTypes(newMap);
-											}}
-										>
-											<SelectTrigger
-												className="h-7 w-20 text-xs"
-												aria-label="Automation type"
-											>
-												<SelectValue />
-											</SelectTrigger>
-											<SelectContent>
-												<SelectItem value="volume">Vol</SelectItem>
-												<SelectItem value="pan" disabled>
-													Pan
-												</SelectItem>
-											</SelectContent>
-										</Select>
-									)}
-
-									{/* Volume Controls - More spacious layout */}
-									<div className="flex flex-1 items-center gap-2">
-										<div className="flex-1 min-w-0">
-											<input
-												type="range"
-												min={0}
-												max={100}
-												value={track.volume}
-												onChange={(e) =>
-													handleVolumeChange(
-														track.id,
-														parseInt(e.target.value, 10),
-													)
-												}
-												onClick={(e) => e.stopPropagation()}
-												className="w-full h-1.5 cursor-pointer appearance-none rounded-lg bg-muted hover:bg-muted/80 transition-colors"
-												title={
-													track.volumeEnvelope?.enabled
-														? `Base volume: ${volumeLabel} (envelope active)`
-														: `Volume: ${volumeLabel}`
-												}
-											/>
-										</div>
-
-										<div className="flex items-center gap-1.5 min-w-[80px]">
-											<span
-												className="text-xs font-mono text-muted-foreground tabular-nums"
-												title={
-													track.volumeEnvelope?.enabled
-														? "Base level"
-														: "Track volume"
-												}
-											>
-												{volumeLabel}
-											</span>
-											{track.volumeEnvelope?.enabled && (
-												<LiveAutomationBadge trackId={track.id} />
-											)}
-										</div>
-									</div>
-								</div>
-
-								{/* Resize Handle - adjusts global zoom */}
-								<button
-									type="button"
-									className="absolute bottom-0 left-0 right-0 h-1 cursor-ns-resize hover:bg-primary/50 opacity-0 hover:opacity-100 transition-opacity"
-									onMouseDown={handleResizeStart}
-									title="Resize all tracks height"
-									aria-label="Resize all tracks height"
-								>
-									<div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-8 h-1 bg-border rounded-t">
-										<GripHorizontal className="w-3 h-3 mx-auto -mt-1 text-muted-foreground" />
-									</div>
-								</button>
-							</div>
-						</TrackContextMenu>
-					);
-				})}
+				{tracks.map((track) => (
+					<TrackListRow
+						key={track.id}
+						track={track}
+						trackHeight={trackHeight}
+						isSelected={selectedTrackId === track.id}
+						isEditing={editingTrackId === track.id}
+						editingName={editingTrackName}
+						automationViewEnabled={automationViewEnabled}
+						automationType={trackAutomationTypes.get(track.id) || "volume"}
+						onSelect={handleSelect}
+						onStartEdit={handleStartEdit}
+						onFinishEdit={handleFinishEdit}
+						onCancelEdit={handleCancelEdit}
+						onEditNameChange={handleEditNameChange}
+						onToggleMute={handleToggleMute}
+						onToggleSolo={handleToggleSolo}
+						onVolumeChange={handleVolumeChange}
+						onSetVolumeDb={handleSetVolumeDb}
+						onResetVolume={handleResetVolume}
+						onDeleteTrack={handleDeleteTrack}
+						onAutomationTypeChange={handleAutomationTypeChange}
+						onResizeStart={handleResizeStart}
+					/>
+				))}
 
 				{tracks.length === 0 && (
 					<div className="text-center py-8 text-muted-foreground px-4">

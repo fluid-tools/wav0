@@ -1,7 +1,7 @@
 "use client";
 
 import { volume } from "@wav0/daw-sdk";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	ContextMenu,
@@ -183,15 +183,18 @@ export function TrackContextMenu({
 }: TrackContextMenuProps) {
 	const [_menuOpen, setMenuOpen] = useState(false);
 
+	const handleOpenChange = useCallback(
+		(open: boolean) => {
+			setMenuOpen(open);
+			if (open) {
+				onSelectTrack();
+			}
+		},
+		[onSelectTrack],
+	);
+
 	return (
-		<ContextMenu
-			onOpenChange={(open) => {
-				setMenuOpen(open);
-				if (open) {
-					onSelectTrack();
-				}
-			}}
-		>
+		<ContextMenu onOpenChange={handleOpenChange}>
 			<ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
 			<ContextMenuContent className="w-64" alignOffset={-4}>
 				<TrackMenuOptions

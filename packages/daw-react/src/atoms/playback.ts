@@ -222,12 +222,23 @@ export const setCurrentTimeAtom = atom(
 	async (get, set, timeMs: number) => {
 		const playback = get(playbackAtom);
 		const tracks = get(tracksAtom);
+		const playbackService = serviceRegistry.playbackService;
 
 		set(playbackAtom, { ...playback, currentTime: timeMs });
 
-		if (!playback.isPlaying || !serviceRegistry.playbackService) return;
+		// If not playing, notify Transport via playback service seek
+		if (!playback.isPlaying) {
+			try {
+				await playbackService?.seek(timeMs);
+			} catch (error) {
+				console.warn("Failed to seek transport", error);
+			}
+			return;
+		}
 
-		await serviceRegistry.playbackService.pause();
+		if (!playbackService) return;
+
+		await playbackService.pause();
 
 		// Hoist callback creation to prevent accumulation on loop restarts
 		const restartPlaybackRef = { current: null as (() => Promise<void>) | null };
@@ -243,8 +254,8 @@ export const setCurrentTimeAtom = atom(
 			const loopRegion = get(loopRegionAtom);
 			const startMs = loopRegion.enabled ? loopRegion.startMs : 0;
 
-			await serviceRegistry.playbackService?.pause();
-			await serviceRegistry.playbackService?.play(currentTracks, {
+			await playbackService.pause();
+			await playbackService.play(currentTracks, {
 				startTime: startMs / 1000,
 				onTimeUpdate: guardedCallback,
 				onPlaybackEnd: () => {
@@ -255,7 +266,7 @@ export const setCurrentTimeAtom = atom(
 		};
 
 		// Use the same callback for initial play
-		await serviceRegistry.playbackService.play(tracks, {
+		await playbackService.play(tracks, {
 			startTime: timeMs / 1000,
 			onTimeUpdate: guardedCallback,
 			onPlaybackEnd: () => {

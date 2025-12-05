@@ -2,11 +2,11 @@
 
 import {
 	automationViewEnabledAtom,
-	currentTimeAtom,
 	horizontalScrollAtom,
 	isPlayingAtom,
 	timelinePxPerMsAtom,
 	updateTrackAtom,
+	useDAWContext,
 } from "@wav0/daw-react";
 import type { Track, TrackEnvelopePoint } from "@wav0/daw-sdk";
 import { curves, volume } from "@wav0/daw-sdk";
@@ -34,8 +34,11 @@ export const AutomationLane = memo(function AutomationLane({
 	const [pxPerMs] = useAtom(timelinePxPerMsAtom);
 	// Use fine-grained atoms to avoid re-renders on every time update
 	const [isPlaying] = useAtom(isPlayingAtom);
-	const [currentTime] = useAtom(currentTimeAtom);
 	const [, updateTrack] = useAtom(updateTrackAtom);
+	const daw = useDAWContext();
+	// Direct Transport subscription for playhead position (no React state)
+	const playheadIndicatorRef = useRef<SVGCircleElement>(null);
+	const currentTimeRef = useRef(daw?.getTransport().getCurrentTime() ?? 0);
 	const [automationViewEnabled] = useAtom(automationViewEnabledAtom);
 	const [_horizontalScroll] = useAtom(horizontalScrollAtom);
 	const [draggingPoint, setDraggingPoint] = useState<{
@@ -320,23 +323,63 @@ export const AutomationLane = memo(function AutomationLane({
 		return pathData;
 	}, [sorted, trackHeight, usableHeight, pxPerMs, envelope?.segments]);
 
-	// Calculate playhead position on curve if playing - MEMOIZED
-	const playheadPosition = useMemo(() => {
-		if (!isPlaying) return null;
-		const x = currentTime * pxPerMs;
-		// Find current multiplier at playhead
-		let currentMultiplier = 1.0;
-		for (const point of sorted) {
-			if (point.time <= currentTime) {
-				currentMultiplier = point.value;
-			} else {
-				break;
+	// Store metrics in refs for Transport callback
+	const metricsRef = useRef({ pxPerMs, sorted, trackHeight, usableHeight });
+	metricsRef.current = { pxPerMs, sorted, trackHeight, usableHeight };
+
+	// Subscribe directly to Transport time-update for playhead indicator
+	// Updates DOM directly without React re-renders
+	useEffect(() => {
+		if (!daw || !isPlaying) {
+			// Hide indicator when not playing
+			if (playheadIndicatorRef.current) {
+				playheadIndicatorRef.current.style.display = "none";
 			}
+			return;
 		}
-		const normalizedValue = Math.max(0, Math.min(4, currentMultiplier)) / 4;
-		const y = trackHeight - padding - normalizedValue * usableHeight;
-		return { x, y };
-	}, [isPlaying, currentTime, pxPerMs, sorted, trackHeight, usableHeight]);
+
+		const transport = daw.getTransport();
+
+		const handleTimeUpdate = (event: CustomEvent<{ currentTime: number }>) => {
+			const timeMs = event.detail.currentTime;
+			currentTimeRef.current = timeMs;
+
+			if (!playheadIndicatorRef.current) return;
+
+			const { pxPerMs: px, sorted: pts, trackHeight: th, usableHeight: uh } = metricsRef.current;
+			const padding = 20;
+
+			// Calculate X position
+			const x = timeMs * px;
+
+			// Find current multiplier at playhead
+			let currentMultiplier = 1.0;
+			for (const point of pts) {
+				if (point.time <= timeMs) {
+					currentMultiplier = point.value;
+				} else {
+					break;
+				}
+			}
+			const normalizedValue = Math.max(0, Math.min(4, currentMultiplier)) / 4;
+			const y = th - padding - normalizedValue * uh;
+
+			// Direct DOM update
+			playheadIndicatorRef.current.style.display = "";
+			playheadIndicatorRef.current.setAttribute("cx", String(x));
+			playheadIndicatorRef.current.setAttribute("cy", String(y));
+		};
+
+		// Initial position
+		const initialTime = transport.getCurrentTime();
+		handleTimeUpdate({ detail: { currentTime: initialTime } } as CustomEvent<{ currentTime: number }>);
+
+		transport.addEventListener("time-update", handleTimeUpdate as EventListener);
+
+		return () => {
+			transport.removeEventListener("time-update", handleTimeUpdate as EventListener);
+		};
+	}, [daw, isPlaying]);
 
 	// Don't render if automation view disabled
 	if (!automationViewEnabled) {
@@ -486,19 +529,16 @@ export const AutomationLane = memo(function AutomationLane({
 					);
 				})}
 
-				{/* Playhead indicator on curve */}
-				{playheadPosition && (
-					<circle
-						cx={playheadPosition.x}
-						cy={playheadPosition.y}
-						r={5}
-						fill="rgb(239, 68, 68)" // red-500
-						stroke="white"
-						strokeWidth={2}
-						className="pointer-events-none"
-						style={{ filter: "drop-shadow(0 0 4px rgba(239, 68, 68, 0.8))" }}
-					/>
-				)}
+				{/* Playhead indicator on curve - updated via ref during playback */}
+				<circle
+					ref={playheadIndicatorRef}
+					r={5}
+					fill="rgb(239, 68, 68)" // red-500
+					stroke="white"
+					strokeWidth={2}
+					className="pointer-events-none"
+					style={{ display: isPlaying ? "" : "none", filter: "drop-shadow(0 0 4px rgba(239, 68, 68, 0.8))" }}
+				/>
 			</svg>
 		</AutomationContextMenu>
 	);

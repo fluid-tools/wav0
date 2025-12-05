@@ -2,16 +2,16 @@
 
 import {
 	horizontalScrollAtom,
-	playbackAtom,
 	playheadDraggingAtom,
 	setCurrentTimeAtom,
 	timelineAtom,
 	timelinePxPerMsAtom,
+	useDAWContext,
 	useTimebase,
 } from "@wav0/daw-react";
 import { time } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
-import { memo, useCallback, useLayoutEffect, useRef } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useRef } from "react";
 
 type Props = {
 	timelineHeaderHeight: number;
@@ -30,11 +30,13 @@ export const UnifiedPlayhead = memo(function UnifiedPlayhead({
 	timelineHeaderHeight,
 }: Props) {
 	const [pxPerMs] = useAtom(timelinePxPerMsAtom);
-	const [playback] = useAtom(playbackAtom);
 	const [horizontalScroll] = useAtom(horizontalScrollAtom);
 	const [timeline] = useAtom(timelineAtom);
 	const [, setCurrentTime] = useAtom(setCurrentTimeAtom);
 	const [, setPlayheadDragging] = useAtom(playheadDraggingAtom);
+	const daw = useDAWContext();
+	// Read Transport time directly (no React state subscription)
+	const currentTimeRef = useRef(daw?.getTransport().getCurrentTime() ?? 0);
 
 	const containerRef = useRef<HTMLDivElement>(null);
 	const playheadLineRef = useRef<HTMLDivElement>(null);
@@ -71,37 +73,76 @@ export const UnifiedPlayhead = memo(function UnifiedPlayhead({
 		playheadHandleRef.current.style.transform = `translateX(${playheadX - 12}px)`;
 	}, []);
 
-	// Sync visual position from React state (when NOT dragging)
+	// Subscribe directly to Transport time-update for playhead animation
+	// Bypasses React state entirely - direct DOM manipulation at 60fps
+	useEffect(() => {
+		if (!daw) return;
+
+		const transport = daw.getTransport();
+
+		const handleTimeUpdate = (event: CustomEvent<{ currentTime: number }>) => {
+			// Skip if dragging - drag handles its own visual updates
+			if (dragRef.current.active) return;
+
+			const timeMs = event.detail.currentTime;
+			currentTimeRef.current = timeMs;
+
+			// Direct DOM update - no React re-render
+			if (!playheadLineRef.current || !playheadHandleRef.current) return;
+			const { pxPerMs: px, horizontalScroll: scroll } = metricsRef.current;
+			const playheadX = Math.round(time.timeToPixel(timeMs, px, scroll));
+			playheadLineRef.current.style.transform = `translateX(${playheadX}px)`;
+			playheadHandleRef.current.style.transform = `translateX(${playheadX - 12}px)`;
+		};
+
+		// Also handle transport events (play/pause/seek) to catch seeks when not playing
+		const handleTransport = (event: CustomEvent<{ currentTime: number }>) => {
+			if (dragRef.current.active) return;
+			const timeMs = event.detail.currentTime;
+			currentTimeRef.current = timeMs;
+			updatePlayheadVisual(timeMs);
+		};
+
+		transport.addEventListener("time-update", handleTimeUpdate as EventListener);
+		transport.addEventListener("transport", handleTransport as EventListener);
+
+		return () => {
+			transport.removeEventListener("time-update", handleTimeUpdate as EventListener);
+			transport.removeEventListener("transport", handleTransport as EventListener);
+		};
+	}, [daw, updatePlayheadVisual]);
+
+	// Sync visual position when metrics change (zoom, scroll) - NOT from time changes
 	useLayoutEffect(() => {
 		// Skip if dragging - drag handles its own visual updates
 		if (dragRef.current.active) return;
 
-		// Inline update using current props (needed for deps)
+		// Update using latest time from ref
 		if (!playheadLineRef.current || !playheadHandleRef.current) return;
-		const playheadX = Math.round(time.timeToPixel(playback.currentTime, pxPerMs, horizontalScroll));
+		const timeMs = currentTimeRef.current;
+		const playheadX = Math.round(time.timeToPixel(timeMs, pxPerMs, horizontalScroll));
 		playheadLineRef.current.style.transform = `translateX(${playheadX}px)`;
 		playheadHandleRef.current.style.transform = `translateX(${playheadX - 12}px)`;
-	}, [playback.currentTime, pxPerMs, horizontalScroll]);
+	}, [pxPerMs, horizontalScroll]);
 
 	// Calculate time from pointer position
 	const getTimeFromPointer = useCallback((clientX: number): number | null => {
 		const { pxPerMs: px, horizontalScroll: scroll, snapToGrid } = metricsRef.current;
 		if (px <= 0) return null;
 
-		const timelineScrollContainer = document.querySelector(
-			'[data-daw-timeline-scroll="true"]',
-		) as HTMLElement | null;
+		const timelineScrollContainer = document.querySelector('[data-daw-timeline-scroll="true"]') as
+			| HTMLElement
+			| null;
 		if (!timelineScrollContainer) return null;
 
-		const timelineElement =
-			timelineScrollContainer.firstElementChild as HTMLElement | null;
-		if (!timelineElement) return null;
+		const rect = timelineScrollContainer.getBoundingClientRect();
+		const viewportX = Math.max(0, clientX - rect.left);
+		if (!Number.isFinite(viewportX)) return null;
 
-		const rect = timelineElement.getBoundingClientRect();
-		const absoluteX = Math.max(0, clientX - rect.left);
-		if (!Number.isFinite(absoluteX)) return null;
-
-		const rawMs = Math.max(0, time.pixelToTime(absoluteX, px, scroll));
+		const rawMs = Math.max(
+			0,
+			time.pixelToTime(viewportX, px, timelineScrollContainer.scrollLeft ?? scroll),
+		);
 		return snapToGrid ? snapRef.current(rawMs) : rawMs;
 	}, []);
 
@@ -150,8 +191,9 @@ export const UnifiedPlayhead = memo(function UnifiedPlayhead({
 		}
 
 		// Sync final position to React state ONCE
-		if (state.active && state.pendingMs !== playback.currentTime) {
+		if (state.active && state.pendingMs !== currentTimeRef.current) {
 			setCurrentTime(state.pendingMs);
+			currentTimeRef.current = state.pendingMs;
 		}
 
 		// Reset drag state
@@ -161,7 +203,7 @@ export const UnifiedPlayhead = memo(function UnifiedPlayhead({
 		state.pendingMs = 0;
 
 		setPlayheadDragging(false);
-	}, [setCurrentTime, setPlayheadDragging, playback.currentTime]);
+	}, [setCurrentTime, setPlayheadDragging]);
 
 	// Handle pointer events for dragging
 	useLayoutEffect(() => {
@@ -222,8 +264,8 @@ export const UnifiedPlayhead = memo(function UnifiedPlayhead({
 					const state = dragRef.current;
 					state.active = true;
 					state.pointerId = event.pointerId;
-					state.lastMs = playback.currentTime;
-					state.pendingMs = playback.currentTime;
+					state.lastMs = currentTimeRef.current;
+					state.pendingMs = currentTimeRef.current;
 					state.visualRaf = 0;
 
 					setPlayheadDragging(true);

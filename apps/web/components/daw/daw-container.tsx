@@ -4,6 +4,7 @@ import {
 	addTrackAtom,
 	horizontalScrollAtom,
 	initializeAudioFromOPFSAtom,
+	isPlayingAtom,
 	playbackAtom,
 	playheadAutoFollowEnabledAtom,
 	playheadDraggingAtom,
@@ -56,7 +57,7 @@ export function DAWContainer() {
 	const [, addTrack] = useAtom(addTrackAtom);
 	const [, setHorizontalScroll] = useAtom(horizontalScrollAtom);
 	const [, setVerticalScroll] = useAtom(verticalScrollAtom);
-	const [playback] = useAtom(playbackAtom);
+	const [isPlaying] = useAtom(isPlayingAtom);
 	const [_timeline] = useAtom(timelineAtom);
 	const [viewport] = useAtom(timelineViewportAtom);
 	const [playheadViewport] = useAtom(playheadViewportAtom);
@@ -362,7 +363,7 @@ export function DAWContainer() {
 		if (isPlayheadDragging) return;
 		if (userIsScrolling) return;
 		if (!autoFollowEnabled) return;
-		if (!playback.isPlaying) return;
+		if (!isPlaying) return;
 
 		const x = playheadViewport.absolutePx;
 		if (!Number.isFinite(x)) return;
@@ -383,7 +384,7 @@ export function DAWContainer() {
 		playheadViewport.absolutePx,
 		userIsScrolling,
 		autoFollowEnabled,
-		playback.isPlaying,
+		isPlaying,
 	]);
 
 	return (

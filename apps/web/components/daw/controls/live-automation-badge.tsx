@@ -1,6 +1,6 @@
 "use client";
 
-import { playbackAtom, useLiveAutomationGain } from "@wav0/daw-react";
+import { isPlayingAtom, useLiveAutomationGain } from "@wav0/daw-react";
 import { volume } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
 
@@ -9,11 +9,11 @@ type LiveAutomationBadgeProps = {
 };
 
 export function LiveAutomationBadge({ trackId }: LiveAutomationBadgeProps) {
-	const [playback] = useAtom(playbackAtom);
+	const [isPlaying] = useAtom(isPlayingAtom);
 	const { currentDb, isAutomated } = useLiveAutomationGain(trackId);
 
 	// Only show during playback when automation is active
-	if (!playback.isPlaying || !isAutomated || currentDb === null) {
+	if (!isPlaying || !isAutomated || currentDb === null) {
 		return null;
 	}
 

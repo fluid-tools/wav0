@@ -3,15 +3,16 @@
 import {
 	addMarkerAtom,
 	horizontalScrollAtom,
-	playbackAtom,
 	projectEndOverrideAtom,
 	projectEndPositionAtom,
 	setCurrentTimeAtom,
 	timelineAtom,
 	timelinePxPerMsAtom,
 	timelineWidthAtom,
+	useDAWContext,
 	useTimebase,
 } from "@wav0/daw-react";
+import { time } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MarkerTrack } from "@/components/daw/panels/marker-track";
@@ -20,8 +21,13 @@ import { UnifiedOverlay } from "@/components/daw/unified-overlay";
 
 export function DAWTimeline() {
 	const [timeline] = useAtom(timelineAtom);
-	const [playback] = useAtom(playbackAtom);
 	const [, setCurrentTime] = useAtom(setCurrentTimeAtom);
+	const daw = useDAWContext();
+	// Read Transport time directly at invocation (no React state subscription)
+	const dawRef = useRef(daw);
+	dawRef.current = daw;
+	const getCurrentTimeRef = useRef(() => dawRef.current?.getTransport().getCurrentTime() ?? 0);
+	getCurrentTimeRef.current = () => dawRef.current?.getTransport().getCurrentTime() ?? 0;
 	const [timelineWidth] = useAtom(timelineWidthAtom);
 	const [projectEndPosition] = useAtom(projectEndPositionAtom);
 	const [_projectEndOverride, setProjectEndOverride] = useAtom(
@@ -33,6 +39,27 @@ export function DAWTimeline() {
 	const [_horizontalScroll] = useAtom(horizontalScrollAtom);
 	const [, addMarker] = useAtom(addMarkerAtom);
 	const { snap } = useTimebase();
+
+	const getTimeFromClientX = useCallback(
+		(clientX: number) => {
+			if (pxPerMs <= 0) return null;
+			const scrollContainer = document.querySelector('[data-daw-timeline-scroll="true"]') as
+				| HTMLElement
+				| null;
+			if (!scrollContainer) return null;
+
+			const rect = scrollContainer.getBoundingClientRect();
+			const viewportX = Math.max(0, clientX - rect.left);
+			if (!Number.isFinite(viewportX)) return null;
+
+			const rawMs = Math.max(
+				0,
+				time.pixelToTime(viewportX, pxPerMs, scrollContainer.scrollLeft),
+			);
+			return timeline.snapToGrid ? snap(rawMs) : rawMs;
+		},
+		[pxPerMs, snap, timeline.snapToGrid],
+	);
 
 	const onMouseMove = useCallback(
 		(e: MouseEvent) => {
@@ -57,12 +84,8 @@ export function DAWTimeline() {
 	}, [isDraggingEnd, onMouseMove]);
 
 	const handleTimelineClick = (e: React.MouseEvent | React.PointerEvent) => {
-		if (pxPerMs <= 0) return;
-
-		const rect = e.currentTarget.getBoundingClientRect();
-		const absoluteX = Math.max(0, e.clientX - rect.left);
-		const rawMs = Math.max(0, absoluteX / pxPerMs);
-		const timeMs = timeline.snapToGrid ? snap(rawMs) : rawMs;
+		const timeMs = getTimeFromClientX(e.clientX);
+		if (timeMs === null) return;
 		setCurrentTime(timeMs);
 	};
 
@@ -82,13 +105,13 @@ export function DAWTimeline() {
 				return;
 			}
 			if (e.key.toLowerCase() !== "m") return;
-			const timeMs = Math.max(0, playback.currentTime);
+			const timeMs = Math.max(0, getCurrentTimeRef.current());
 			const snapped = snap(timeMs);
 			addMarker({ timeMs: snapped, name: "", color: "#ffffff" });
 		};
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
-	}, [addMarker, snap, playback.currentTime]);
+	}, [addMarker, snap]);
 
 	const onTimelinePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
 		if (event.button !== 0) return;
@@ -123,7 +146,7 @@ export function DAWTimeline() {
 					if (isDraggingEnd) return;
 					if (e.key === "Enter" || e.key === " ") {
 						e.preventDefault();
-						const at = Math.max(0, playback.currentTime);
+						const at = Math.max(0, getCurrentTimeRef.current());
 						const snapped = timeline.snapToGrid ? snap(at) : at;
 						setCurrentTime(snapped);
 					}

@@ -75,12 +75,25 @@ export default function RootLayout({
 		<html lang="en" suppressHydrationWarning>
 			<head>
 				{process.env.NODE_ENV === "development" && (
-					<Script
-						src="//unpkg.com/react-grab/dist/index.global.js"
-						crossOrigin="anonymous"
-						strategy="beforeInteractive"
-						data-enabled="true"
-					/>
+					<>
+						<Script
+							crossOrigin="anonymous"
+							data-enabled="true"
+							src="//unpkg.com/react-scan/dist/auto.global.js"
+							strategy="beforeInteractive"
+						/>
+						<Script
+							src="//unpkg.com/react-grab/dist/index.global.js"
+							crossOrigin="anonymous"
+							strategy="beforeInteractive"
+							data-enabled="true"
+						/>
+						<Script
+							src="//unpkg.com/@react-grab/cursor/dist/client.global.js"
+							strategy="lazyOnload"
+						/>
+
+					</>
 				)}
 			</head>
 			<body

@@ -656,29 +656,32 @@ export function DAWTrackContent() {
 
 	const lastPointer = useRef<{ clientX: number } | null>(null);
 
-	const handleTrackDrop = async (trackId: string, e: React.DragEvent) => {
-		e.preventDefault();
-		setDragOverTrackId(null);
+	const handleTrackDrop = useCallback(
+		async (trackId: string, e: React.DragEvent) => {
+			e.preventDefault();
+			setDragOverTrackId(null);
 
-		const files = Array.from(e.dataTransfer.files).filter((file) =>
-			file.type.startsWith("audio/"),
-		);
+			const files = Array.from(e.dataTransfer.files).filter((file) =>
+				file.type.startsWith("audio/"),
+			);
 
-		if (files.length === 0) return;
+			if (files.length === 0) return;
 
-		const file = files[0];
+			const file = files[0];
 
-		// Calculate drop position
-		const rect = e.currentTarget.getBoundingClientRect();
-		const x = e.clientX - rect.left;
-		const startTime = x / pixelsPerMs;
+			// Calculate drop position
+			const rect = e.currentTarget.getBoundingClientRect();
+			const x = e.clientX - rect.left;
+			const startTime = x / pixelsPerMs;
 
-		try {
-			await loadAudioFile(file, trackId, { startTimeMs: startTime });
-		} catch (error) {
-			console.error("Error loading audio file:", error);
-		}
-	};
+			try {
+				await loadAudioFile(file, trackId, { startTimeMs: startTime });
+			} catch (error) {
+				console.error("Error loading audio file:", error);
+			}
+		},
+		[pixelsPerMs, loadAudioFile],
+	);
 
 	const interactionActive = Boolean(
 		resizingClip || draggingClip || loopDragging,
