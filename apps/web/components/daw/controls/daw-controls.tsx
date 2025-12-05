@@ -1,7 +1,8 @@
 "use client";
 
 import {
-	playbackAtom,
+	currentTimeAtom,
+	isPlayingAtom,
 	selectedClipIdAtom,
 	selectedTrackIdAtom,
 	setCurrentTimeAtom,
@@ -29,6 +30,7 @@ import {
 	ZoomIn,
 	ZoomOut,
 } from "lucide-react";
+import { useDeferredValue } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	DAW_BUTTONS,
@@ -39,7 +41,10 @@ import {
 import { MasterMeter } from "./master-meter";
 
 function DAWControls() {
-	const [playback] = useAtom(playbackAtom);
+	// Use fine-grained atoms + deferred value for non-critical time display
+	const [isPlaying] = useAtom(isPlayingAtom);
+	const [currentTime] = useAtom(currentTimeAtom);
+	const deferredTime = useDeferredValue(currentTime);
 	const [timeline] = useAtom(timelineAtom);
 	const [trackHeightZoom] = useAtom(trackHeightZoomAtom);
 	const [, togglePlayback] = useAtom(togglePlaybackAtom);
@@ -124,6 +129,13 @@ function DAWControls() {
 		if (loopEnd === undefined) {
 			loopEnd = computeLoopEndMs(clip);
 		}
+		// If playhead is past computed loopEnd, extend to include current position
+		const clipDuration = clip.trimEnd - clip.trimStart;
+		if (clipDuration > 0 && currentTime >= loopEnd) {
+			const pastEnd = currentTime - clip.startTime;
+			const cycles = Math.ceil(pastEnd / clipDuration);
+			loopEnd = clip.startTime + clipDuration * (cycles + 2);
+		}
 		await updateClip(track.id, clip.id, { loop: true, loopEnd });
 	};
 
@@ -151,9 +163,9 @@ function DAWControls() {
 							width: DAW_HEIGHTS.BUTTON_LG,
 							height: DAW_HEIGHTS.BUTTON_LG,
 						}}
-						aria-label={playback.isPlaying ? "Pause" : "Play"}
+						aria-label={isPlaying ? "Pause" : "Play"}
 					>
-						{playback.isPlaying ? (
+						{isPlaying ? (
 							<Pause className={DAW_ICONS.LG} />
 						) : (
 							<Play className={DAW_ICONS.LG} />
@@ -175,22 +187,23 @@ function DAWControls() {
 				<div
 					className={`flex items-center gap-3 ${DAW_BUTTONS.PANEL} px-3 py-1.5`}
 				>
+					{/* Use deferred time for non-critical visual display */}
 					<span className={`${DAW_TEXT.MONO_TIME} min-w-14`}>
-						{time.formatDuration(playback.currentTime)}
+						{time.formatDuration(deferredTime)}
 					</span>
 					<div className="relative flex-1">
 						<input
 							type="range"
 							min={0}
 							max={totalDuration}
-							value={playback.currentTime}
+							value={deferredTime}
 							onChange={handleTimeChange}
 							className="w-48 h-1.5 bg-muted/50 rounded-full appearance-none cursor-pointer slider"
 							style={{
 								background: `linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) ${
-									(playback.currentTime / totalDuration) * 100
+									(deferredTime / totalDuration) * 100
 								}%, hsl(var(--muted)) ${
-									(playback.currentTime / totalDuration) * 100
+									(deferredTime / totalDuration) * 100
 								}%, hsl(var(--muted)) 100%)`,
 							}}
 						/>

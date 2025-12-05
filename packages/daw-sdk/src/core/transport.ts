@@ -258,7 +258,18 @@ export class Transport extends EventTarget {
 				}
 			}
 		} else {
-			timeIntoClip = Math.max(0, timelineSec - clipStartSec);
+			// For non-looping clips, still calculate cycle position if we're past one-shot end
+			// This allows the current "phantom cycle" to finish when loop is disabled mid-playback
+			const elapsed = Math.max(0, timelineSec - clipStartSec);
+			if (elapsed > clipDurationSec && clipDurationSec > 0) {
+				// We're past one-shot end - calculate position within current cycle
+				// to allow the current iteration to finish
+				const cycleIndex = Math.floor(elapsed / clipDurationSec);
+				cycleOffsetSec = cycleIndex * clipDurationSec;
+				timeIntoClip = elapsed - cycleOffsetSec;
+			} else {
+				timeIntoClip = elapsed;
+			}
 		}
 
 		// Apply start grace period
@@ -270,13 +281,15 @@ export class Transport extends EventTarget {
 		const audioFileReadStart = clipTrimStartSec + timeIntoClip;
 		if (audioFileReadStart >= clipTrimEndSec) return;
 
-		// Calculate clip start time in AudioContext time
-		const clipStartInPlayback = clip.startTime - playbackStart;
-		const clipStartAC = this.contextStartTime + clipStartInPlayback / 1000;
+		// Calculate clip timing in AudioContext time using original play reference
+		const clipStartAC =
+			this.contextStartTime + (clip.startTime - this.playbackStartTime) / 1000;
 		const loopEndAC =
-			this.contextStartTime + (loopUntilSec * 1000 - playbackStart) / 1000;
+			this.contextStartTime +
+			(loopUntilSec * 1000 - this.playbackStartTime) / 1000;
 		const oneShotEndAC =
-			this.contextStartTime + (clipOneShotEndSec * 1000 - playbackStart) / 1000;
+			this.contextStartTime +
+			(clipOneShotEndSec * 1000 - this.playbackStartTime) / 1000;
 
 		// Apply fade envelopes (cancel → anchor → future-only) with generation guard
 		try {
@@ -324,7 +337,6 @@ export class Transport extends EventTarget {
 			clipDurationSec,
 			cycleOffsetSec,
 			loopUntilSec,
-			clipStartInPlayback,
 			timeIntoClip, // Pass offset for mid-playback scheduling
 		);
 	}
@@ -345,7 +357,6 @@ export class Transport extends EventTarget {
 		clipDurationSec: number,
 		cycleOffsetSec: number,
 		loopUntilSec: number,
-		clipStartInPlayback: number,
 		timeIntoClipSec: number,
 	): Promise<void> {
 		// Calculate audio file read position for this cycle
@@ -382,10 +393,12 @@ export class Transport extends EventTarget {
 			// Stop if we've reached or passed the loop boundary
 			if (timelinePos >= loopUntilSec) break;
 
-			// Calculate AudioContext start time for this buffer
-			const bufferOffsetMs = (cycleOffsetSec + timeInTrimmed) * 1000;
+			// Calculate buffer's absolute timeline position in ms
+			const bufferTimelineMs =
+				clip.startTime + (cycleOffsetSec + timeInTrimmed) * 1000;
+			// Convert to AudioContext time using the original play reference
 			const startTime =
-				this.contextStartTime + (clipStartInPlayback + bufferOffsetMs) / 1000;
+				this.contextStartTime + (bufferTimelineMs - this.playbackStartTime) / 1000;
 
 			if (startTime >= this.audioContext.currentTime) {
 				node.start(startTime);
@@ -436,7 +449,6 @@ export class Transport extends EventTarget {
 					clipDurationSec,
 					cycleOffsetSec + clipDurationSec, // Increment cycle offset
 					loopUntilSec,
-					clipStartInPlayback,
 					0, // Subsequent cycles always start from trim start
 				);
 			}
@@ -808,14 +820,14 @@ export class Transport extends EventTarget {
 			}
 
 			const acStart = now + (segmentStart - currentTimeMs) / 1000;
-			let adjustedStart = acStart;
-			if (adjustedStart < lastScheduledEnd + schedulingEpsilon) {
-				adjustedStart = lastScheduledEnd + schedulingEpsilon;
-			}
-			if (adjustedStart < now) {
-				adjustedStart = now + schedulingEpsilon;
-			}
-			const adjustedDuration = durationSec - (adjustedStart - acStart);
+			// Single Math.max guarantees no overlap regardless of floating-point edge cases
+			const adjustedStart = Math.max(
+				acStart,
+				lastScheduledEnd + schedulingEpsilon,
+				now + schedulingEpsilon,
+			);
+			// Keep original duration (don't try to preserve end time - causes overlap)
+			const adjustedDuration = Math.max(durationSec, schedulingEpsilon);
 			if (adjustedDuration <= schedulingEpsilon) {
 				lastTime = point.time;
 				lastMultiplier = point.value;
@@ -827,7 +839,9 @@ export class Transport extends EventTarget {
 				adjustedStart,
 				safeDuration,
 			);
-			lastScheduledEnd = adjustedStart + safeDuration;
+			// Enforce monotonic forward progress (prevents floating-point boundary overlap)
+			const newEnd = adjustedStart + safeDuration;
+			lastScheduledEnd = Math.max(lastScheduledEnd + schedulingEpsilon, newEnd);
 
 			lastTime = point.time;
 			lastMultiplier = point.value;

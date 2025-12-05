@@ -43,7 +43,6 @@ import { EventListSheet } from "./inspectors/event-list-sheet";
 import { DAWTimeline } from "./panels/daw-timeline";
 import { DAWTrackContent } from "./panels/daw-track-content";
 import { DAWTrackList } from "./panels/daw-track-list";
-import { TrackGridCanvas } from "./panels/track-grid-canvas";
 import { UnifiedPlayhead } from "./panels/unified-playhead";
 import { ClipMoveToastManager } from "./toast/clip-move-toast";
 
@@ -501,8 +500,6 @@ export function DAWContainer() {
 										onScroll={onTrackGridScroll}
 										style={{ scrollbarWidth: "thin" }}
 									>
-										<TrackGridCanvas />
-
 										<div
 											style={{
 												width: timelineWidth,

@@ -17,6 +17,15 @@ type Props = {
 	timelineHeaderHeight: number;
 };
 
+/**
+ * UnifiedPlayhead - Performance-optimized playhead component
+ *
+ * During drag: Updates DOM directly via refs, bypassing React state entirely.
+ * This eliminates the cascading re-renders that cause jank on rapid movements.
+ * Only syncs to React state on drag end.
+ *
+ * During playback: Uses useLayoutEffect to update transforms synchronously.
+ */
 export const UnifiedPlayhead = memo(function UnifiedPlayhead({
 	timelineHeaderHeight,
 }: Props) {
@@ -31,117 +40,140 @@ export const UnifiedPlayhead = memo(function UnifiedPlayhead({
 	const playheadLineRef = useRef<HTMLDivElement>(null);
 	const playheadHandleRef = useRef<HTMLButtonElement>(null);
 
+	// Store current metrics in refs to avoid stale closures during drag
+	const metricsRef = useRef({ pxPerMs, horizontalScroll, snapToGrid: timeline.snapToGrid });
+	metricsRef.current = { pxPerMs, horizontalScroll, snapToGrid: timeline.snapToGrid };
+
 	const dragRef = useRef<{
 		active: boolean;
 		pointerId: number | null;
 		lastMs: number;
 		pendingMs: number;
-		raf: number;
-	} | null>(null);
+		visualRaf: number; // Separate RAF for visual updates
+	}>({
+		active: false,
+		pointerId: null,
+		lastMs: 0,
+		pendingMs: 0,
+		visualRaf: 0,
+	});
 
 	const { snap } = useTimebase();
+	const snapRef = useRef(snap);
+	snapRef.current = snap;
 
-	useLayoutEffect(() => {
+	// Direct DOM update function - bypasses React entirely
+	const updatePlayheadVisual = useCallback((timeMs: number) => {
 		if (!playheadLineRef.current || !playheadHandleRef.current) return;
+		const { pxPerMs: px, horizontalScroll: scroll } = metricsRef.current;
+		const playheadX = Math.round(time.timeToPixel(timeMs, px, scroll));
+		playheadLineRef.current.style.transform = `translateX(${playheadX}px)`;
+		playheadHandleRef.current.style.transform = `translateX(${playheadX - 12}px)`;
+	}, []);
 
-		const playheadX = Math.round(
-			time.timeToPixel(playback.currentTime, pxPerMs, horizontalScroll),
-		);
+	// Sync visual position from React state (when NOT dragging)
+	useLayoutEffect(() => {
+		// Skip if dragging - drag handles its own visual updates
+		if (dragRef.current.active) return;
 
+		// Inline update using current props (needed for deps)
+		if (!playheadLineRef.current || !playheadHandleRef.current) return;
+		const playheadX = Math.round(time.timeToPixel(playback.currentTime, pxPerMs, horizontalScroll));
 		playheadLineRef.current.style.transform = `translateX(${playheadX}px)`;
 		playheadHandleRef.current.style.transform = `translateX(${playheadX - 12}px)`;
 	}, [playback.currentTime, pxPerMs, horizontalScroll]);
 
+	// Calculate time from pointer position
+	const getTimeFromPointer = useCallback((clientX: number): number | null => {
+		const { pxPerMs: px, horizontalScroll: scroll, snapToGrid } = metricsRef.current;
+		if (px <= 0) return null;
+
+		const timelineScrollContainer = document.querySelector(
+			'[data-daw-timeline-scroll="true"]',
+		) as HTMLElement | null;
+		if (!timelineScrollContainer) return null;
+
+		const timelineElement =
+			timelineScrollContainer.firstElementChild as HTMLElement | null;
+		if (!timelineElement) return null;
+
+		const rect = timelineElement.getBoundingClientRect();
+		const absoluteX = Math.max(0, clientX - rect.left);
+		if (!Number.isFinite(absoluteX)) return null;
+
+		const rawMs = Math.max(0, time.pixelToTime(absoluteX, px, scroll));
+		return snapToGrid ? snapRef.current(rawMs) : rawMs;
+	}, []);
+
 	const updateTime = useCallback(
-		(clientX: number, _timeStamp?: number) => {
-			if (!containerRef.current || pxPerMs <= 0) return;
-
-			const timelineScrollContainer = document.querySelector(
-				'[data-daw-timeline-scroll="true"]',
-			) as HTMLElement | null;
-			if (!timelineScrollContainer) return;
-
-			const timelineElement =
-				timelineScrollContainer.firstElementChild as HTMLElement | null;
-			if (!timelineElement) return;
-
-			const rect = timelineElement.getBoundingClientRect();
-			const absoluteX = Math.max(0, clientX - rect.left);
-			if (!Number.isFinite(absoluteX)) return;
-
-			const rawMs = Math.max(
-				0,
-				time.pixelToTime(absoluteX, pxPerMs, horizontalScroll),
-			);
-			const nextMs = timeline.snapToGrid ? snap(rawMs) : rawMs;
+		(clientX: number) => {
+			const nextMs = getTimeFromPointer(clientX);
+			if (nextMs === null) return;
 
 			const state = dragRef.current;
-			if (!state?.active) {
+			if (!state.active) {
+				// Not dragging - update React state directly
 				setCurrentTime(nextMs);
 				return;
 			}
 
+			// During drag: Update visual immediately, skip React state
 			state.lastMs = nextMs;
 			state.pendingMs = nextMs;
-			if (!state.raf) {
-				state.raf = requestAnimationFrame(() => {
-					const current = dragRef.current;
-					if (!current) return;
-					const value = current.pendingMs;
-					current.raf = 0;
-					setCurrentTime(value);
+
+			// Visual update via RAF for smooth 60fps
+			if (!state.visualRaf) {
+				state.visualRaf = requestAnimationFrame(() => {
+					state.visualRaf = 0;
+					updatePlayheadVisual(state.pendingMs);
 				});
 			}
 		},
-		[pxPerMs, setCurrentTime, timeline.snapToGrid, snap, horizontalScroll],
+		[getTimeFromPointer, setCurrentTime, updatePlayheadVisual],
 	);
 
 	const stopDrag = useCallback(() => {
 		const state = dragRef.current;
-		if (!state?.active || !playheadHandleRef.current) {
-			dragRef.current = {
-				active: false,
-				pointerId: null,
-				lastMs: 0,
-				pendingMs: 0,
-				raf: 0,
-			};
-			setPlayheadDragging(false);
-			return;
-		}
 		const element = playheadHandleRef.current;
-		const pointerId = state.pointerId;
-		if (pointerId !== null && element.hasPointerCapture?.(pointerId)) {
+
+		// Cancel any pending visual RAF
+		if (state.visualRaf) {
+			cancelAnimationFrame(state.visualRaf);
+			state.visualRaf = 0;
+		}
+
+		// Release pointer capture
+		if (element && state.pointerId !== null && element.hasPointerCapture?.(state.pointerId)) {
 			try {
-				element.releasePointerCapture(pointerId);
+				element.releasePointerCapture(state.pointerId);
 			} catch {}
 		}
-		if (state.raf) {
-			cancelAnimationFrame(state.raf);
-			state.raf = 0;
+
+		// Sync final position to React state ONCE
+		if (state.active && state.pendingMs !== playback.currentTime) {
+			setCurrentTime(state.pendingMs);
 		}
-		setCurrentTime(state.pendingMs);
-		dragRef.current = {
-			active: false,
-			pointerId: null,
-			lastMs: 0,
-			pendingMs: 0,
-			raf: 0,
-		};
+
+		// Reset drag state
+		state.active = false;
+		state.pointerId = null;
+		state.lastMs = 0;
+		state.pendingMs = 0;
+
 		setPlayheadDragging(false);
-	}, [setCurrentTime, setPlayheadDragging]);
+	}, [setCurrentTime, setPlayheadDragging, playback.currentTime]);
 
 	// Handle pointer events for dragging
 	useLayoutEffect(() => {
 		const handlePointerMove = (event: PointerEvent) => {
 			const state = dragRef.current;
-			if (!state?.active || state.pointerId !== event.pointerId) return;
-			updateTime(event.clientX, event.timeStamp);
+			if (!state.active || state.pointerId !== event.pointerId) return;
+			updateTime(event.clientX);
 		};
 
 		const handlePointerUp = (event: PointerEvent) => {
 			const state = dragRef.current;
-			if (!state?.active || state.pointerId !== event.pointerId) return;
+			if (!state.active || state.pointerId !== event.pointerId) return;
 			stopDrag();
 		};
 
@@ -185,16 +217,18 @@ export const UnifiedPlayhead = memo(function UnifiedPlayhead({
 				onPointerDown={(event) => {
 					event.preventDefault();
 					if (event.button !== 0) return;
-					dragRef.current = {
-						active: true,
-						pointerId: event.pointerId,
-						lastMs: playback.currentTime,
-						pendingMs: playback.currentTime,
-						raf: 0,
-					};
+
+					// Initialize drag state
+					const state = dragRef.current;
+					state.active = true;
+					state.pointerId = event.pointerId;
+					state.lastMs = playback.currentTime;
+					state.pendingMs = playback.currentTime;
+					state.visualRaf = 0;
+
 					setPlayheadDragging(true);
 					event.currentTarget.setPointerCapture?.(event.pointerId);
-					updateTime(event.clientX, event.timeStamp);
+					updateTime(event.clientX);
 				}}
 				aria-label="Move playhead"
 			>

@@ -2,8 +2,9 @@
 
 import {
 	automationViewEnabledAtom,
+	currentTimeAtom,
 	horizontalScrollAtom,
-	playbackAtom,
+	isPlayingAtom,
 	timelinePxPerMsAtom,
 	updateTrackAtom,
 } from "@wav0/daw-react";
@@ -11,7 +12,7 @@ import type { Track, TrackEnvelopePoint } from "@wav0/daw-sdk";
 import { curves, volume } from "@wav0/daw-sdk";
 import { automation } from "@wav0/daw-sdk/utils";
 import { useAtom } from "jotai";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AutomationContextMenu } from "@/components/daw/context-menus/automation-context-menu";
 
 const {
@@ -25,16 +26,18 @@ type AutomationLaneProps = {
 	trackWidth: number;
 };
 
-export function AutomationLane({
+export const AutomationLane = memo(function AutomationLane({
 	track,
 	trackHeight,
 	trackWidth,
 }: AutomationLaneProps) {
 	const [pxPerMs] = useAtom(timelinePxPerMsAtom);
-	const [playback] = useAtom(playbackAtom);
+	// Use fine-grained atoms to avoid re-renders on every time update
+	const [isPlaying] = useAtom(isPlayingAtom);
+	const [currentTime] = useAtom(currentTimeAtom);
 	const [, updateTrack] = useAtom(updateTrackAtom);
 	const [automationViewEnabled] = useAtom(automationViewEnabledAtom);
-	const [horizontalScroll] = useAtom(horizontalScrollAtom);
+	const [_horizontalScroll] = useAtom(horizontalScrollAtom);
 	const [draggingPoint, setDraggingPoint] = useState<{
 		pointId: string;
 		startX: number;
@@ -46,10 +49,13 @@ export function AutomationLane({
 	const svgRef = useRef<SVGSVGElement>(null);
 	const isDraggingRef = useRef(false);
 
-	// Auto-migrate envelope on render
-	const envelope = track.volumeEnvelope
-		? migrateAutomationToSegments(track.volumeEnvelope)
-		: null;
+	// Auto-migrate envelope on render - memoized
+	const envelope = useMemo(() =>
+		track.volumeEnvelope
+			? migrateAutomationToSegments(track.volumeEnvelope)
+			: null,
+		[track.volumeEnvelope]
+	);
 
 	// Hooks must be called unconditionally
 	const handlePointPointerDown = useCallback(
@@ -120,7 +126,7 @@ export function AutomationLane({
 					}
 
 					// Clip exists, update with clip-relative time
-					const clipStartTime = clipStartTimeMap.get(p.clipId)!;
+					const clipStartTime = clipStartTimeMap.get(p.clipId) ?? 0;
 					return {
 						...p,
 						value: newValue,
@@ -235,42 +241,28 @@ export function AutomationLane({
 		};
 	}, [draggingPoint]);
 
-	// Don't render if automation view disabled
-	if (!automationViewEnabled) {
-		return null;
-	}
+	const padding = 20;
+	const usableHeight = trackHeight - padding * 2;
 
-	// Don't render if automation disabled or no points
-	if (!envelope?.enabled || !envelope.points || envelope.points.length === 0) {
-		return null;
-	}
+	// Resolve clip-relative points to absolute time for rendering - MEMOIZED
+	// Must be before early returns to maintain hook order
+	const sorted = useMemo(() => {
+		if (!envelope?.points) return [];
+		return [...envelope.points]
+			.map((point) => {
+				// If point is clip-bound, resolve its absolute time
+				const clip = track.clips?.find((c) => c.id === point.clipId);
+				const resolved = clip
+					? resolveClipRelativePoint(point, clip.startTime)
+					: point;
+				return resolved;
+			})
+			.sort((a, b) => a.time - b.time);
+	}, [envelope?.points, track.clips]);
 
-	// Resolve clip-relative points to absolute time for rendering
-	const sorted = [...envelope.points]
-		.map((point) => {
-			// If point is clip-bound, resolve its absolute time
-			const clip = track.clips?.find((c) => c.id === point.clipId);
-			const resolved = clip
-				? resolveClipRelativePoint(point, clip.startTime)
-				: point;
-			return resolved;
-		})
-		.sort((a, b) => a.time - b.time);
-
-	// Generate SVG path
-	// NOTE: X coordinates use absolute timeline positions (point.time * pxPerMs) WITHOUT
-	// subtracting horizontalScroll. This is intentional - the entire track content area
-	// scrolls as a unit via CSS overflow:scroll on the parent container. Elements are
-	// rendered at absolute timeline positions, and the browser's scroll mechanism moves
-	// the viewport over that content.
-	// Click handlers also don't need scroll adjustment because getBoundingClientRect()
-	// returns viewport-relative position - when scrolled, rect.left becomes negative,
-	// so (clientX - rect.left) already gives absolute position within the SVG.
-	const generatePath = (): string => {
+	// MEMOIZED SVG path generation - only recomputes when points/dimensions change
+	const path = useMemo(() => {
 		if (sorted.length === 0) return "";
-
-		const padding = 20; // Vertical padding from track edges
-		const usableHeight = trackHeight - padding * 2;
 
 		// Map multiplier (0-4) to Y position (inverted: high value = low Y)
 		const multiplierToY = (multiplier: number): number => {
@@ -295,7 +287,7 @@ export function AutomationLane({
 			const curr = points[i];
 
 			// Find segment for this point pair
-			const segment = envelope.segments?.find(
+			const segment = envelope?.segments?.find(
 				(s) => s.fromPointId === prev.point.id && s.toPointId === curr.point.id,
 			);
 			const curve = segment?.curve ?? 0;
@@ -326,28 +318,34 @@ export function AutomationLane({
 		}
 
 		return pathData;
-	};
+	}, [sorted, trackHeight, usableHeight, pxPerMs, envelope?.segments]);
 
-	const path = generatePath();
-	const padding = 20;
-	const usableHeight = trackHeight - padding * 2;
-
-	// Calculate playhead position on curve if playing
-	let playheadX: number | null = null;
-	let playheadY: number | null = null;
-	if (playback.isPlaying) {
-		playheadX = playback.currentTime * pxPerMs;
+	// Calculate playhead position on curve if playing - MEMOIZED
+	const playheadPosition = useMemo(() => {
+		if (!isPlaying) return null;
+		const x = currentTime * pxPerMs;
 		// Find current multiplier at playhead
 		let currentMultiplier = 1.0;
 		for (const point of sorted) {
-			if (point.time <= playback.currentTime) {
+			if (point.time <= currentTime) {
 				currentMultiplier = point.value;
 			} else {
 				break;
 			}
 		}
 		const normalizedValue = Math.max(0, Math.min(4, currentMultiplier)) / 4;
-		playheadY = trackHeight - padding - normalizedValue * usableHeight;
+		const y = trackHeight - padding - normalizedValue * usableHeight;
+		return { x, y };
+	}, [isPlaying, currentTime, pxPerMs, sorted, trackHeight, usableHeight]);
+
+	// Don't render if automation view disabled
+	if (!automationViewEnabled) {
+		return null;
+	}
+
+	// Don't render if automation disabled or no points
+	if (!envelope?.enabled || !envelope.points || envelope.points.length === 0) {
+		return null;
 	}
 
 	// Derive automation color from track color (lighter version)
@@ -489,10 +487,10 @@ export function AutomationLane({
 				})}
 
 				{/* Playhead indicator on curve */}
-				{playback.isPlaying && playheadX !== null && playheadY !== null && (
+				{playheadPosition && (
 					<circle
-						cx={playheadX}
-						cy={playheadY}
+						cx={playheadPosition.x}
+						cy={playheadPosition.y}
 						r={5}
 						fill="rgb(239, 68, 68)" // red-500
 						stroke="white"
@@ -504,4 +502,4 @@ export function AutomationLane({
 			</svg>
 		</AutomationContextMenu>
 	);
-}
+});

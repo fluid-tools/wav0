@@ -227,7 +227,14 @@ export function GlobalShortcuts() {
 						loopEnd: undefined,
 					});
 				} else {
-					const loopEnd = computeLoopEndMs(clip);
+					let loopEnd = computeLoopEndMs(clip);
+					// If playhead is past computed loopEnd, extend to include current position
+					const clipDuration = clip.trimEnd - clip.trimStart;
+					if (clipDuration > 0 && playback.currentTime >= loopEnd) {
+						const pastEnd = playback.currentTime - clip.startTime;
+						const cycles = Math.ceil(pastEnd / clipDuration);
+						loopEnd = clip.startTime + clipDuration * (cycles + 2);
+					}
 					updateClip(selectedTrackId, clip.id, { loop: true, loopEnd });
 				}
 				return;

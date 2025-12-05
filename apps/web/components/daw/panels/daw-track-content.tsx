@@ -1,19 +1,12 @@
 "use client";
 
-import type {
-	Clip,
-	Track,
-	TrackEnvelopePoint,
-	TrackEnvelopeSegment,
-} from "@wav0/daw-sdk";
-import { time } from "@wav0/daw-sdk";
 import {
 	activeToolAtom,
 	clipMoveHistoryAtom,
 	dragMachineAtom,
 	dragPreviewAtom,
+	isPlayingAtom,
 	loadAudioFileAtom,
-	playbackAtom,
 	projectEndPositionAtom,
 	selectedClipIdAtom,
 	selectedTrackIdAtom,
@@ -28,17 +21,498 @@ import {
 	updateTrackAtom,
 	useTimebase,
 } from "@wav0/daw-react";
+import type {
+	Clip,
+	Track,
+	TrackEnvelopePoint,
+	TrackEnvelopeSegment,
+} from "@wav0/daw-sdk";
+import { time } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ClipContextMenu } from "@/components/daw/context-menus/clip-context-menu";
 import { ClipFadeHandles } from "@/components/daw/controls/clip-fade-handles";
 import { AutomationLane } from "@/components/daw/panels/automation-lane";
 import { DAW_HEIGHTS } from "@/lib/constants/daw-design";
+import { cn } from "@/lib/utils";
 import {
 	computeAutomationTransfer,
 	mergeAutomationPoints,
 } from "@/lib/utils/automation-helpers";
-import { cn } from "@/lib/utils";
+
+// ===== Memoized Clip Component =====
+type MemoizedClipProps = {
+	clip: Clip;
+	track: Track;
+	trackIndex: number;
+	pixelsPerMs: number;
+	isSelected: boolean;
+	onSelect: (trackId: string, clipId: string) => void;
+	onStartDrag: (params: {
+		trackId: string;
+		clipId: string;
+		startX: number;
+		startY: number;
+		startTime: number;
+		originalTrackIndex: number;
+		sourceTrackId: string;
+		offsetX: number;
+		offsetY: number;
+	}) => void;
+	onStartResize: (params: {
+		trackId: string;
+		clipId: string;
+		type: "start" | "end";
+		startX: number;
+		startTrimStart: number;
+		startTrimEnd: number;
+		startClipStartTime: number;
+	}) => void;
+	onFadeChange: (clipId: string, fade: string, value: number) => void;
+};
+
+const MemoizedClip = memo(function MemoizedClip({
+	clip,
+	track,
+	trackIndex,
+	pixelsPerMs,
+	isSelected,
+	onSelect,
+	onStartDrag,
+	onStartResize,
+	onFadeChange,
+}: MemoizedClipProps) {
+	const clipX = clip.startTime * pixelsPerMs;
+	const clipWidth = Math.max((clip.trimEnd - clip.trimStart) * pixelsPerMs, 20);
+
+	return (
+		<ClipContextMenu trackId={track.id} clipId={clip.id} clipName={clip.name}>
+			<div
+				data-clip-id={clip.id}
+				data-selected={isSelected ? "true" : "false"}
+				className={`group absolute top-0 bottom-0 rounded-md border-2 transition-all ${
+					isSelected
+						? "border-primary bg-primary/10 ring-2 ring-primary"
+						: "border-border bg-muted/50 hover:bg-muted/70"
+				} ${track.muted ? "opacity-50" : ""}`}
+				style={{
+					left: clipX,
+					width: clipWidth,
+					...(isSelected
+						? { backgroundColor: "hsl(var(--primary) / 0.18)" }
+						: {
+								backgroundColor: `${clip.color ?? track.color}20`,
+								borderColor: clip.color ?? track.color,
+							}),
+				}}
+			>
+				{/* Full-body interactive area with context menu */}
+				{/* biome-ignore lint/a11y/useSemanticElements: clip overlay must stay a div to avoid nested buttons while preserving keyboard access */}
+				<div
+					role="button"
+					tabIndex={0}
+					className="absolute inset-0 rounded-md bg-transparent cursor-default"
+					aria-label={`Select audio clip: ${clip.name}`}
+					onMouseDown={(e) => {
+						const rect = e.currentTarget.getBoundingClientRect();
+						const localX = e.clientX - rect.left;
+						const nearLeft = localX < 8;
+						const nearRight = localX > rect.width - 8;
+						onSelect(track.id, clip.id);
+						if (!nearLeft && !nearRight) {
+							onStartDrag({
+								trackId: track.id,
+								clipId: clip.id,
+								startX: e.clientX,
+								startY: e.clientY,
+								startTime: clip.startTime,
+								originalTrackIndex: trackIndex,
+								sourceTrackId: track.id,
+								offsetX: e.clientX - rect.left,
+								offsetY: e.clientY - rect.top,
+							});
+						}
+					}}
+					onKeyDown={(e) => {
+						if (e.key === "Enter" || e.key === " ") {
+							e.preventDefault();
+							onSelect(track.id, clip.id);
+						}
+					}}
+					onFocus={() => onSelect(track.id, clip.id)}
+					onClick={(e) => {
+						e.preventDefault();
+						onSelect(track.id, clip.id);
+					}}
+				>
+					<span className="sr-only">{`Select audio clip: ${clip.name}`}</span>
+				</div>
+
+				{/* Visible grab handle on hover */}
+				<button
+					type="button"
+					className="absolute top-1/2 -translate-y-1/2 left-2 h-8 w-2 rounded-sm opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing"
+					style={{
+						background:
+							"repeating-linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.35) 2px, transparent 2px, transparent 4px)",
+					}}
+					onMouseDown={(e) => {
+						e.stopPropagation();
+						const rect = e.currentTarget.parentElement?.getBoundingClientRect();
+						onSelect(track.id, clip.id);
+						if (rect) {
+							onStartDrag({
+								trackId: track.id,
+								clipId: clip.id,
+								startX: e.clientX,
+								startY: e.clientY,
+								startTime: clip.startTime,
+								originalTrackIndex: trackIndex,
+								sourceTrackId: track.id,
+								offsetX: e.clientX - rect.left,
+								offsetY: e.clientY - rect.top,
+							});
+						}
+					}}
+					aria-label="Drag clip"
+				/>
+
+				{/* Left resize handle */}
+				<button
+					type="button"
+					className="absolute left-0 top-0 bottom-0 w-2 cursor-w-resize bg-primary/20 hover:bg-primary/40"
+					onMouseDown={(e) => {
+						e.stopPropagation();
+						onSelect(track.id, clip.id);
+						onStartResize({
+							trackId: track.id,
+							clipId: clip.id,
+							type: "start",
+							startX: e.clientX,
+							startTrimStart: clip.trimStart,
+							startTrimEnd: clip.trimEnd,
+							startClipStartTime: clip.startTime,
+						});
+					}}
+					aria-label="Resize clip start"
+				/>
+				{/* Right resize handle */}
+				<button
+					type="button"
+					className="absolute right-0 top-0 bottom-0 w-2 cursor-e-resize bg-primary/20 hover:bg-primary/40"
+					onMouseDown={(e) => {
+						e.stopPropagation();
+						onSelect(track.id, clip.id);
+						onStartResize({
+							trackId: track.id,
+							clipId: clip.id,
+							type: "end",
+							startX: e.clientX,
+							startTrimStart: clip.trimStart,
+							startTrimEnd: clip.trimEnd,
+							startClipStartTime: clip.startTime,
+						});
+					}}
+					aria-label="Resize clip end"
+				/>
+
+				{/* Clip label (Logic-style: top bar with name/duration) */}
+				<div className="absolute left-2 right-2 top-1 flex items-center justify-between gap-2 pointer-events-none z-10">
+					<div className="text-[11px] font-medium truncate">{clip.name}</div>
+					<div className="text-[11px] text-muted-foreground tabular-nums">
+						{time.formatDuration(clip.trimEnd - clip.trimStart, {
+							pxPerMs: pixelsPerMs,
+						})}
+					</div>
+				</div>
+
+				{/* Fade Handles */}
+				<ClipFadeHandles
+					clip={clip}
+					clipWidth={clipWidth}
+					pixelsPerMs={pixelsPerMs}
+					isSelected={isSelected}
+					onFadeChange={onFadeChange}
+				/>
+
+				{/* Reserved center area for waveform */}
+				<div className="absolute inset-x-2 top-5 bottom-2 rounded-sm bg-background/20 pointer-events-none" />
+			</div>
+		</ClipContextMenu>
+	);
+});
+
+// ===== Memoized Track Row Component =====
+type TrackRowProps = {
+	track: Track;
+	index: number;
+	trackHeight: number;
+	pixelsPerMs: number;
+	timelineWidth: number;
+	isSelected: boolean;
+	selectedClipId: string | null;
+	dragOverTrackId: string | null;
+	onTrackSelect: (trackId: string) => void;
+	onClipSelect: (trackId: string, clipId: string) => void;
+	onTrackDrop: (trackId: string, e: React.DragEvent) => void;
+	onDragEnter: (trackId: string) => void;
+	onDragLeave: (trackId: string, e: React.DragEvent) => void;
+	onStartClipDrag: (params: {
+		trackId: string;
+		clipId: string;
+		startX: number;
+		startY: number;
+		startTime: number;
+		originalTrackIndex: number;
+		sourceTrackId: string;
+		offsetX: number;
+		offsetY: number;
+	}) => void;
+	onStartResize: (params: {
+		trackId: string;
+		clipId: string;
+		type: "start" | "end";
+		startX: number;
+		startTrimStart: number;
+		startTrimEnd: number;
+		startClipStartTime: number;
+	}) => void;
+	onStartLoopDrag: (params: {
+		trackId: string;
+		clipId: string;
+		startX: number;
+		startLoopEnd: number | undefined;
+	}) => void;
+	onFadeChange: (
+		trackId: string,
+		clipId: string,
+		fade: string,
+		value: number,
+	) => void;
+};
+
+const TrackRow = memo(function TrackRow({
+	track,
+	index,
+	trackHeight,
+	pixelsPerMs,
+	timelineWidth,
+	isSelected,
+	selectedClipId,
+	dragOverTrackId,
+	onTrackSelect,
+	onClipSelect,
+	onTrackDrop,
+	onDragEnter,
+	onDragLeave,
+	onStartClipDrag,
+	onStartResize,
+	onStartLoopDrag,
+	onFadeChange,
+}: TrackRowProps) {
+	const trackY = index * trackHeight;
+
+	// Get clips for this track
+	const clips: Clip[] = useMemo(() => {
+		const hasClipArray = Array.isArray(track.clips);
+		if (hasClipArray) {
+			return (track.clips as Clip[]) ?? [];
+		}
+		if (track.opfsFileId) {
+			return [
+				{
+					id: track.id,
+					name: track.name,
+					opfsFileId: track.opfsFileId,
+					audioFileName: track.audioFileName,
+					audioFileType: track.audioFileType,
+					startTime: track.startTime,
+					trimStart: track.trimStart,
+					trimEnd: track.trimEnd,
+					sourceDurationMs: Math.max(0, track.trimEnd - track.trimStart),
+					color: track.color,
+				} as Clip,
+			];
+		}
+		return [];
+	}, [track]);
+
+	const handleSelect = useCallback(
+		(trackId: string, clipId: string) => {
+			onClipSelect(trackId, clipId);
+		},
+		[onClipSelect],
+	);
+
+	const handleFadeChange = useCallback(
+		(clipId: string, fade: string, value: number) => {
+			onFadeChange(track.id, clipId, fade, value);
+		},
+		[track.id, onFadeChange],
+	);
+
+	return (
+		<div
+			className={cn(
+				"absolute border-b border-border/50 transition-colors",
+				isSelected ? "bg-muted/30 z-40" : "z-10",
+			)}
+			style={{
+				top: trackY,
+				height: trackHeight,
+				left: 0,
+				right: 0,
+				padding: "12px",
+			}}
+		>
+			{/* Track Drop Zone */}
+			{/* biome-ignore lint/a11y/useSemanticElements: drop zone must remain a focusable div to host drag events without nesting buttons */}
+			<div
+				tabIndex={0}
+				role="button"
+				className={`absolute inset-0 w-full h-full border-none p-0 cursor-default transition-colors ${
+					dragOverTrackId === track.id
+						? "bg-primary/10 border-2 border-primary border-dashed"
+						: "bg-transparent"
+				}`}
+				onDrop={(e) => onTrackDrop(track.id, e)}
+				onDragOver={(e) => e.preventDefault()}
+				onDragEnter={() => onDragEnter(track.id)}
+				onDragLeave={(e) => onDragLeave(track.id, e)}
+				onClick={() => onTrackSelect(track.id)}
+				onKeyDown={(e) => {
+					if (e.key === "Enter" || e.key === " ") {
+						e.preventDefault();
+						onTrackSelect(track.id);
+					}
+				}}
+				style={{ padding: "12px" }}
+				aria-label={`Track ${track.name} drop zone`}
+			>
+				{/* Render clips */}
+				{clips.map((clip) => (
+					<MemoizedClip
+						key={clip.id}
+						clip={clip}
+						track={track}
+						trackIndex={index}
+						pixelsPerMs={pixelsPerMs}
+						isSelected={isSelected && selectedClipId === clip.id}
+						onSelect={handleSelect}
+						onStartDrag={onStartClipDrag}
+						onStartResize={onStartResize}
+						onFadeChange={handleFadeChange}
+					/>
+				))}
+
+				{/* Loop ghosts overlay (non-interactive) */}
+				{clips.map((clip) => {
+					const loop = clip.loop;
+					const loopEnd = clip.loopEnd;
+					const clipDur = Math.max(0, clip.trimEnd - clip.trimStart);
+					if (!loop || clipDur <= 0) return null;
+					const oneShotEnd = clip.startTime + clipDur;
+					if (!loopEnd || loopEnd <= oneShotEnd) return null;
+
+					const tiles: React.ReactNode[] = [];
+					const separators: React.ReactNode[] = [];
+					for (let t = oneShotEnd; t < loopEnd; t += clipDur) {
+						const end = Math.min(t + clipDur, loopEnd);
+						const left = t * pixelsPerMs;
+						const width = Math.max((end - t) * pixelsPerMs, 8);
+						tiles.push(
+							<div
+								key={`ghost-${clip.id}-${t}`}
+								className="absolute top-0 bottom-0 rounded-md pointer-events-none"
+								style={{
+									left,
+									width,
+									backgroundColor: `${clip.color ?? track.color}14`,
+									border: `1px dashed ${clip.color ?? track.color}`,
+									opacity: 0.5,
+									zIndex: 1,
+								}}
+							/>,
+						);
+						separators.push(
+							<div
+								key={`sep-${clip.id}-${t}`}
+								className="absolute top-0 bottom-0 w-px pointer-events-none"
+								style={{
+									left,
+									backgroundColor: clip.color ?? track.color,
+									opacity: 0.5,
+									zIndex: 2,
+								}}
+							/>,
+						);
+					}
+					return (
+						<div
+							key={`ghost-wrap-${clip.id}`}
+							className="absolute inset-0 pointer-events-none z-0"
+						>
+							{tiles}
+							{separators}
+						</div>
+					);
+				})}
+
+				{/* Loop-end marker + handle (interactive only at loopEnd) */}
+				{clips.map((clip) => {
+					const clipIsSelected = isSelected && selectedClipId === clip.id;
+					const isLoop = clip.loop;
+					const clipDur = Math.max(0, clip.trimEnd - clip.trimStart);
+					const oneShotEnd = clip.startTime + clipDur;
+					const loopEnd = clip.loopEnd;
+					if (!clipIsSelected || !isLoop || !loopEnd || loopEnd <= oneShotEnd)
+						return null;
+					const xPx = loopEnd * pixelsPerMs;
+					return (
+						<div
+							key={`loop-end-${clip.id}`}
+							className="absolute inset-0 z-20 pointer-events-none"
+						>
+							<div
+								className="absolute top-0 bottom-0 w-px bg-primary/70 pointer-events-none"
+								style={{ left: xPx }}
+							/>
+							<button
+								type="button"
+								className="absolute top-1/2 -translate-y-1/2 w-3 h-6 rounded-sm bg-primary shadow cursor-ew-resize pointer-events-auto"
+								style={{ left: xPx - 6 }}
+								onMouseDown={(e) => {
+									e.stopPropagation();
+									onStartLoopDrag({
+										trackId: track.id,
+										clipId: clip.id,
+										startX: e.clientX,
+										startLoopEnd: clip.loopEnd,
+									});
+								}}
+								aria-label="Adjust loop end"
+							/>
+						</div>
+					);
+				})}
+
+				{/* Drop Zone Indicator - Only show when no audio */}
+				{clips.length === 0 && track.duration === 0 && (
+					<div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
+						Drop audio file here
+					</div>
+				)}
+
+				{/* Automation Lane Overlay */}
+				<AutomationLane
+					track={track}
+					trackHeight={trackHeight}
+					trackWidth={timelineWidth}
+				/>
+			</div>
+		</div>
+	);
+});
 
 export function DAWTrackContent() {
 	const [tracks, setTracks] = useAtom(tracksAtom);
@@ -48,7 +522,8 @@ export function DAWTrackContent() {
 	const [, _updateTrack] = useAtom(updateTrackAtom);
 	const [, updateClip] = useAtom(updateClipAtom);
 	const [, loadAudioFile] = useAtom(loadAudioFileAtom);
-	const [playback] = useAtom(playbackAtom);
+	// Use isPlayingAtom instead of playbackAtom to avoid re-renders on currentTime changes
+	const [isPlaying] = useAtom(isPlayingAtom);
 	const [timeline] = useAtom(timelineAtom);
 	const [pxPerMs] = useAtom(timelinePxPerMsAtom);
 	const [timelineWidth] = useAtom(timelineWidthAtom);
@@ -515,9 +990,11 @@ export function DAWTrackContent() {
 						const targetTrack = computedTargetTrack as Track;
 						const updated = computedUpdated;
 
-						if (playback.isPlaying && serviceRegistry.playbackService) {
+						if (isPlaying && serviceRegistry.playbackService) {
 							try {
-								await serviceRegistry.playbackService.synchronizeTracks(updated);
+								await serviceRegistry.playbackService.synchronizeTracks(
+									updated,
+								);
 							} catch (error) {
 								console.error(
 									"Failed to synchronize tracks after clip move",
@@ -612,13 +1089,115 @@ export function DAWTrackContent() {
 		timeline.snapToGrid,
 		trackHeightZoom,
 		totalDuration,
-		playback.isPlaying,
+		isPlaying,
 		setTracks,
 		dragPreview,
 		sendDragEvent,
 		setMoveHistory,
 		snap,
 	]);
+
+	// ===== Memoized callbacks for TrackRow =====
+	const handleTrackSelect = useCallback(
+		(trackId: string) => {
+			setSelectedTrackId(trackId);
+		},
+		[setSelectedTrackId],
+	);
+
+	const handleClipSelect = useCallback(
+		(trackId: string, clipId: string) => {
+			setSelectedTrackId(trackId);
+			setSelectedClipId(clipId);
+		},
+		[setSelectedTrackId, setSelectedClipId],
+	);
+
+	const handleDragEnter = useCallback((trackId: string) => {
+		setDragOverTrackId(trackId);
+	}, []);
+
+	const handleDragLeave = useCallback(
+		(_trackId: string, e: React.DragEvent) => {
+			const rect = e.currentTarget.getBoundingClientRect();
+			const x = e.clientX;
+			const y = e.clientY;
+			if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+				setDragOverTrackId(null);
+			}
+		},
+		[],
+	);
+
+	const handleStartClipDrag = useCallback(
+		(params: {
+			trackId: string;
+			clipId: string;
+			startX: number;
+			startY: number;
+			startTime: number;
+			originalTrackIndex: number;
+			sourceTrackId: string;
+			offsetX: number;
+			offsetY: number;
+		}) => {
+			setDraggingClip({
+				trackId: params.trackId,
+				clipId: params.clipId,
+				startX: params.startX,
+				startY: params.startY,
+				startTime: params.startTime,
+				originalTrackIndex: params.originalTrackIndex,
+				sourceTrackId: params.sourceTrackId,
+			});
+			sendDragEvent({
+				type: "START_CLIP_DRAG",
+				clipId: params.clipId,
+				trackId: params.trackId,
+				startTime: params.startTime,
+				offsetX: params.offsetX,
+				offsetY: params.offsetY,
+			});
+		},
+		[sendDragEvent],
+	);
+
+	const handleStartResize = useCallback(
+		(params: {
+			trackId: string;
+			clipId: string;
+			type: "start" | "end";
+			startX: number;
+			startTrimStart: number;
+			startTrimEnd: number;
+			startClipStartTime: number;
+		}) => {
+			setResizingClip(params);
+		},
+		[],
+	);
+
+	const handleStartLoopDrag = useCallback(
+		(params: {
+			trackId: string;
+			clipId: string;
+			startX: number;
+			startLoopEnd: number | undefined;
+		}) => {
+			setLoopDragging(params);
+		},
+		[],
+	);
+
+	const handleFadeChange = useCallback(
+		(trackId: string, clipId: string, fade: string, value: number) => {
+			updateClip(trackId, clipId, { [fade]: value });
+		},
+		[updateClip],
+	);
+
+	// Compute track height once
+	const trackHeight = Math.round(DAW_HEIGHTS.TRACK_ROW * trackHeightZoom);
 
 	return (
 		<>
@@ -628,405 +1207,28 @@ export function DAWTrackContent() {
 				data-daw-grid
 				data-dragging={draggingClip ? "true" : undefined}
 			>
-				{tracks.map((track, index) => {
-					// Track row layout
-					const trackHeight = Math.round(
-						DAW_HEIGHTS.TRACK_ROW * trackHeightZoom,
-					);
-					const trackY = index * trackHeight;
-
-					// Fallback legacy clip only when the track has no multi-clip data defined
-					const hasClipArray = Array.isArray(track.clips);
-					const clips: Clip[] = hasClipArray
-						? ((track.clips as Clip[]) ?? [])
-						: track.opfsFileId
-							? [
-									{
-										id: track.id,
-										name: track.name,
-										opfsFileId: track.opfsFileId,
-										audioFileName: track.audioFileName,
-										audioFileType: track.audioFileType,
-										startTime: track.startTime,
-										trimStart: track.trimStart,
-										trimEnd: track.trimEnd,
-										sourceDurationMs: Math.max(
-											0,
-											track.trimEnd - track.trimStart,
-										),
-										color: track.color,
-									} as Clip,
-								]
-							: [];
-
-					return (
-						<div
-							key={track.id}
-							className={cn(
-								"absolute border-b border-border/50 transition-colors",
-								selectedTrackId === track.id ? "bg-muted/30 z-40" : "z-10",
-							)}
-							style={{
-								top: trackY,
-								height: trackHeight,
-								left: 0,
-								right: 0,
-								padding: "12px",
-							}}
-						>
-							{/* Track Drop Zone */}
-							{/* biome-ignore lint/a11y/useSemanticElements: drop zone must remain a focusable div to host drag events without nesting buttons */}
-							<div
-								tabIndex={0}
-								role="button"
-								className={`absolute inset-0 w-full h-full border-none p-0 cursor-default transition-colors ${
-									dragOverTrackId === track.id
-										? "bg-primary/10 border-2 border-primary border-dashed"
-										: "bg-transparent"
-								}`}
-								onDrop={(e) => handleTrackDrop(track.id, e)}
-								onDragOver={(e) => e.preventDefault()}
-								onDragEnter={() => setDragOverTrackId(track.id)}
-								onDragLeave={(e) => {
-									const rect = e.currentTarget.getBoundingClientRect();
-									const x = e.clientX;
-									const y = e.clientY;
-									if (
-										x < rect.left ||
-										x > rect.right ||
-										y < rect.top ||
-										y > rect.bottom
-									) {
-										setDragOverTrackId(null);
-									}
-								}}
-								onClick={() => setSelectedTrackId(track.id)}
-								onKeyDown={(e) => {
-									if (e.key === "Enter" || e.key === " ") {
-										e.preventDefault();
-										setSelectedTrackId(track.id);
-									}
-								}}
-								style={{ padding: "12px" }}
-								aria-label={`Track ${track.name} drop zone`}
-							>
-								{/* Render clips */}
-								{clips.map((clip) => {
-									const clipX = clip.startTime * pixelsPerMs;
-									const clipWidth = Math.max(
-										(clip.trimEnd - clip.trimStart) * pixelsPerMs,
-										20,
-									);
-									const isSelected =
-										selectedTrackId === track.id && selectedClipId === clip.id;
-									return (
-										<ClipContextMenu
-											key={clip.id}
-											trackId={track.id}
-											clipId={clip.id}
-											clipName={clip.name}
-										>
-											<div
-												key={clip.id}
-												data-clip-id={clip.id}
-												data-selected={isSelected ? "true" : "false"}
-												className={`group absolute top-0 bottom-0 rounded-md border-2 transition-all ${
-													isSelected
-														? "border-primary bg-primary/10 ring-2 ring-primary"
-														: "border-border bg-muted/50 hover:bg-muted/70"
-												} ${track.muted ? "opacity-50" : ""}`}
-												style={{
-													left: clipX,
-													width: clipWidth,
-													...(isSelected
-														? { backgroundColor: "hsl(var(--primary) / 0.18)" }
-														: {
-																backgroundColor: `${clip.color ?? track.color}20`,
-																borderColor: clip.color ?? track.color,
-															}),
-												}}
-											>
-												{/* Full-body interactive area with context menu */}
-												{/* biome-ignore lint/a11y/useSemanticElements: clip overlay must stay a div to avoid nested buttons while preserving keyboard access */}
-												<div
-													role="button"
-													tabIndex={0}
-													className="absolute inset-0 rounded-md bg-transparent cursor-default"
-													aria-label={`Select audio clip: ${clip.name}`}
-													onMouseDown={(e) => {
-														const rect =
-															e.currentTarget.getBoundingClientRect();
-														const localX = e.clientX - rect.left;
-														const nearLeft = localX < 8;
-														const nearRight = localX > rect.width - 8;
-														setSelectedTrackId(track.id);
-														setSelectedClipId(clip.id);
-														if (!nearLeft && !nearRight) {
-															setDraggingClip({
-																trackId: track.id,
-																clipId: clip.id,
-																startX: e.clientX,
-																startY: e.clientY,
-																startTime: clip.startTime,
-																originalTrackIndex: index,
-																sourceTrackId: track.id,
-															});
-															sendDragEvent({
-																type: "START_CLIP_DRAG",
-																clipId: clip.id,
-																trackId: track.id,
-																startTime: clip.startTime,
-																offsetX: e.clientX - rect.left,
-																offsetY: e.clientY - rect.top,
-															});
-														}
-													}}
-													onKeyDown={(e) => {
-														if (e.key === "Enter" || e.key === " ") {
-															e.preventDefault();
-															setSelectedTrackId(track.id);
-															setSelectedClipId(clip.id);
-														}
-													}}
-													onFocus={() => {
-														setSelectedTrackId(track.id);
-														setSelectedClipId(clip.id);
-													}}
-													onClick={(e) => {
-														e.preventDefault();
-														setSelectedTrackId(track.id);
-														setSelectedClipId(clip.id);
-													}}
-												>
-													<span className="sr-only">{`Select audio clip: ${clip.name}`}</span>
-												</div>
-
-												{/* Visible grab handle on hover */}
-												<button
-													type="button"
-													className="absolute top-1/2 -translate-y-1/2 left-2 h-8 w-2 rounded-sm opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing"
-													style={{
-														background:
-															"repeating-linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.35) 2px, transparent 2px, transparent 4px)",
-													}}
-													onMouseDown={(e) => {
-														e.stopPropagation();
-														setSelectedTrackId(track.id);
-														setSelectedClipId(clip.id);
-														setDraggingClip({
-															trackId: track.id,
-															clipId: clip.id,
-															startX: e.clientX,
-															startY: e.clientY,
-															startTime: clip.startTime,
-															originalTrackIndex: index,
-															sourceTrackId: track.id,
-														});
-														const rect =
-															e.currentTarget.parentElement?.getBoundingClientRect();
-														if (rect) {
-															sendDragEvent({
-																type: "START_CLIP_DRAG",
-																clipId: clip.id,
-																trackId: track.id,
-																startTime: clip.startTime,
-																offsetX: e.clientX - rect.left,
-																offsetY: e.clientY - rect.top,
-															});
-														}
-													}}
-													aria-label="Drag clip"
-												/>
-
-												{/* Left resize handle */}
-												<button
-													type="button"
-													className="absolute left-0 top-0 bottom-0 w-2 cursor-w-resize bg-primary/20 hover:bg-primary/40"
-													onMouseDown={(e) => {
-														e.stopPropagation();
-														setSelectedTrackId(track.id);
-														setSelectedClipId(clip.id);
-														setResizingClip({
-															trackId: track.id,
-															clipId: clip.id,
-															type: "start",
-															startX: e.clientX,
-															startTrimStart: clip.trimStart,
-															startTrimEnd: clip.trimEnd,
-															startClipStartTime: clip.startTime,
-														});
-													}}
-													aria-label="Resize clip start"
-												/>
-												{/* Right resize handle */}
-												<button
-													type="button"
-													className="absolute right-0 top-0 bottom-0 w-2 cursor-e-resize bg-primary/20 hover:bg-primary/40"
-													onMouseDown={(e) => {
-														e.stopPropagation();
-														setSelectedTrackId(track.id);
-														setSelectedClipId(clip.id);
-														setResizingClip({
-															trackId: track.id,
-															clipId: clip.id,
-															type: "end",
-															startX: e.clientX,
-															startTrimStart: clip.trimStart,
-															startTrimEnd: clip.trimEnd,
-															startClipStartTime: clip.startTime,
-														});
-													}}
-													aria-label="Resize clip end"
-												/>
-
-												{/* Clip label (Logic-style: top bar with name/duration) */}
-												<div className="absolute left-2 right-2 top-1 flex items-center justify-between gap-2 pointer-events-none z-10">
-													<div className="text-[11px] font-medium truncate">
-														{clip.name}
-													</div>
-													<div className="text-[11px] text-muted-foreground tabular-nums">
-														{time.formatDuration(
-															clip.trimEnd - clip.trimStart,
-															{
-																pxPerMs: pixelsPerMs,
-															},
-														)}
-													</div>
-												</div>
-
-												{/* Fade Handles */}
-												<ClipFadeHandles
-													clip={clip}
-													clipWidth={clipWidth}
-													pixelsPerMs={pixelsPerMs}
-													isSelected={isSelected}
-													onFadeChange={(clipId, fade, value) => {
-														updateClip(track.id, clipId, { [fade]: value });
-													}}
-												/>
-
-												{/* Reserved center area for waveform */}
-												<div className="absolute inset-x-2 top-5 bottom-2 rounded-sm bg-background/20 pointer-events-none" />
-											</div>
-										</ClipContextMenu>
-									);
-								})}
-
-								{/* Loop ghosts overlay (non-interactive) */}
-								{clips.map((clip) => {
-									const loop = clip.loop;
-									const loopEnd = clip.loopEnd;
-									const clipDur = Math.max(0, clip.trimEnd - clip.trimStart);
-									if (!loop || clipDur <= 0) return null;
-									const oneShotEnd = clip.startTime + clipDur;
-									if (!loopEnd || loopEnd <= oneShotEnd) return null;
-
-									const tiles: React.ReactNode[] = [];
-									const separators: React.ReactNode[] = [];
-									for (let t = oneShotEnd; t < loopEnd; t += clipDur) {
-										const end = Math.min(t + clipDur, loopEnd);
-										const left = t * pixelsPerMs;
-										const width = Math.max((end - t) * pixelsPerMs, 8);
-										tiles.push(
-											<div
-												key={`ghost-${clip.id}-${t}`}
-												className="absolute top-0 bottom-0 rounded-md pointer-events-none"
-												style={{
-													left,
-													width,
-													backgroundColor: `${clip.color ?? track.color}14`,
-													border: `1px dashed ${clip.color ?? track.color}`,
-													opacity: 0.5,
-													zIndex: 1,
-												}}
-											/>,
-										);
-										separators.push(
-											<div
-												key={`sep-${clip.id}-${t}`}
-												className="absolute top-0 bottom-0 w-px pointer-events-none"
-												style={{
-													left,
-													backgroundColor: clip.color ?? track.color,
-													opacity: 0.5,
-													zIndex: 2,
-												}}
-											/>,
-										);
-									}
-									return (
-										<div
-											key={`ghost-wrap-${clip.id}`}
-											className="absolute inset-0 pointer-events-none z-0"
-										>
-											{tiles}
-											{separators}
-										</div>
-									);
-								})}
-
-								{/* Loop-end marker + handle (interactive only at loopEnd) */}
-								{clips.map((clip) => {
-									const isSelected =
-										selectedTrackId === track.id && selectedClipId === clip.id;
-									const isLoop = clip.loop;
-									const clipDur = Math.max(0, clip.trimEnd - clip.trimStart);
-									const oneShotEnd = clip.startTime + clipDur;
-									const loopEnd = clip.loopEnd;
-									if (
-										!isSelected ||
-										!isLoop ||
-										!loopEnd ||
-										loopEnd <= oneShotEnd
-									)
-										return null;
-									const xPx = loopEnd * pixelsPerMs;
-									return (
-										<div
-											key={`loop-end-${clip.id}`}
-											className="absolute inset-0 z-20 pointer-events-none"
-										>
-											<div
-												className="absolute top-0 bottom-0 w-px bg-primary/70 pointer-events-none"
-												style={{ left: xPx }}
-											/>
-											<button
-												type="button"
-												className="absolute top-1/2 -translate-y-1/2 w-3 h-6 rounded-sm bg-primary shadow cursor-ew-resize pointer-events-auto"
-												style={{ left: xPx - 6 }}
-												onMouseDown={(e) => {
-													e.stopPropagation();
-													setLoopDragging({
-														trackId: track.id,
-														clipId: clip.id,
-														startX: e.clientX,
-														startLoopEnd: clip.loopEnd,
-													});
-												}}
-												aria-label="Adjust loop end"
-											/>
-										</div>
-									);
-								})}
-
-								{/* Drop Zone Indicator - Only show when no audio */}
-								{(!track.clips || track.clips.length === 0) &&
-									track.duration === 0 && (
-										<div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
-											Drop audio file here
-										</div>
-									)}
-
-								{/* Automation Lane Overlay */}
-								<AutomationLane
-									track={track}
-									trackHeight={trackHeight}
-									trackWidth={timelineWidth}
-								/>
-							</div>
-						</div>
-					);
-				})}
+				{tracks.map((track, index) => (
+					<TrackRow
+						key={track.id}
+						track={track}
+						index={index}
+						trackHeight={trackHeight}
+						pixelsPerMs={pixelsPerMs}
+						timelineWidth={timelineWidth}
+						isSelected={selectedTrackId === track.id}
+						selectedClipId={selectedClipId}
+						dragOverTrackId={dragOverTrackId}
+						onTrackSelect={handleTrackSelect}
+						onClipSelect={handleClipSelect}
+						onTrackDrop={handleTrackDrop}
+						onDragEnter={handleDragEnter}
+						onDragLeave={handleDragLeave}
+						onStartClipDrag={handleStartClipDrag}
+						onStartResize={handleStartResize}
+						onStartLoopDrag={handleStartLoopDrag}
+						onFadeChange={handleFadeChange}
+					/>
+				))}
 
 				{/* Drag Preview Overlay */}
 				{dragPreview &&

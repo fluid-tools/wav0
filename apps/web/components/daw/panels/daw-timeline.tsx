@@ -167,19 +167,6 @@ export function DAWTimeline() {
 			/>
 
 			{/* Playhead is rendered in UnifiedOverlay to keep header + grid perfectly synchronized */}
-
-			{/* Snap grid overlay */}
-			{timeline.snapToGrid && (
-				<div className="absolute inset-0 pointer-events-none z-5">
-					{Array.from({ length: Math.ceil(timelineWidth / 25) }).map((_, i) => (
-						<div
-							key={`snap-grid-${i * 25}`}
-							className="absolute top-0 bottom-0 w-px bg-primary/10"
-							style={{ left: i * 25 }}
-						/>
-					))}
-				</div>
-			)}
 		</div>
 	);
 }

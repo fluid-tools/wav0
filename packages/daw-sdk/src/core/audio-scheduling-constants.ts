@@ -25,17 +25,15 @@ export const AUTOMATION_CANCEL_LOOKAHEAD_SEC = 0.01;
  * Minimum gap (in seconds) between scheduled automation segments.
  *
  * Ensures setValueCurveAtTime calls don't overlap, which would cause a
- * NotSupportedError. 1ms is the minimum practical duration that prevents
- * rounding errors and API errors while maintaining precision.
+ * NotSupportedError. 5ms provides robust buffer against floating-point
+ * rounding errors while remaining inaudible.
  *
  * @example
  * ```ts
- * if (adjustedStart < lastScheduledEnd + AUTOMATION_SCHEDULING_EPSILON_SEC) {
- *   adjustedStart = lastScheduledEnd + AUTOMATION_SCHEDULING_EPSILON_SEC;
- * }
+ * const adjustedStart = Math.max(acStart, lastScheduledEnd + AUTOMATION_SCHEDULING_EPSILON_SEC);
  * ```
  */
-export const AUTOMATION_SCHEDULING_EPSILON_SEC = 0.001;
+export const AUTOMATION_SCHEDULING_EPSILON_SEC = 0.005;
 
 /**
  * Minimum valid duration (in seconds) for automation segments.

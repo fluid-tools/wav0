@@ -6,7 +6,12 @@ import {
 	timelinePxPerMsAtom,
 } from "@wav0/daw-react";
 import { useAtom } from "jotai";
-import { memo, useLayoutEffect, useMemo, useRef } from "react";
+import { memo, useLayoutEffect, useRef, useState } from "react";
+
+type ThemeColors = {
+	minor: string;
+	major: string;
+};
 
 type Props = {
 	width: number;
@@ -24,20 +29,25 @@ export const TrackGridLines = memo(function TrackGridLines({
 
 	const timeGrid = useAtom(cachedTimeGridAtom)[0];
 
-	const themeColors = useMemo(() => {
-		if (!canvasRef.current) return null;
+	// Initialize theme colors ONCE after canvas mounts
+	const [themeColors, setThemeColors] = useState<ThemeColors | null>(null);
+
+	// Read theme colors from DOM on mount (runs once)
+	useLayoutEffect(() => {
+		if (themeColors || !canvasRef.current) return;
 
 		const styles = getComputedStyle(canvasRef.current);
-		return {
+		setThemeColors({
 			minor:
-				styles.getPropertyValue("--timeline-grid-minor").trim() ||
+				styles.getPropertyValue("--timeline-grid-sub").trim() ||
 				"rgba(255,255,255,0.15)",
 			major:
-				styles.getPropertyValue("--timeline-grid-major").trim() ||
+				styles.getPropertyValue("--timeline-grid-measure").trim() ||
 				"rgba(255,255,255,0.4)",
-		};
-	}, []);
+		});
+	}, [themeColors]);
 
+	// Draw grid lines
 	useLayoutEffect(() => {
 		const canvas = canvasRef.current;
 		if (!canvas || !themeColors) return;
