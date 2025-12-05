@@ -1,7 +1,5 @@
 "use client";
 
-import type { Track, TrackEnvelopePoint } from "@wav0/daw-sdk";
-import { automation, curves, volume } from "@wav0/daw-sdk";
 import {
 	automationViewEnabledAtom,
 	horizontalScrollAtom,
@@ -9,15 +7,18 @@ import {
 	timelinePxPerMsAtom,
 	updateTrackAtom,
 } from "@wav0/daw-react";
+import type { Track, TrackEnvelopePoint } from "@wav0/daw-sdk";
+import { curves, volume } from "@wav0/daw-sdk";
+import { automation } from "@wav0/daw-sdk/utils";
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AutomationContextMenu } from "@/components/daw/context-menus/automation-context-menu";
-const {
-	addAutomationPoint,
-	migrateAutomationToSegments,
-	resolveClipRelativePoint,
-} = automation;
 
+const {
+	resolveClipRelativePoint,
+	migrateAutomationToSegments,
+	addAutomationPoint,
+} = automation;
 type AutomationLaneProps = {
 	track: Track;
 	trackHeight: number;
@@ -33,7 +34,7 @@ export function AutomationLane({
 	const [playback] = useAtom(playbackAtom);
 	const [, updateTrack] = useAtom(updateTrackAtom);
 	const [automationViewEnabled] = useAtom(automationViewEnabledAtom);
-	const [_horizontalScroll] = useAtom(horizontalScrollAtom);
+	const [horizontalScroll] = useAtom(horizontalScrollAtom);
 	const [draggingPoint, setDraggingPoint] = useState<{
 		pointId: string;
 		startX: number;
@@ -143,7 +144,15 @@ export function AutomationLane({
 				},
 			});
 		},
-		[draggingPoint, trackHeight, envelope, track.id, track.clips, updateTrack, pxPerMs],
+		[
+			draggingPoint,
+			trackHeight,
+			envelope,
+			track.id,
+			track.clips,
+			updateTrack,
+			pxPerMs,
+		],
 	);
 
 	const handlePointerUp = useCallback(
@@ -169,15 +178,15 @@ export function AutomationLane({
 
 			if (!isCmdCtrlClick && !isDoubleClick) return;
 
-		const rect = svgRef.current.getBoundingClientRect();
-		const x = e.clientX - rect.left;
-		const y = e.clientY - rect.top;
+			const rect = svgRef.current.getBoundingClientRect();
+			const x = e.clientX - rect.left;
+			const y = e.clientY - rect.top;
 
-		// Convert pixel position to time and value
-		// NOTE: Do NOT add horizontalScroll here - getBoundingClientRect() already
-		// accounts for scroll (rect.left becomes negative when scrolled), so
-		// x = clientX - rect.left gives the absolute position within the SVG
-		const time = x / pxPerMs;
+			// Convert pixel position to time and value
+			// NOTE: Do NOT add horizontalScroll here - getBoundingClientRect() already
+			// accounts for scroll (rect.left becomes negative when scrolled), so
+			// x = clientX - rect.left gives the absolute position within the SVG
+			const time = x / pxPerMs;
 			const padding = 20;
 			const usableHeight = trackHeight - padding * 2;
 			const normalizedY = (trackHeight - padding - y) / usableHeight;
@@ -193,12 +202,12 @@ export function AutomationLane({
 			// Use helper to add point and generate segments
 			const updatedEnvelope = addAutomationPoint(envelope, newPoint);
 
-		updateTrack(track.id, {
-			volumeEnvelope: updatedEnvelope,
-		});
-	},
-	[envelope, pxPerMs, trackHeight, track.id, updateTrack],
-);
+			updateTrack(track.id, {
+				volumeEnvelope: updatedEnvelope,
+			});
+		},
+		[envelope, pxPerMs, trackHeight, track.id, updateTrack],
+	);
 
 	// Lock scroll while dragging automation point
 	useEffect(() => {

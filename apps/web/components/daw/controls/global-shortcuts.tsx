@@ -1,8 +1,8 @@
 "use client";
 
-import { computeLoopEndMs } from "@wav0/daw-sdk";
 import {
 	automationViewEnabledAtom,
+	computeLoopEndMs,
 	playbackAtom,
 	projectEndOverrideAtom,
 	resetProjectAtom,
