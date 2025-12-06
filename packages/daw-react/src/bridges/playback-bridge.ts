@@ -14,6 +14,7 @@ import type { DAW, Track } from "@wav0/daw-sdk";
 export class PlaybackServiceBridge {
 	private cleanupFns: (() => void)[] = [];
 	private playbackCleanup: (() => void) | null = null;
+	private disposed = false;
 
 	constructor(private sdk: DAW) {
 		this.setupEventSync();
@@ -66,6 +67,7 @@ export class PlaybackServiceBridge {
 
 		if (options?.onTimeUpdate) {
 			const handleTimeUpdate = ((event: CustomEvent) => {
+				if (this.disposed) return;
 				// SDK Transport sends ms, callback expects seconds
 				options.onTimeUpdate?.(event.detail.currentTime / 1000);
 			}) as EventListener;
@@ -77,6 +79,7 @@ export class PlaybackServiceBridge {
 
 		if (options?.onPlaybackEnd) {
 			const handleStop = ((event: CustomEvent) => {
+				if (this.disposed) return;
 				if (event.detail.type === "stop") {
 					options.onPlaybackEnd?.();
 				}
@@ -243,6 +246,7 @@ export class PlaybackServiceBridge {
 	 * Cleanup bridge resources
 	 */
 	dispose(): void {
+		this.disposed = true;
 		// Clean up playback session listeners
 		this.cleanupPlaybackListeners();
 		// Clean up persistent listeners (e.g., event sync)

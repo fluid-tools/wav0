@@ -3,18 +3,21 @@
 import {
 	addMarkerAtom,
 	horizontalScrollAtom,
+	isPlayingAtom,
 	projectEndOverrideAtom,
 	projectEndPositionAtom,
 	setCurrentTimeAtom,
+	stopPlaybackAtom,
 	timelineAtom,
 	timelinePxPerMsAtom,
 	timelineWidthAtom,
+	tracksAtom,
 	useDAWContext,
 	useTimebase,
 } from "@wav0/daw-react";
 import { time } from "@wav0/daw-sdk";
-import { useAtom } from "jotai";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MarkerTrack } from "@/components/daw/panels/marker-track";
 import { TimelineGridCanvas } from "@/components/daw/panels/timeline-grid-canvas";
 import { UnifiedOverlay } from "@/components/daw/unified-overlay";
@@ -22,6 +25,9 @@ import { UnifiedOverlay } from "@/components/daw/unified-overlay";
 export function DAWTimeline() {
 	const [timeline] = useAtom(timelineAtom);
 	const [, setCurrentTime] = useAtom(setCurrentTimeAtom);
+	const tracks = useAtomValue(tracksAtom);
+	const isPlaying = useAtomValue(isPlayingAtom);
+	const stopPlayback = useSetAtom(stopPlaybackAtom);
 	const daw = useDAWContext();
 	// Read Transport time directly at invocation (no React state subscription)
 	const dawRef = useRef(daw);
@@ -39,6 +45,18 @@ export function DAWTimeline() {
 	const [_horizontalScroll] = useAtom(horizontalScrollAtom);
 	const [, addMarker] = useAtom(addMarkerAtom);
 	const { snap } = useTimebase();
+
+	const isInClipAtTime = useMemo(() => {
+		return (timeMs: number) =>
+			tracks.some((track) =>
+				(track.clips ?? []).some((clip) => {
+					const clipStart = clip.startTime;
+					const clipDuration = Math.max(0, clip.trimEnd - clip.trimStart);
+					const clipEnd = clipStart + clipDuration;
+					return timeMs >= clipStart && timeMs <= clipEnd;
+				}),
+			);
+	}, [tracks]);
 
 	const getTimeFromClientX = useCallback(
 		(clientX: number) => {
@@ -83,11 +101,23 @@ export function DAWTimeline() {
 		};
 	}, [isDraggingEnd, onMouseMove]);
 
-	const handleTimelineClick = (e: React.MouseEvent | React.PointerEvent) => {
-		const timeMs = getTimeFromClientX(e.clientX);
-		if (timeMs === null) return;
-		setCurrentTime(timeMs);
-	};
+	const handleTimelineClick = useCallback(
+		async (e: React.MouseEvent | React.PointerEvent) => {
+			const timeMs = getTimeFromClientX(e.clientX);
+			if (timeMs === null) return;
+			await setCurrentTime(timeMs);
+
+			const overlapsClip = isInClipAtTime(timeMs);
+			if (overlapsClip && isPlaying) {
+				try {
+					await stopPlayback();
+				} catch (error) {
+					console.warn("Failed to pause playback from timeline click", error);
+				}
+			}
+		},
+		[getTimeFromClientX, setCurrentTime, isInClipAtTime, isPlaying, stopPlayback],
+	);
 
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {

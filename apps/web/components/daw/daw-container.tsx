@@ -86,7 +86,9 @@ export function DAWContainer() {
 	const panLockRef = useRef(false);
 
 	const scrollRef = useRef({ left: 0, top: 0 });
-	const playheadViewportRef = useRef(store.get(playheadViewportAtom));
+const initialPlayheadViewport =
+	store.get(playheadViewportAtom) ?? { absolutePx: 0, viewportPx: 0, ms: 0 };
+const playheadViewportRef = useRef(initialPlayheadViewport);
 	const autoFollowStateRef = useRef({
 		isPlaying,
 		isPlayheadDragging,
@@ -104,7 +106,9 @@ export function DAWContainer() {
 	}, [autoFollowEnabled, isPlayheadDragging, isPlaying, userIsScrolling]);
 
 	useEffect(() => {
-		const unsubscribe = store.sub(playheadViewportAtom, (value) => {
+		const unsubscribe = store.sub(playheadViewportAtom, () => {
+			const value = store.get(playheadViewportAtom);
+			if (!value) return;
 			playheadViewportRef.current = value;
 
 			const {
@@ -163,8 +167,12 @@ export function DAWContainer() {
 			batch.raf = requestAnimationFrame(() => {
 				batch.pending = false;
 				batch.raf = 0;
-				setHorizontalScroll(batch.nextLeft);
-				setVerticalScroll(batch.nextTop);
+				try {
+					setHorizontalScroll(batch.nextLeft);
+					setVerticalScroll(batch.nextTop);
+				} catch (error) {
+					console.warn("[DAWContainer] scroll batch set failed", error);
+				}
 			});
 		},
 		[setHorizontalScroll, setVerticalScroll],
@@ -288,7 +296,8 @@ export function DAWContainer() {
 				const controller = gridControllerRef.current;
 				const grid = trackGridScrollRef.current;
 				if (controller && grid) {
-					const x = playheadViewportRef.current.absolutePx;
+					const x = playheadViewportRef.current?.absolutePx;
+					if (!Number.isFinite(x)) return;
 					const width = grid.clientWidth;
 					const viewportLeft = controller.scrollLeft;
 					const viewportRight = viewportLeft + width;
@@ -313,25 +322,34 @@ export function DAWContainer() {
 		const gridEl = trackGridScrollRef.current;
 		const listEl = trackListScrollRef.current;
 
+		let rafId = 0;
+		let controllerScrollLeft = gridEl.scrollLeft;
+		let controllerScrollTop = gridEl.scrollTop;
+
 		const controller: GridController = {
-			scrollLeft: gridEl.scrollLeft,
-			scrollTop: gridEl.scrollTop,
-			rAF: 0,
+			scrollLeft: controllerScrollLeft,
+			scrollTop: controllerScrollTop,
+			rAF: rafId,
 			setScroll(left, top) {
-				if (this.rAF) cancelAnimationFrame(this.rAF);
-				this.rAF = requestAnimationFrame(() => {
-					this.rAF = 0;
+				if (rafId) cancelAnimationFrame(rafId);
+				rafId = requestAnimationFrame(() => {
+					rafId = 0;
 					if (timelineEl.scrollLeft !== left) timelineEl.scrollLeft = left;
 					if (gridEl.scrollLeft !== left) gridEl.scrollLeft = left;
 					if (gridEl.scrollTop !== top) gridEl.scrollTop = top;
 					if (listEl && listEl.scrollTop !== top) listEl.scrollTop = top;
-					this.scrollLeft = left;
-					this.scrollTop = top;
+					controllerScrollLeft = left;
+					controllerScrollTop = top;
+					controller.scrollLeft = controllerScrollLeft;
+					controller.scrollTop = controllerScrollTop;
+					controller.rAF = rafId;
 				});
+				controller.rAF = rafId;
 			},
 			cancelAnimation() {
-				if (this.rAF) cancelAnimationFrame(this.rAF);
-				this.rAF = 0;
+				if (rafId) cancelAnimationFrame(rafId);
+				rafId = 0;
+				controller.rAF = rafId;
 			},
 		};
 		gridControllerRef.current = controller;

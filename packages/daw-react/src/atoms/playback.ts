@@ -5,10 +5,33 @@
 
 "use client";
 
+import type { WritableAtom } from "jotai";
 import { atom, type Getter, type Setter } from "jotai";
 import { playbackAtom, totalDurationAtom, tracksAtom } from "./base";
 import { loopRegionAtom } from "./project";
 import { serviceRegistry } from "./service-registry";
+
+type SafeState = { disposed: boolean; label: string };
+
+function safeSet<Value>(
+	setter: Setter,
+	targetAtom: unknown,
+	value: Value,
+	state: SafeState,
+) {
+	if (state.disposed) return;
+	try {
+		const atomRef = targetAtom as WritableAtom<
+			Value,
+			[Value | ((prev: Value) => Value)],
+			void
+		>;
+		setter(atomRef, value);
+	} catch (error) {
+		console.warn(`[playbackAtom] set failed (${state.label})`, error);
+		state.disposed = true;
+	}
+}
 
 // ===== Guarded Time Update =====
 
@@ -25,6 +48,7 @@ function createGuardedTimeUpdateCallback(
 	get: Getter,
 	set: Setter,
 	restartPlayback: () => Promise<void>,
+	state: SafeState,
 ) {
 	// Per-instance throttling state (not shared across sessions)
 	let lastUpdateTime = 0;
@@ -85,10 +109,15 @@ function createGuardedTimeUpdateCallback(
 				// Loop back to start
 				isRestarting = true;
 				try {
-					set(playbackAtom, {
-						...currentPlayback,
-						currentTime: loopStartMs,
-					});
+					safeSet(
+						set,
+						playbackAtom,
+						{
+							...currentPlayback,
+							currentTime: loopStartMs,
+						},
+						state,
+					);
 					// Restart playback from loop start
 					await restartPlayback();
 				} finally {
@@ -98,13 +127,23 @@ function createGuardedTimeUpdateCallback(
 			}
 
 			// Not looping - stop playback
-			set(playbackAtom, { ...newPlayback, currentTime: 0, isPlaying: false });
+			safeSet(
+				set,
+				playbackAtom,
+				{ ...newPlayback, currentTime: 0, isPlaying: false },
+				state,
+			);
 			return;
 		}
 
 		// Only update atom if value changed meaningfully
 		if (Math.abs(newPlayback.currentTime - currentMs) >= 0.01) {
-			set(playbackAtom, { ...newPlayback, currentTime: currentMs });
+			safeSet(
+				set,
+				playbackAtom,
+				{ ...newPlayback, currentTime: currentMs },
+				state,
+			);
 		}
 	};
 }
@@ -152,6 +191,7 @@ export const loopingAtom = atom(
 export const togglePlaybackAtom = atom(null, async (get, set) => {
 	const tracks = get(tracksAtom);
 	const playback = get(playbackAtom);
+	const state = { disposed: false, label: "toggle" };
 
 	if (!serviceRegistry.playbackService) {
 		console.warn("Playback service not registered");
@@ -160,7 +200,7 @@ export const togglePlaybackAtom = atom(null, async (get, set) => {
 
 	if (playback.isPlaying) {
 		await serviceRegistry.playbackService.pause();
-		set(playbackAtom, { ...playback, isPlaying: false });
+		safeSet(set, playbackAtom, { ...playback, isPlaying: false }, state);
 		return;
 	}
 
@@ -170,11 +210,16 @@ export const togglePlaybackAtom = atom(null, async (get, set) => {
 
 	// Hoist callback creation to prevent accumulation on loop restarts
 	const restartPlaybackRef = { current: null as (() => Promise<void>) | null };
-	
+
 	// Create callback once, reuse for all restarts
-	const guardedCallback = createGuardedTimeUpdateCallback(get, set, () => {
-		return restartPlaybackRef.current?.() ?? Promise.resolve();
-	});
+	const guardedCallback = createGuardedTimeUpdateCallback(
+		get,
+		set,
+		() => {
+			return restartPlaybackRef.current?.() ?? Promise.resolve();
+		},
+		state,
+	);
 
 	// Create restart function for looping support
 	restartPlaybackRef.current = async () => {
@@ -188,7 +233,7 @@ export const togglePlaybackAtom = atom(null, async (get, set) => {
 			onTimeUpdate: guardedCallback,
 			onPlaybackEnd: () => {
 				const endState = get(playbackAtom);
-				set(playbackAtom, { ...endState, isPlaying: false });
+				safeSet(set, playbackAtom, { ...endState, isPlaying: false }, state);
 			},
 		});
 	};
@@ -199,14 +244,15 @@ export const togglePlaybackAtom = atom(null, async (get, set) => {
 		onTimeUpdate: guardedCallback,
 		onPlaybackEnd: () => {
 			const endState = get(playbackAtom);
-			set(playbackAtom, { ...endState, isPlaying: false });
+			safeSet(set, playbackAtom, { ...endState, isPlaying: false }, state);
 		},
 	});
 
-	set(playbackAtom, { ...playback, isPlaying: true });
+	safeSet(set, playbackAtom, { ...playback, isPlaying: true }, state);
 });
 
 export const stopPlaybackAtom = atom(null, async (get, set) => {
+	const state = { disposed: false, label: "stop" };
 	if (!serviceRegistry.playbackService) {
 		console.warn("Playback service not registered");
 		return;
@@ -214,7 +260,7 @@ export const stopPlaybackAtom = atom(null, async (get, set) => {
 
 	await serviceRegistry.playbackService.stop();
 	const playback = get(playbackAtom);
-	set(playbackAtom, { ...playback, isPlaying: false });
+	safeSet(set, playbackAtom, { ...playback, isPlaying: false }, state);
 });
 
 export const setCurrentTimeAtom = atom(
@@ -223,8 +269,9 @@ export const setCurrentTimeAtom = atom(
 		const playback = get(playbackAtom);
 		const tracks = get(tracksAtom);
 		const playbackService = serviceRegistry.playbackService;
+		const state = { disposed: false, label: "setCurrentTime" };
 
-		set(playbackAtom, { ...playback, currentTime: timeMs });
+		safeSet(set, playbackAtom, { ...playback, currentTime: timeMs }, state);
 
 		// If not playing, notify Transport via playback service seek
 		if (!playback.isPlaying) {
@@ -241,12 +288,19 @@ export const setCurrentTimeAtom = atom(
 		await playbackService.pause();
 
 		// Hoist callback creation to prevent accumulation on loop restarts
-		const restartPlaybackRef = { current: null as (() => Promise<void>) | null };
-		
+		const restartPlaybackRef = {
+			current: null as (() => Promise<void>) | null,
+		};
+
 		// Create callback once, reuse for all restarts
-		const guardedCallback = createGuardedTimeUpdateCallback(get, set, () => {
-			return restartPlaybackRef.current?.() ?? Promise.resolve();
-		});
+		const guardedCallback = createGuardedTimeUpdateCallback(
+			get,
+			set,
+			() => {
+				return restartPlaybackRef.current?.() ?? Promise.resolve();
+			},
+			state,
+		);
 
 		// Create restart function for looping support
 		restartPlaybackRef.current = async () => {
@@ -260,7 +314,7 @@ export const setCurrentTimeAtom = atom(
 				onTimeUpdate: guardedCallback,
 				onPlaybackEnd: () => {
 					const endState = get(playbackAtom);
-					set(playbackAtom, { ...endState, isPlaying: false });
+					safeSet(set, playbackAtom, { ...endState, isPlaying: false }, state);
 				},
 			});
 		};
@@ -271,7 +325,7 @@ export const setCurrentTimeAtom = atom(
 			onTimeUpdate: guardedCallback,
 			onPlaybackEnd: () => {
 				const endState = get(playbackAtom);
-				set(playbackAtom, { ...endState, isPlaying: false });
+				safeSet(set, playbackAtom, { ...endState, isPlaying: false }, state);
 			},
 		});
 	},
@@ -280,10 +334,20 @@ export const setCurrentTimeAtom = atom(
 export const setBpmAtom = atom(null, (get, set, bpm: number) => {
 	const playback = get(playbackAtom);
 	const clamped = Math.max(30, Math.min(300, Number.isFinite(bpm) ? bpm : 120));
-	set(playbackAtom, { ...playback, bpm: clamped });
+	safeSet(
+		set,
+		playbackAtom,
+		{ ...playback, bpm: clamped },
+		{ disposed: false, label: "setBpm" },
+	);
 });
 
 export const toggleLoopingAtom = atom(null, (get, set) => {
 	const playback = get(playbackAtom);
-	set(playbackAtom, { ...playback, looping: !playback.looping });
+	safeSet(
+		set,
+		playbackAtom,
+		{ ...playback, looping: !playback.looping },
+		{ disposed: false, label: "toggleLooping" },
+	);
 });

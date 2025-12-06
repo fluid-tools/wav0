@@ -26,12 +26,19 @@ export function usePlaybackAtomSync<T extends { currentTime: number }>(
 	const setPlayback = useSetAtom(playbackAtom);
 	const store = useStore();
 	const playbackRef = useRef(store.get(playbackAtom));
+	const disposedRef = useRef(false);
 
 	useEffect(() => {
+		disposedRef.current = false;
 		return store.sub(playbackAtom, () => {
 			playbackRef.current = store.get(playbackAtom);
 		});
 	}, [store, playbackAtom]);
+	useEffect(() => {
+		return () => {
+			disposedRef.current = true;
+		};
+	}, []);
 	const daw = useDAWContext();
 
 	// Non-reactive event handler - always reads latest playback state
@@ -45,7 +52,15 @@ export function usePlaybackAtomSync<T extends { currentTime: number }>(
 				currentTime,
 			};
 			playbackRef.current = nextPlayback;
-			setPlayback(nextPlayback);
+			if (disposedRef.current) return;
+			try {
+				setPlayback(nextPlayback);
+			} catch (error) {
+				if (!disposedRef.current) {
+					console.warn("[usePlaybackAtomSync] setPlayback failed", error);
+					disposedRef.current = true;
+				}
+			}
 		},
 	);
 
@@ -92,12 +107,19 @@ export function useTrackAtomSync(
 	const setTracks = useSetAtom(tracksAtom);
 	const store = useStore();
 	const tracksRef = useRef(store.get(tracksAtom));
+	const disposedRef = useRef(false);
 
 	useEffect(() => {
+		disposedRef.current = false;
 		return store.sub(tracksAtom, () => {
 			tracksRef.current = store.get(tracksAtom);
 		});
 	}, [store, tracksAtom]);
+	useEffect(() => {
+		return () => {
+			disposedRef.current = true;
+		};
+	}, []);
 	const daw = useDAWContext();
 
 	// Non-reactive track loaded handler
@@ -122,7 +144,15 @@ export function useTrackAtomSync(
 			if (!changed) return;
 
 			tracksRef.current = updatedTracks;
-			setTracks(updatedTracks);
+			if (disposedRef.current) return;
+			try {
+				setTracks(updatedTracks);
+			} catch (error) {
+				if (!disposedRef.current) {
+					console.warn("[useTrackAtomSync] setTracks failed", error);
+					disposedRef.current = true;
+				}
+			}
 		},
 	);
 

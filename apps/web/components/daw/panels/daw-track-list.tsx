@@ -54,6 +54,7 @@ type TrackListRowProps = {
 	isSelected: boolean;
 	isEditing: boolean;
 	editingName: string;
+	isPlaying: boolean;
 	automationViewEnabled: boolean;
 	automationType: AutomationType;
 	onSelect: (trackId: string) => void;
@@ -77,6 +78,7 @@ const TrackListRow = memo(function TrackListRow({
 	isSelected,
 	isEditing,
 	editingName,
+	isPlaying,
 	automationViewEnabled,
 	automationType,
 	onSelect,
@@ -189,7 +191,7 @@ const TrackListRow = memo(function TrackListRow({
 						onDoubleClick={handleStartEdit}
 					>
 						<div
-							className={`${DAW_ICONS.XS} rounded-full flex-shrink-0`}
+							className={`${DAW_ICONS.XS} rounded-full shrink-0`}
 							style={{ backgroundColor: track.color }}
 						/>
 						{isEditing ? (
@@ -246,7 +248,7 @@ const TrackListRow = memo(function TrackListRow({
 					<Button
 						variant={track.muted ? "default" : "ghost"}
 						size="sm"
-						className="h-7 w-7 p-0 flex-shrink-0"
+						className="h-7 w-7 p-0 shrink-0"
 						onClick={(e) => {
 							e.stopPropagation();
 							handleToggleMute();
@@ -327,7 +329,11 @@ const TrackListRow = memo(function TrackListRow({
 								{volumeLabel}
 							</span>
 							{track.volumeEnvelope?.enabled && (
-								<LiveAutomationBadge trackId={track.id} />
+				<LiveAutomationBadge
+					envelope={track.volumeEnvelope}
+					baseVolume={track.volume ?? 75}
+					isPlaying={isPlaying}
+				/>
 							)}
 						</div>
 					</div>
@@ -366,7 +372,9 @@ export function DAWTrackList() {
 	const [isPlaying] = useAtom(isPlayingAtom);
 	// Ref to read isPlaying in callbacks without adding to deps (prevents callback recreation on play/pause)
 	const isPlayingRef = useRef(isPlaying);
-	isPlayingRef.current = isPlaying;
+	useEffect(() => {
+		isPlayingRef.current = isPlaying;
+	}, [isPlaying]);
 
 	const [editingTrackId, setEditingTrackId] = useState<string | null>(null);
 	const [editingTrackName, setEditingTrackName] = useState<string>("");
@@ -533,6 +541,7 @@ export function DAWTrackList() {
 						isSelected={selectedTrackId === track.id}
 						isEditing={editingTrackId === track.id}
 						editingName={editingTrackName}
+						isPlaying={isPlaying}
 						automationViewEnabled={automationViewEnabled}
 						automationType={trackAutomationTypes.get(track.id) || "volume"}
 						onSelect={handleSelect}
