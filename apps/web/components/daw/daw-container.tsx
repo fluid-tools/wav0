@@ -20,7 +20,7 @@ import {
 	userIsManuallyScrollingAtom,
 	verticalScrollAtom,
 } from "@wav0/daw-react";
-import { useAtom } from "jotai";
+import { useAtom, useStore } from "jotai";
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,7 @@ export function DAWContainer() {
 	useDAWAtomSync(playbackAtom, tracksAtom);
 	const { audio: audioBridge } = useBridges();
 
+	const store = useStore();
 	const [timelineWidth] = useAtom(timelineWidthAtom);
 	const [tracks] = useAtom(tracksAtom);
 	const [trackHeightZoom] = useAtom(trackHeightZoomAtom);
@@ -60,7 +61,6 @@ export function DAWContainer() {
 	const [isPlaying] = useAtom(isPlayingAtom);
 	const [_timeline] = useAtom(timelineAtom);
 	const [viewport] = useAtom(timelineViewportAtom);
-	const [playheadViewport] = useAtom(playheadViewportAtom);
 	const [isPlayheadDragging] = useAtom(playheadDraggingAtom);
 	const [, initializeAudioFromOPFS] = useAtom(initializeAudioFromOPFSAtom);
 	const [, setTimelineZoom] = useAtom(setTimelineZoomAtom);
@@ -86,6 +86,58 @@ export function DAWContainer() {
 	const panLockRef = useRef(false);
 
 	const scrollRef = useRef({ left: 0, top: 0 });
+	const playheadViewportRef = useRef(store.get(playheadViewportAtom));
+	const autoFollowStateRef = useRef({
+		isPlaying,
+		isPlayheadDragging,
+		userIsScrolling,
+		autoFollowEnabled,
+	});
+
+	useEffect(() => {
+		autoFollowStateRef.current = {
+			isPlaying,
+			isPlayheadDragging,
+			userIsScrolling,
+			autoFollowEnabled,
+		};
+	}, [autoFollowEnabled, isPlayheadDragging, isPlaying, userIsScrolling]);
+
+	useEffect(() => {
+		const unsubscribe = store.sub(playheadViewportAtom, (value) => {
+			playheadViewportRef.current = value;
+
+			const {
+				isPlaying: playing,
+				isPlayheadDragging: dragging,
+				userIsScrolling: scrolling,
+				autoFollowEnabled: enabled,
+			} = autoFollowStateRef.current;
+
+			if (!playing || dragging || scrolling || !enabled) return;
+
+			const controller = gridControllerRef.current;
+			const grid = trackGridScrollRef.current;
+			if (!controller || !grid) return;
+
+			const x = value.absolutePx;
+			if (!Number.isFinite(x)) return;
+			const width = grid.clientWidth;
+			if (width <= 0) return;
+			const left = controller.scrollLeft;
+
+			const bandLeft = left + width * 0.35;
+			const bandRight = left + width * 0.65;
+
+			if (x < bandLeft || x > bandRight) {
+				const target = Math.max(0, x - width * 0.5);
+				if (Math.abs(target - controller.scrollLeft) < 0.5) return;
+				controller.setScroll(target, controller.scrollTop);
+			}
+		});
+
+		return unsubscribe;
+	}, [store]);
 
 	const scrollBatchRef = useRef<{
 		pending: boolean;
@@ -236,7 +288,7 @@ export function DAWContainer() {
 				const controller = gridControllerRef.current;
 				const grid = trackGridScrollRef.current;
 				if (controller && grid) {
-					const x = playheadViewport.absolutePx;
+					const x = playheadViewportRef.current.absolutePx;
 					const width = grid.clientWidth;
 					const viewportLeft = controller.scrollLeft;
 					const viewportRight = viewportLeft + width;
@@ -252,7 +304,6 @@ export function DAWContainer() {
 			batchScrollUpdate,
 			setUserIsScrolling,
 			setAutoFollowEnabled,
-			playheadViewport.absolutePx,
 		],
 	);
 
@@ -354,38 +405,6 @@ export function DAWContainer() {
 			document.removeEventListener("touchstart", preventTouchNav);
 		};
 	}, []);
-
-	useEffect(() => {
-		const controller = gridControllerRef.current;
-		const grid = trackGridScrollRef.current;
-		if (!controller || !grid) return;
-
-		if (isPlayheadDragging) return;
-		if (userIsScrolling) return;
-		if (!autoFollowEnabled) return;
-		if (!isPlaying) return;
-
-		const x = playheadViewport.absolutePx;
-		if (!Number.isFinite(x)) return;
-		const width = grid.clientWidth;
-		if (width <= 0) return;
-		const left = controller.scrollLeft;
-
-		const bandLeft = left + width * 0.35;
-		const bandRight = left + width * 0.65;
-
-		if (x < bandLeft || x > bandRight) {
-			const target = Math.max(0, x - width * 0.5);
-			if (Math.abs(target - controller.scrollLeft) < 0.5) return;
-			controller.setScroll(target, controller.scrollTop);
-		}
-	}, [
-		isPlayheadDragging,
-		playheadViewport.absolutePx,
-		userIsScrolling,
-		autoFollowEnabled,
-		isPlaying,
-	]);
 
 	return (
 		<div className="h-screen flex flex-col bg-background">
