@@ -11,7 +11,7 @@ import {
 	timelineAtom,
 	toggleSnapToGridAtom,
 } from "@wav0/daw-react";
-import { useAtom } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import {
 	Activity,
 	Download,
@@ -52,11 +52,11 @@ import { Toggle } from "@/components/ui/toggle";
 import { DAW_HEIGHTS, DAW_ICONS, DAW_TEXT } from "@/lib/constants/daw-design";
 
 function SnapGranularityControls() {
-	const [timeline] = useAtom(timelineAtom);
-	const [snapInterval] = useAtom(snapIntervalMsAtom);
-	const [, setSnapGranularity] = useAtom(setSnapGranularityAtom);
-	const [, setCustomInterval] = useAtom(setCustomSnapIntervalAtom);
-	const [, toggleSnap] = useAtom(toggleSnapToGridAtom);
+	const timeline = useAtomValue(timelineAtom);
+	const snapInterval = useAtomValue(snapIntervalMsAtom);
+	const setSnapGranularity = useSetAtom(setSnapGranularityAtom);
+	const setCustomInterval = useSetAtom(setCustomSnapIntervalAtom);
+	const toggleSnap = useSetAtom(toggleSnapToGridAtom);
 
 	const formatInterval = (ms: number) => {
 		if (ms >= 1000) return `${(ms / 1000).toFixed(1)}s`;
@@ -123,7 +123,7 @@ function SnapGranularityControls() {
 export function DAWToolbar() {
 	const [music, setMusic] = useAtom(musicalMetadataAtom);
 	const [projectName, setProjectName] = useAtom(projectNameAtom);
-	const [, setEventListOpen] = useAtom(eventListOpenAtom);
+	const setEventListOpen = useSetAtom(eventListOpenAtom);
 	const [automationViewEnabled, setAutomationViewEnabled] = useAtom(
 		automationViewEnabledAtom,
 	);

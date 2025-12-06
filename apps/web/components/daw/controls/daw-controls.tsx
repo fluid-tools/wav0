@@ -17,7 +17,7 @@ import {
 	useDAWContext,
 } from "@wav0/daw-react";
 import { computeLoopEndMs, time } from "@wav0/daw-sdk";
-import { useAtom } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import {
 	ChevronsUpDown,
 	Pause,
@@ -41,15 +41,15 @@ import {
 import { MasterMeter } from "./master-meter";
 
 function DAWControls() {
-	const [isPlaying] = useAtom(isPlayingAtom);
-	const [timeline] = useAtom(timelineAtom);
-	const [trackHeightZoom] = useAtom(trackHeightZoomAtom);
-	const [, togglePlayback] = useAtom(togglePlaybackAtom);
-	const [, stopPlayback] = useAtom(stopPlaybackAtom);
-	const [, setCurrentTime] = useAtom(setCurrentTimeAtom);
-	const [, setTimelineZoom] = useAtom(setTimelineZoomAtom);
-	const [, setTrackHeightZoom] = useAtom(setTrackHeightZoomAtom);
-	const [totalDuration] = useAtom(totalDurationAtom);
+	const isPlaying = useAtomValue(isPlayingAtom);
+	const timeline = useAtomValue(timelineAtom);
+	const trackHeightZoom = useAtomValue(trackHeightZoomAtom);
+	const togglePlayback = useSetAtom(togglePlaybackAtom);
+	const stopPlayback = useSetAtom(stopPlaybackAtom);
+	const setCurrentTime = useSetAtom(setCurrentTimeAtom);
+	const setTimelineZoom = useSetAtom(setTimelineZoomAtom);
+	const setTrackHeightZoom = useSetAtom(setTrackHeightZoomAtom);
+	const totalDuration = useAtomValue(totalDurationAtom);
 
 	// Throttled time display - polls Transport at 10Hz instead of subscribing to atom
 	const daw = useDAWContext();
@@ -79,10 +79,10 @@ function DAWControls() {
 	}, [daw]);
 
 	// Selection and clip update atoms
-	const [selectedTrackId] = useAtom(selectedTrackIdAtom);
-	const [selectedClipId] = useAtom(selectedClipIdAtom);
-	const [tracks] = useAtom(tracksAtom);
-	const [, updateClip] = useAtom(updateClipAtom);
+	const selectedTrackId = useAtomValue(selectedTrackIdAtom);
+	const selectedClipId = useAtomValue(selectedClipIdAtom);
+	const tracks = useAtomValue(tracksAtom);
+	const updateClip = useSetAtom(updateClipAtom);
 
 	const handleStop = async () => {
 		try {
