@@ -11,7 +11,14 @@ import {
 } from "@wav0/daw-react";
 import { time } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
-import { memo, useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import {
+	memo,
+	useCallback,
+	useEffect,
+	useEffectEvent,
+	useLayoutEffect,
+	useRef,
+} from "react";
 
 type Props = {
 	timelineHeaderHeight: number;
@@ -35,8 +42,14 @@ export const UnifiedPlayhead = memo(function UnifiedPlayhead({
 	const [, setCurrentTime] = useAtom(setCurrentTimeAtom);
 	const [, setPlayheadDragging] = useAtom(playheadDraggingAtom);
 	const daw = useDAWContext();
-	// Read Transport time directly (no React state subscription)
-	const currentTimeRef = useRef(daw?.getTransport().getCurrentTime() ?? 0);
+	const readTransport = useEffectEvent(() => daw?.getTransport());
+	const currentTimeRef = useRef(0);
+
+	useEffect(() => {
+		const transport = readTransport();
+		if (!transport) return;
+		currentTimeRef.current = transport.getCurrentTime();
+	}, [readTransport]);
 
 	const containerRef = useRef<HTMLDivElement>(null);
 	const playheadLineRef = useRef<HTMLDivElement>(null);
@@ -73,21 +86,14 @@ export const UnifiedPlayhead = memo(function UnifiedPlayhead({
 		playheadHandleRef.current.style.transform = `translateX(${playheadX - 12}px)`;
 	}, []);
 
-	// Subscribe directly to Transport time-update for playhead animation
-	// Bypasses React state entirely - direct DOM manipulation at 60fps
 	useEffect(() => {
-		if (!daw) return;
-
-		const transport = daw.getTransport();
+		const transport = readTransport();
+		if (!transport) return;
 
 		const handleTimeUpdate = (event: CustomEvent<{ currentTime: number }>) => {
-			// Skip if dragging - drag handles its own visual updates
 			if (dragRef.current.active) return;
-
 			const timeMs = event.detail.currentTime;
 			currentTimeRef.current = timeMs;
-
-			// Direct DOM update - no React re-render
 			if (!playheadLineRef.current || !playheadHandleRef.current) return;
 			const { pxPerMs: px, horizontalScroll: scroll } = metricsRef.current;
 			const playheadX = Math.round(time.timeToPixel(timeMs, px, scroll));
@@ -95,7 +101,6 @@ export const UnifiedPlayhead = memo(function UnifiedPlayhead({
 			playheadHandleRef.current.style.transform = `translateX(${playheadX - 12}px)`;
 		};
 
-		// Also handle transport events (play/pause/seek) to catch seeks when not playing
 		const handleTransport = (event: CustomEvent<{ currentTime: number }>) => {
 			if (dragRef.current.active) return;
 			const timeMs = event.detail.currentTime;
@@ -110,7 +115,7 @@ export const UnifiedPlayhead = memo(function UnifiedPlayhead({
 			transport.removeEventListener("time-update", handleTimeUpdate as EventListener);
 			transport.removeEventListener("transport", handleTransport as EventListener);
 		};
-	}, [daw, updatePlayheadVisual]);
+	}, [readTransport, updatePlayheadVisual]);
 
 	// Sync visual position when metrics change (zoom, scroll) - NOT from time changes
 	useLayoutEffect(() => {

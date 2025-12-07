@@ -3,21 +3,18 @@
 import {
 	addMarkerAtom,
 	horizontalScrollAtom,
-	isPlayingAtom,
 	projectEndOverrideAtom,
 	projectEndPositionAtom,
 	setCurrentTimeAtom,
-	stopPlaybackAtom,
 	timelineAtom,
 	timelinePxPerMsAtom,
 	timelineWidthAtom,
-	tracksAtom,
 	useDAWContext,
 	useTimebase,
 } from "@wav0/daw-react";
 import { time } from "@wav0/daw-sdk";
-import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useAtom } from "jotai";
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
 import { MarkerTrack } from "@/components/daw/panels/marker-track";
 import { TimelineGridCanvas } from "@/components/daw/panels/timeline-grid-canvas";
 import { UnifiedOverlay } from "@/components/daw/unified-overlay";
@@ -25,15 +22,10 @@ import { UnifiedOverlay } from "@/components/daw/unified-overlay";
 export function DAWTimeline() {
 	const [timeline] = useAtom(timelineAtom);
 	const [, setCurrentTime] = useAtom(setCurrentTimeAtom);
-	const tracks = useAtomValue(tracksAtom);
-	const isPlaying = useAtomValue(isPlayingAtom);
-	const stopPlayback = useSetAtom(stopPlaybackAtom);
 	const daw = useDAWContext();
-	// Read Transport time directly at invocation (no React state subscription)
-	const dawRef = useRef(daw);
-	dawRef.current = daw;
-	const getCurrentTimeRef = useRef(() => dawRef.current?.getTransport().getCurrentTime() ?? 0);
-	getCurrentTimeRef.current = () => dawRef.current?.getTransport().getCurrentTime() ?? 0;
+	const getCurrentTime = useEffectEvent(
+		() => daw?.getTransport().getCurrentTime() ?? 0,
+	);
 	const [timelineWidth] = useAtom(timelineWidthAtom);
 	const [projectEndPosition] = useAtom(projectEndPositionAtom);
 	const [_projectEndOverride, setProjectEndOverride] = useAtom(
@@ -45,18 +37,6 @@ export function DAWTimeline() {
 	const [_horizontalScroll] = useAtom(horizontalScrollAtom);
 	const [, addMarker] = useAtom(addMarkerAtom);
 	const { snap } = useTimebase();
-
-	const isInClipAtTime = useMemo(() => {
-		return (timeMs: number) =>
-			tracks.some((track) =>
-				(track.clips ?? []).some((clip) => {
-					const clipStart = clip.startTime;
-					const clipDuration = Math.max(0, clip.trimEnd - clip.trimStart);
-					const clipEnd = clipStart + clipDuration;
-					return timeMs >= clipStart && timeMs <= clipEnd;
-				}),
-			);
-	}, [tracks]);
 
 	const getTimeFromClientX = useCallback(
 		(clientX: number) => {
@@ -106,17 +86,8 @@ export function DAWTimeline() {
 			const timeMs = getTimeFromClientX(e.clientX);
 			if (timeMs === null) return;
 			await setCurrentTime(timeMs);
-
-			const overlapsClip = isInClipAtTime(timeMs);
-			if (overlapsClip && isPlaying) {
-				try {
-					await stopPlayback();
-				} catch (error) {
-					console.warn("Failed to pause playback from timeline click", error);
-				}
-			}
 		},
-		[getTimeFromClientX, setCurrentTime, isInClipAtTime, isPlaying, stopPlayback],
+		[getTimeFromClientX, setCurrentTime],
 	);
 
 	useEffect(() => {
@@ -135,13 +106,13 @@ export function DAWTimeline() {
 				return;
 			}
 			if (e.key.toLowerCase() !== "m") return;
-			const timeMs = Math.max(0, getCurrentTimeRef.current());
+			const timeMs = Math.max(0, getCurrentTime());
 			const snapped = snap(timeMs);
 			addMarker({ timeMs: snapped, name: "", color: "#ffffff" });
 		};
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
-	}, [addMarker, snap]);
+	}, [addMarker, snap, getCurrentTime]);
 
 	const onTimelinePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
 		if (event.button !== 0) return;
@@ -176,7 +147,7 @@ export function DAWTimeline() {
 					if (isDraggingEnd) return;
 					if (e.key === "Enter" || e.key === " ") {
 						e.preventDefault();
-						const at = Math.max(0, getCurrentTimeRef.current());
+						const at = Math.max(0, getCurrentTime());
 						const snapped = timeline.snapToGrid ? snap(at) : at;
 						setCurrentTime(snapped);
 					}

@@ -20,6 +20,24 @@ const {
 	migrateAutomationToSegments,
 	addAutomationPoint,
 } = automation;
+
+function resolveAutomationPoints(
+	points: TrackEnvelopePoint[] | undefined,
+	clips: Track["clips"] | undefined,
+) {
+	if (!points || points.length === 0) return [];
+	const clipStarts =
+		clips && clips.length > 0
+			? new Map(clips.map((clip) => [clip.id, clip.startTime]))
+			: null;
+	return points
+		.map((point) =>
+			point.clipId && clipStarts?.has(point.clipId)
+				? resolveClipRelativePoint(point, clipStarts.get(point.clipId) ?? 0)
+				: point,
+		)
+		.sort((a, b) => a.time - b.time);
+}
 type AutomationLaneProps = {
 	track: Track;
 	trackHeight: number;
@@ -247,21 +265,8 @@ export const AutomationLane = memo(function AutomationLane({
 	const padding = 20;
 	const usableHeight = trackHeight - padding * 2;
 
-	// Resolve clip-relative points to absolute time for rendering - MEMOIZED
-	// Must be before early returns to maintain hook order
-	const sorted = useMemo(() => {
-		if (!envelope?.points) return [];
-		return [...envelope.points]
-			.map((point) => {
-				// If point is clip-bound, resolve its absolute time
-				const clip = track.clips?.find((c) => c.id === point.clipId);
-				const resolved = clip
-					? resolveClipRelativePoint(point, clip.startTime)
-					: point;
-				return resolved;
-			})
-			.sort((a, b) => a.time - b.time);
-	}, [envelope?.points, track.clips]);
+	// Resolve clip-relative points to absolute time for rendering (compiler-friendly helper)
+	const sorted = resolveAutomationPoints(envelope?.points, track.clips);
 
 	// MEMOIZED SVG path generation - only recomputes when points/dimensions change
 	const path = useMemo(() => {
@@ -325,7 +330,9 @@ export const AutomationLane = memo(function AutomationLane({
 
 	// Store metrics in refs for Transport callback
 	const metricsRef = useRef({ pxPerMs, sorted, trackHeight, usableHeight });
-	metricsRef.current = { pxPerMs, sorted, trackHeight, usableHeight };
+	useEffect(() => {
+		metricsRef.current = { pxPerMs, sorted, trackHeight, usableHeight };
+	}, [pxPerMs, sorted, trackHeight, usableHeight]);
 
 	// Subscribe directly to Transport time-update for playhead indicator
 	// Updates DOM directly without React re-renders

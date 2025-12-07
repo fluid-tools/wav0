@@ -17,19 +17,13 @@ import {
 } from "@wav0/daw-react";
 import { computeLoopEndMs } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
-import { useEffect, useRef } from "react";
+import { useEffect, useEffectEvent } from "react";
 
 export function GlobalShortcuts() {
 	const daw = useDAWContext();
-	// Store daw in ref for stable access in event handlers
-	const dawRef = useRef(daw);
-	dawRef.current = daw;
-
-	// Helper to get current time directly from Transport (no React state subscription)
-	// Using ref pattern intentionally - this function reads from a ref
-	// and should NOT cause effect re-runs when daw changes
-	const getCurrentTimeRef = useRef(() => dawRef.current?.getTransport().getCurrentTime() ?? 0);
-	getCurrentTimeRef.current = () => dawRef.current?.getTransport().getCurrentTime() ?? 0;
+	const getCurrentTime = useEffectEvent(
+		() => daw?.getTransport().getCurrentTime() ?? 0,
+	);
 
 	const [timeline] = useAtom(timelineAtom);
 	const [tracks] = useAtom(tracksAtom);
@@ -51,8 +45,7 @@ export function GlobalShortcuts() {
 			// Ensure a track is selected
 			let trackId = selectedTrackId;
 			if (!trackId) {
-				// Prefer track with a clip under playhead, else first track
-				const t = getCurrentTimeRef.current();
+				const t = getCurrentTime();
 				const found = tracks.find((tr) =>
 					(tr.clips ?? []).some(
 						(c) =>
@@ -73,7 +66,7 @@ export function GlobalShortcuts() {
 				if (clips.length > 0) {
 					let clipId = selectedClipId;
 					if (!clipId) {
-						const t = getCurrentTimeRef.current();
+						const t = getCurrentTime();
 						const under = clips.find(
 							(c) =>
 								t >= c.startTime &&
@@ -154,7 +147,7 @@ export function GlobalShortcuts() {
 						.slice()
 						.sort((a, b) => a.startTime - b.startTime);
 					if (clips.length > 0) {
-						const t = getCurrentTimeRef.current();
+						const t = getCurrentTime();
 						const under = clips.find(
 							(c) =>
 								t >= c.startTime &&
@@ -211,7 +204,7 @@ export function GlobalShortcuts() {
 				} else if (e.altKey) {
 					const clipDur = Math.max(0, clip.trimEnd - clip.trimStart);
 					const oneShotEnd = clip.startTime + clipDur;
-					const loopEnd = Math.max(oneShotEnd, getCurrentTimeRef.current());
+					const loopEnd = Math.max(oneShotEnd, getCurrentTime());
 					updateClip(selectedTrackId, clip.id, { loop: true, loopEnd });
 				}
 				return;
@@ -240,7 +233,7 @@ export function GlobalShortcuts() {
 					let loopEnd = computeLoopEndMs(clip);
 					// If playhead is past computed loopEnd, extend to include current position
 					const clipDuration = clip.trimEnd - clip.trimStart;
-					const transportTime = getCurrentTimeRef.current();
+				const transportTime = getCurrentTime();
 					if (clipDuration > 0 && transportTime >= loopEnd) {
 						const pastEnd = transportTime - clip.startTime;
 						const cycles = Math.ceil(pastEnd / clipDuration);
@@ -255,12 +248,12 @@ export function GlobalShortcuts() {
 			const stepMs = timeline.gridSize || 500;
 			if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "ArrowRight") {
 				e.preventDefault();
-				setCurrentTime(Math.min(getCurrentTimeRef.current() + stepMs, totalDuration));
+				setCurrentTime(Math.min(getCurrentTime() + stepMs, totalDuration));
 				return;
 			}
 			if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "ArrowLeft") {
 				e.preventDefault();
-				setCurrentTime(Math.max(0, getCurrentTimeRef.current() - stepMs));
+				setCurrentTime(Math.max(0, getCurrentTime() - stepMs));
 				return;
 			}
 			if (
@@ -306,6 +299,7 @@ export function GlobalShortcuts() {
 	}, [
 		timeline.gridSize,
 		totalDuration,
+		getCurrentTime,
 		selectedTrackId,
 		selectedClipId,
 		tracks,

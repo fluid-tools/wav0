@@ -30,7 +30,7 @@ import {
 	ZoomIn,
 	ZoomOut,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	DAW_BUTTONS,
@@ -55,20 +55,20 @@ function DAWControls() {
 	const daw = useDAWContext();
 	const [displayTime, setDisplayTime] = useState(0);
 	const displayTimeRef = useRef(0);
+	const readTransportTime = useEffectEvent(
+		() => daw?.getTransport().getCurrentTime() ?? 0,
+	);
 
 	useEffect(() => {
 		if (!daw) return;
 
-		const transport = daw.getTransport();
-
 		// Initial sync
-		displayTimeRef.current = transport.getCurrentTime();
+		displayTimeRef.current = readTransportTime();
 		setDisplayTime(displayTimeRef.current);
 
 		// Update display at 10Hz (100ms) for non-critical time readout
 		const interval = setInterval(() => {
-			const newTime = transport.getCurrentTime();
-			// Only update React state if time changed significantly (>10ms)
+			const newTime = readTransportTime();
 			if (Math.abs(newTime - displayTimeRef.current) > 10) {
 				displayTimeRef.current = newTime;
 				setDisplayTime(newTime);
@@ -76,7 +76,7 @@ function DAWControls() {
 		}, 100);
 
 		return () => clearInterval(interval);
-	}, [daw]);
+	}, [daw, readTransportTime]);
 
 	// Selection and clip update atoms
 	const selectedTrackId = useAtomValue(selectedTrackIdAtom);

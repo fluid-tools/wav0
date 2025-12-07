@@ -50,11 +50,13 @@ export function DAWProvider({
 	// Track the last storage adapter to avoid redundant calls on every render
 	const lastStorageAdapterRef = useRef<StorageAdapter | undefined>(undefined);
 
-	// Set storage adapter only when it changes (avoid redundant calls on every render)
-	if (storageAdapter && storageAdapter !== lastStorageAdapterRef.current) {
+	// Set storage adapter only when it changes (avoid redundant calls on render)
+	useEffect(() => {
+		if (!storageAdapter) return;
+		if (storageAdapter === lastStorageAdapterRef.current) return;
 		setStorageAdapter(storageAdapter);
 		lastStorageAdapterRef.current = storageAdapter;
-	}
+	}, [storageAdapter]);
 
 	// Setup bridges and register them to service registry
 	useEffect(() => {
