@@ -1,0 +1,1 @@
+You have access to the browser. interact with the browser to get the information you need. including react-scan dialog for perf notes, etc.
