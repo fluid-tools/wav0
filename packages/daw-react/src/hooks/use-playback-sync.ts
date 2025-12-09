@@ -6,6 +6,7 @@
 
 "use client";
 
+import type { WritableAtom } from "jotai";
 import { useAtom } from "jotai";
 import { useEffect, useEffectEvent } from "react";
 import { useTransportEvents } from "./use-transport-events";
@@ -19,7 +20,7 @@ export interface PlaybackStateAtom {
 }
 
 interface UsePlaybackSyncOptions<T extends PlaybackStateAtom> {
-	playbackAtom: any; // Jotai atom for playback state
+	playbackAtom: WritableAtom<T, [T | ((prev: T) => T)], void>;
 	enabled?: boolean;
 }
 
@@ -32,6 +33,7 @@ export function usePlaybackSync<T extends PlaybackStateAtom>({
 	enabled = true,
 }: UsePlaybackSyncOptions<T>) {
 	const [playbackState, setPlaybackState] = useAtom<T, [T], void>(playbackAtom);
+	const lastTimeRef = useRef<number>(0);
 
 	// Non-reactive state change handler - always reads latest playbackState
 	const handleStateChange = useEffectEvent(
@@ -55,12 +57,16 @@ export function usePlaybackSync<T extends PlaybackStateAtom>({
 		if (!enabled) return;
 		// Read latest playbackState through closure
 		const latestState = playbackState;
-		if (latestState.isPlaying) {
-			setPlaybackState({
-				...latestState,
-				currentTime,
-			} as T);
-		}
+		if (!latestState.isPlaying) return;
+		if (Math.abs(latestState.currentTime - currentTime) < 0.5) return;
+		if (Math.abs(lastTimeRef.current - currentTime) < 0.5) return;
+
+		lastTimeRef.current = currentTime;
+
+		setPlaybackState({
+			...latestState,
+			currentTime,
+		} as T);
 	});
 
 	// Listen for time-update events from Transport (replaces setInterval polling)

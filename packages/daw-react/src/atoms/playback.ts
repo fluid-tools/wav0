@@ -55,8 +55,14 @@ function createGuardedTimeUpdateCallback(
 	let lastUpdateMs = 0;
 	let isFirstUpdate = true;
 	let isRestarting = false;
+	let setting = false;
 
 	return async (timeSeconds: number) => {
+		if (state.disposed || setting) return;
+		setting = true;
+		queueMicrotask(() => {
+			setting = false;
+		});
 		// Prevent re-entrancy during restart
 		if (isRestarting) return;
 
@@ -136,15 +142,7 @@ function createGuardedTimeUpdateCallback(
 			return;
 		}
 
-		// Only update atom if value changed meaningfully
-		if (Math.abs(newPlayback.currentTime - currentMs) >= 0.01) {
-			safeSet(
-				set,
-				playbackAtom,
-				{ ...newPlayback, currentTime: currentMs },
-				state,
-			);
-		}
+		// Skip continuous currentTime writes; use external sync hooks instead
 	};
 }
 
@@ -287,42 +285,42 @@ export const setCurrentTimeAtom = atom(
 
 		await playbackService.pause();
 
-		// Hoist callback creation to prevent accumulation on loop restarts
-		const restartPlaybackRef = {
-			current: null as (() => Promise<void>) | null,
-		};
+	// Hoist callback creation to prevent accumulation on loop restarts
+	const restartPlaybackRef = {
+		current: null as (() => Promise<void>) | null,
+	};
 
-		// Create callback once, reuse for all restarts
-		const guardedCallback = createGuardedTimeUpdateCallback(
-			get,
-			set,
-			() => {
-				return restartPlaybackRef.current?.() ?? Promise.resolve();
+	// Create callback once, reuse for all restarts
+	const guardedCallback = createGuardedTimeUpdateCallback(
+		get,
+		set,
+		() => {
+			return restartPlaybackRef.current?.() ?? Promise.resolve();
+		},
+		state,
+	);
+
+	// Create restart function for looping support
+	restartPlaybackRef.current = async () => {
+		const currentTracks = get(tracksAtom);
+		const loopRegion = get(loopRegionAtom);
+		const startMs = loopRegion.enabled ? loopRegion.startMs : 0;
+
+		await playbackService.pause();
+		await playbackService.play(currentTracks, {
+			startTime: startMs / 1000,
+			onTimeUpdate: guardedCallback,
+			onPlaybackEnd: () => {
+				const endState = get(playbackAtom);
+				safeSet(set, playbackAtom, { ...endState, isPlaying: false }, state);
 			},
-			state,
-		);
-
-		// Create restart function for looping support
-		restartPlaybackRef.current = async () => {
-			const currentTracks = get(tracksAtom);
-			const loopRegion = get(loopRegionAtom);
-			const startMs = loopRegion.enabled ? loopRegion.startMs : 0;
-
-			await playbackService.pause();
-			await playbackService.play(currentTracks, {
-				startTime: startMs / 1000,
-				onTimeUpdate: guardedCallback,
-				onPlaybackEnd: () => {
-					const endState = get(playbackAtom);
-					safeSet(set, playbackAtom, { ...endState, isPlaying: false }, state);
-				},
-			});
-		};
+		});
+	};
 
 		// Use the same callback for initial play
 		await playbackService.play(tracks, {
 			startTime: timeMs / 1000,
-			onTimeUpdate: guardedCallback,
+		onTimeUpdate: guardedCallback,
 			onPlaybackEnd: () => {
 				const endState = get(playbackAtom);
 				safeSet(set, playbackAtom, { ...endState, isPlaying: false }, state);

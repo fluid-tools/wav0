@@ -1,23 +1,51 @@
 "use client";
 
-import { serviceRegistry } from "@wav0/daw-react";
+import { isPlayingAtom, serviceRegistry } from "@wav0/daw-react";
 import { volume } from "@wav0/daw-sdk";
-import { useEffect, useState } from "react";
+import { useAtomValue } from "jotai";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 export function MasterMeter() {
+	const isPlaying = useAtomValue(isPlayingAtom);
 	const [db, setDb] = useState(Number.NEGATIVE_INFINITY);
+	const lastDbRef = useRef(Number.NEGATIVE_INFINITY);
 
 	useEffect(() => {
-		const interval = setInterval(() => {
+		let rafId: number | null = null;
+		let disposed = false;
+
+		if (!isPlaying) {
+			setDb(Number.NEGATIVE_INFINITY);
+			lastDbRef.current = Number.NEGATIVE_INFINITY;
+			return () => {
+				disposed = true;
+				if (rafId !== null) cancelAnimationFrame(rafId);
+			};
+		}
+
+		const tick = () => {
+			if (disposed) return;
 			const currentDb =
 				serviceRegistry.playbackService?.getMasterDb() ??
 				Number.NEGATIVE_INFINITY;
-			setDb(currentDb);
-		}, 50); // Update UI at 20Hz
 
-		return () => clearInterval(interval);
-	}, []);
+			// Avoid re-renders when value is effectively unchanged
+			if (Math.abs(currentDb - lastDbRef.current) > 0.25) {
+				lastDbRef.current = currentDb;
+				setDb(currentDb);
+			}
+
+			rafId = requestAnimationFrame(tick);
+		};
+
+		rafId = requestAnimationFrame(tick);
+
+		return () => {
+			disposed = true;
+			if (rafId !== null) cancelAnimationFrame(rafId);
+		};
+	}, [isPlaying]);
 
 	// Calculate fill percentage for visual bar
 	const minDb = -60;
@@ -31,7 +59,7 @@ export function MasterMeter() {
 		<div className="flex items-center gap-2 min-w-[120px]">
 			<div className="flex-1 h-6 bg-muted rounded-md overflow-hidden relative">
 				{/* LED segments */}
-				<div className="flex h-full gap-[1px]">
+				<div className="flex h-full gap-px">
 					{Array.from({ length: 20 }, (_, i) => ({
 						id: `meter-segment-${i}`,
 						index: i,
@@ -61,7 +89,7 @@ export function MasterMeter() {
 
 				{/* 0dB marker */}
 				<div
-					className="absolute top-0 bottom-0 w-[1px] bg-white/50"
+					className="absolute top-0 bottom-0 w-px bg-white/50"
 					style={{ left: `${((0 - minDb) / (maxDb - minDb)) * 100}%` }}
 				/>
 			</div>

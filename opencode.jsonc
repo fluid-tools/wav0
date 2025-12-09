@@ -29,6 +29,24 @@
             "environment": {
                 "NEXT_TELEMETRY_DISABLED": "1"
             }
+        },
+        "playwright": {
+            "type": "local",
+            "command": [
+                "bunx",
+                "@playwright/mcp@latest"
+            ],
+            "enabled": true
+        },
+        "convex": {
+            "type": "local",
+            "command": [
+                "bunx",
+                "-y",
+                "convex@latest",
+                "mcp",
+                "start"
+            ]
         }
     }
 }
