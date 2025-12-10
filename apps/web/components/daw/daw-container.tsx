@@ -20,7 +20,7 @@ import {
 	userIsManuallyScrollingAtom,
 	verticalScrollAtom,
 } from "@wav0/daw-react";
-import { useAtom, useStore } from "jotai";
+import { useAtom, useSetAtom, useStore } from "jotai";
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
@@ -59,27 +59,23 @@ export function DAWContainer() {
 	const [timelineWidth] = useAtom(timelineWidthAtom);
 	const [tracks] = useAtom(tracksAtom);
 	const [trackHeightZoom] = useAtom(trackHeightZoomAtom);
-	const [, addTrack] = useAtom(addTrackAtom);
-	const [, setHorizontalScroll] = useAtom(horizontalScrollAtom);
-	const [, setVerticalScroll] = useAtom(verticalScrollAtom);
+	const addTrack = useSetAtom(addTrackAtom);
+	const setHorizontalScroll = useSetAtom(horizontalScrollAtom);
+	const setVerticalScroll = useSetAtom(verticalScrollAtom);
 	const [isPlaying] = useAtom(isPlayingAtom);
 	const [_timeline] = useAtom(timelineAtom);
-	// Use timelineStaticMetricsAtom instead of timelineViewportAtom to avoid re-renders on currentTime changes
-	// (timelineViewportAtom includes playheadViewportPx which changes on every seek)
-	const [viewport] = useAtom(timelineStaticMetricsAtom);
+	// Don't subscribe to timelineStaticMetricsAtom - it includes horizontalScroll which changes on every scroll
+	// Use store.get() to read zoom directly in event handlers
 	// Use store.sub() instead of useAtom to avoid re-renders - value only used in refs
 	const isPlayheadDraggingRef = useRef(store.get(playheadDraggingAtom));
 	// #region agent log
 	fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-container.tsx:64',message:'isPlayheadDragging ref init',data:{isPlayheadDragging:isPlayheadDraggingRef.current},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1-FIX'})}).catch(()=>{});
 	// #endregion
-	const [, initializeAudioFromOPFS] = useAtom(initializeAudioFromOPFSAtom);
-	const [, setTimelineZoom] = useAtom(setTimelineZoomAtom);
-	const [userIsScrolling, setUserIsScrolling] = useAtom(
-		userIsManuallyScrollingAtom,
-	);
-	const [autoFollowEnabled, setAutoFollowEnabled] = useAtom(
-		playheadAutoFollowEnabledAtom,
-	);
+	const initializeAudioFromOPFS = useSetAtom(initializeAudioFromOPFSAtom);
+	const setTimelineZoom = useSetAtom(setTimelineZoomAtom);
+	// useSetAtom returns stable setter - no subscription, no re-renders on atom change
+	const setUserIsScrolling = useSetAtom(userIsManuallyScrollingAtom);
+	const setAutoFollowEnabled = useSetAtom(playheadAutoFollowEnabledAtom);
 
 	const timelineScrollRef = useRef<HTMLDivElement>(null);
 	const trackListScrollRef = useRef<HTMLDivElement>(null);
@@ -99,41 +95,38 @@ export function DAWContainer() {
 	const autoFollowStateRef = useRef({
 		isPlaying,
 		isPlayheadDragging: isPlayheadDraggingRef.current,
-		userIsScrolling,
-		autoFollowEnabled,
+		userIsScrolling: store.get(userIsManuallyScrollingAtom),
+		autoFollowEnabled: store.get(playheadAutoFollowEnabledAtom),
 	});
 
-	// Sync isPlayheadDragging via store.sub() to avoid re-renders
+	// Sync refs via store.sub() to avoid re-renders - these values only used in callbacks
 	useEffect(() => {
-		const unsubscribe = store.sub(playheadDraggingAtom, () => {
-			const value = store.get(playheadDraggingAtom);
-			isPlayheadDraggingRef.current = value;
-			autoFollowStateRef.current.isPlayheadDragging = value;
-			// #region agent log
-			fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-container.tsx:playheadDraggingSub',message:'playheadDragging changed via sub',data:{value},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1-FIX'})}).catch(()=>{});
-			// #endregion
-		});
-		return unsubscribe;
+		const unsubs = [
+			store.sub(playheadDraggingAtom, () => {
+				const value = store.get(playheadDraggingAtom);
+				isPlayheadDraggingRef.current = value;
+				autoFollowStateRef.current.isPlayheadDragging = value;
+			}),
+			store.sub(userIsManuallyScrollingAtom, () => {
+				autoFollowStateRef.current.userIsScrolling = store.get(userIsManuallyScrollingAtom);
+			}),
+			store.sub(playheadAutoFollowEnabledAtom, () => {
+				autoFollowStateRef.current.autoFollowEnabled = store.get(playheadAutoFollowEnabledAtom);
+			}),
+		];
+		return () => { for (const u of unsubs) u(); };
 	}, [store]);
 
+	// Only sync isPlaying via effect (still subscribed via useAtom for UI)
 	useEffect(() => {
-		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-container.tsx:autoFollowEffect',message:'autoFollowStateRef useEffect RAN',data:{isPlayheadDragging:isPlayheadDraggingRef.current,isPlaying,userIsScrolling,autoFollowEnabled},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
-		// #endregion
-		autoFollowStateRef.current = {
-			isPlaying,
-			isPlayheadDragging: isPlayheadDraggingRef.current,
-			userIsScrolling,
-			autoFollowEnabled,
-		};
-	}, [autoFollowEnabled, isPlaying, userIsScrolling]);
+		autoFollowStateRef.current.isPlaying = isPlaying;
+	}, [isPlaying]);
 
 	// Auto-scroll: subscribe to Transport time-update events directly (not playheadViewportAtom)
 	// playheadViewportAtom depends on playbackAtom.currentTime which doesn't update during playback
 	useEffect(() => {
 		if (!daw) return;
 		const transport = daw.getTransport();
-		const { pxPerMs } = store.get(timelineStaticMetricsAtom);
 
 		const handleTimeUpdate = (event: CustomEvent<{ currentTime: number }>) => {
 			const {
@@ -153,11 +146,13 @@ export function DAWContainer() {
 			const x = event.detail.currentTime * currentPxPerMs;
 			if (!Number.isFinite(x)) return;
 			const width = grid.clientWidth;
-			if (width <= 0) return;
+			if (width <= 100) return; // Skip if viewport too narrow
 			const left = controller.scrollLeft;
 
-			const bandLeft = left + width * 0.35;
-			const bandRight = left + width * 0.65;
+			// Use wider band margins for narrow viewports (20%-80% vs 35%-65%)
+			const marginRatio = width < 400 ? 0.2 : 0.35;
+			const bandLeft = left + width * marginRatio;
+			const bandRight = left + width * (1 - marginRatio);
 
 			if (x < bandLeft || x > bandRight) {
 				const target = Math.max(0, x - width * 0.5);
@@ -393,7 +388,8 @@ export function DAWContainer() {
 			event.preventDefault();
 			const delta = event.deltaY;
 			const zoomFactor = delta < 0 ? 1.1 : 0.9;
-			const { zoom } = viewport;
+			// Read zoom directly from store to avoid subscription re-renders
+			const { zoom } = store.get(timelineStaticMetricsAtom);
 			const clamped = Math.min(Math.max(zoom * zoomFactor, 0.05), 5);
 			setTimelineZoom(clamped);
 		};
@@ -440,7 +436,7 @@ export function DAWContainer() {
 				handleAutomationDragEnd,
 			);
 		};
-	}, [viewport, setTimelineZoom]);
+	}, [store, setTimelineZoom]);
 
 	useEffect(() => {
 		const preventTouchNav = (e: TouchEvent) => {

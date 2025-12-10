@@ -25,22 +25,29 @@ export type TimelineViewportMetrics = {
 	projectEndViewportPx: number;
 };
 
-// Static metrics (only changes on zoom/scroll, not during playback)
+// Zoom-only metrics (doesn't depend on scroll - only changes when zoom changes)
+export const timelineZoomMetricsAtom = atom((get) => {
+	const timeline = get(timelineAtom);
+	const pxPerMs = (DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * timeline.zoom) / 1000;
+	return {
+		pxPerMs: Number.isFinite(pxPerMs) ? pxPerMs : 0,
+		zoom: timeline.zoom,
+	};
+});
+
+// Static metrics (changes on zoom OR scroll, not during playback)
 export const timelineStaticMetricsAtom = atom<{
 	pxPerMs: number;
 	zoom: number;
 	horizontalScroll: number;
 }>((get) => {
-	const timeline = get(timelineAtom);
+	const { pxPerMs, zoom } = get(timelineZoomMetricsAtom);
 	const scroll = get(horizontalScrollAtom);
-
-	const pxPerMs = (DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * timeline.zoom) / 1000;
-	const clampedPxPerMs = Number.isFinite(pxPerMs) ? pxPerMs : 0;
 	const clampedScroll = Number.isFinite(scroll) ? scroll : 0;
 
 	return {
-		pxPerMs: clampedPxPerMs,
-		zoom: timeline.zoom,
+		pxPerMs,
+		zoom,
 		horizontalScroll: clampedScroll,
 	};
 });
@@ -82,9 +89,10 @@ export const timelineViewportAtom = atom<TimelineViewportMetrics>((get) => {
 	};
 });
 
+// Use timelineZoomMetricsAtom - only depends on zoom, not scroll
 export const timelineWidthAtom = atom((get) => {
 	const durationMs = get(totalDurationAtom);
-	const { pxPerMs, zoom } = get(timelineViewportAtom);
+	const { pxPerMs, zoom } = get(timelineZoomMetricsAtom);
 	const durationPx = durationMs * pxPerMs;
 	const paddingPx = DAW_PIXELS_PER_SECOND_AT_ZOOM_1 * zoom * 2;
 	return durationPx + paddingPx;
@@ -92,7 +100,7 @@ export const timelineWidthAtom = atom((get) => {
 
 export const projectEndPositionAtom = atom((get) => {
 	const durationMs = get(totalDurationAtom);
-	const { pxPerMs } = get(timelineViewportAtom);
+	const { pxPerMs } = get(timelineZoomMetricsAtom);
 	return durationMs * pxPerMs;
 });
 
