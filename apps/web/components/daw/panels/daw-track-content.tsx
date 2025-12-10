@@ -549,13 +549,17 @@ export function DAWTrackContent() {
 		? {
 				trackId: dragPreview.originalTrackId,
 				clipId: dragPreview.clipId,
-				startX: 0, // Not needed for commit logic
-				startY: 0,
+				startX: dragPreview.startX,
+				startY: dragPreview.startY,
 				startTime: dragPreview.originalStartTime,
 				originalTrackIndex: -1, // Computed during move
 				sourceTrackId: dragPreview.originalTrackId,
+				startScrollLeft: dragPreview.startScrollLeft,
 			}
 		: null;
+	// #region agent log
+	if(draggingClip&&dragPreview){fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-track-content.tsx:558',message:'derived draggingClip POST-FIX',data:{startX:draggingClip.startX,startScrollLeft:draggingClip.startScrollLeft,originalStartTime:dragPreview.originalStartTime},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A-startX-zero'})}).catch(()=>{});}
+	// #endregion
 
 	const [, setMoveHistory] = useAtom(clipMoveHistoryAtom);
 
@@ -760,12 +764,24 @@ export function DAWTrackContent() {
 				}
 
 				if (draggingClip) {
-					const deltaX = lastX - draggingClip.startX;
+					// Compensate for scroll changes during drag (read directly from scrollable)
+					const scrollable = containerRef.current?.closest(
+						'[data-daw-grid-scroll="true"]',
+					) as HTMLDivElement | null;
+					const currentScrollLeft = scrollable?.scrollLeft ?? scrollRef.current.left;
+					const scrollDelta = currentScrollLeft - draggingClip.startScrollLeft;
+					const deltaX = (lastX - draggingClip.startX) + scrollDelta;
+					// #region agent log
+					fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-track-content.tsx:762',message:'drag move POST-FIX',data:{lastX,startX:draggingClip.startX,scrollDelta,deltaX},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A-scroll-comp'})}).catch(()=>{});
+					// #endregion
 					const deltaTime = deltaX / pixelsPerMs;
 					let previewStartTime = Math.max(
 						0,
 						draggingClip.startTime + deltaTime,
 					);
+					// #region agent log
+					fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-track-content.tsx:770',message:'delta calc POST-FIX',data:{deltaX,deltaTime,previewStartTime,pixelsPerMs},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A-scroll-comp'})}).catch(()=>{});
+					// #endregion
 					if (timeline.snapToGrid) {
 						previewStartTime = snap(previewStartTime);
 					}
@@ -1138,6 +1154,14 @@ export function DAWTrackContent() {
 			offsetX: number;
 			offsetY: number;
 		}) => {
+			// Capture actual scroll position at drag start (read directly from DOM)
+			const scrollable = containerRef.current?.closest(
+				'[data-daw-grid-scroll="true"]',
+			) as HTMLDivElement | null;
+			const currentScrollLeft = scrollable?.scrollLeft ?? 0;
+			// #region agent log
+			fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-track-content.tsx:1150',message:'startClipDrag called',data:{startX:params.startX,startY:params.startY,startTime:params.startTime,startScrollLeft:currentScrollLeft},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A-scroll-comp'})}).catch(()=>{});
+			// #endregion
 			startClipDrag({
 				trackId: params.trackId,
 				clipId: params.clipId,
@@ -1147,6 +1171,7 @@ export function DAWTrackContent() {
 				originalTrackIndex: params.originalTrackIndex,
 				offsetX: params.offsetX,
 				offsetY: params.offsetY,
+				startScrollLeft: currentScrollLeft,
 			});
 		},
 		[startClipDrag],

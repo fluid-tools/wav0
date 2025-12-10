@@ -157,6 +157,8 @@ export const projectEndOverrideAtom = atomWithStorage<number | null>(
 export const playheadDraggingAtom = atom<boolean>(false);
 export const userIsManuallyScrollingAtom = atom<boolean>(false);
 export const playheadAutoFollowEnabledAtom = atom<boolean>(true);
+// Flag to suppress isPlaying sync during seek operations (prevents pause→play flicker)
+export const isSeekingAtom = atom<boolean>(false);
 
 // ===== Derived Atoms =====
 

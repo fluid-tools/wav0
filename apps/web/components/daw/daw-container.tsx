@@ -9,7 +9,6 @@ import {
 	playheadAutoFollowEnabledAtom,
 	playheadDraggingAtom,
 	setTimelineZoomAtom,
-	timelineAtom,
 	timelineStaticMetricsAtom,
 	timelineWidthAtom,
 	trackHeightZoomAtom,
@@ -20,7 +19,7 @@ import {
 	userIsManuallyScrollingAtom,
 	verticalScrollAtom,
 } from "@wav0/daw-react";
-import { useAtom, useSetAtom, useStore } from "jotai";
+import { useAtomValue, useSetAtom, useStore } from "jotai";
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
@@ -48,19 +47,31 @@ import { UnifiedPlayhead } from "./panels/unified-playhead";
 import { ClipMoveToastManager } from "./toast/clip-move-toast";
 
 export function DAWContainer() {
+	// #region agent log
+	fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-container.tsx:RENDER',message:'DAWContainer RENDER',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'F'})}).catch(()=>{});
+	// #endregion
 	useDAWAtomSync(playbackAtom, tracksAtom);
 	const { audio: audioBridge } = useBridges();
 	const daw = useDAWContext();
 
 	const store = useStore();
-	const [timelineWidth] = useAtom(timelineWidthAtom);
-	const [tracks] = useAtom(tracksAtom);
-	const [trackHeightZoom] = useAtom(trackHeightZoomAtom);
+	// #region agent log - track which atom causes re-renders
+	const timelineWidthVal = useAtomValue(timelineWidthAtom);
+	const tracksVal = useAtomValue(tracksAtom);
+	const trackHeightZoomVal = useAtomValue(trackHeightZoomAtom);
+	fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-container.tsx:ATOMS',message:'DAWContainer atom values',data:{timelineWidth:timelineWidthVal,tracksCount:tracksVal.length,trackHeightZoom:trackHeightZoomVal,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'G'})}).catch(()=>{});
+	// Alias for compatibility
+	const timelineWidth = timelineWidthVal;
+	const tracks = tracksVal;
+	const trackHeightZoom = trackHeightZoomVal;
+	// #endregion
 	const addTrack = useSetAtom(addTrackAtom);
 	const setHorizontalScroll = useSetAtom(horizontalScrollAtom);
 	const setVerticalScroll = useSetAtom(verticalScrollAtom);
-	const [isPlaying] = useAtom(isPlayingAtom);
-	const [_timeline] = useAtom(timelineAtom);
+	// Don't subscribe to isPlayingAtom - DAWContainer doesn't render based on it
+	// Only used in refs for auto-scroll logic - read from store when needed
+	const isPlayingRef = useRef(store.get(isPlayingAtom));
+	// REMOVED: const [_timeline] = useAtom(timelineAtom) - was unused, causing unnecessary re-renders
 	// Don't subscribe to timelineStaticMetricsAtom - it includes horizontalScroll which changes on every scroll
 	// Use store.get() to read zoom directly in event handlers
 	// Use store.sub() instead of useAtom to avoid re-renders - value only used in refs
@@ -88,11 +99,23 @@ export function DAWContainer() {
 	const scrollRef = useRef({ left: 0, top: 0 });
 	// Initialize with store.get() instead of reading other refs during render (React Compiler requirement)
 	const autoFollowStateRef = useRef({
-		isPlaying,
+		isPlaying: store.get(isPlayingAtom),
 		isPlayheadDragging: store.get(playheadDraggingAtom),
 		userIsScrolling: store.get(userIsManuallyScrollingAtom),
 		autoFollowEnabled: store.get(playheadAutoFollowEnabledAtom),
 	});
+
+	// Sync isPlaying ref via store.sub() - NO re-renders, just keep ref updated
+	useEffect(() => {
+		return store.sub(isPlayingAtom, () => {
+			const newVal = store.get(isPlayingAtom);
+			// #region agent log
+			fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-container.tsx:isPlayingAtom.sub',message:'isPlayingAtom subscription fired',data:{newVal,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H'})}).catch(()=>{});
+			// #endregion
+			isPlayingRef.current = newVal;
+			autoFollowStateRef.current.isPlaying = newVal;
+		});
+	}, [store]);
 
 	// Sync refs via store.sub() to avoid re-renders - these values only used in callbacks
 	useEffect(() => {
@@ -112,10 +135,7 @@ export function DAWContainer() {
 		return () => { for (const u of unsubs) u(); };
 	}, [store]);
 
-	// Only sync isPlaying via effect (still subscribed via useAtom for UI)
-	useEffect(() => {
-		autoFollowStateRef.current.isPlaying = isPlaying;
-	}, [isPlaying]);
+	// REMOVED: isPlaying sync effect - now handled in store.sub above
 
 	// Auto-scroll: subscribe to Transport time-update events directly (not playheadViewportAtom)
 	// playheadViewportAtom depends on playbackAtom.currentTime which doesn't update during playback

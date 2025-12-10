@@ -13,6 +13,7 @@ import type { PlaybackState, Track, TransportEvent } from "@wav0/daw-sdk";
 import type { WritableAtom } from "jotai";
 import { useSetAtom, useStore } from "jotai";
 import { useEffect, useEffectEvent, useRef } from "react";
+import { isSeekingAtom } from "../atoms/base";
 import { useDAWContext } from "../providers/daw-provider";
 
 /**
@@ -20,13 +21,20 @@ import { useDAWContext } from "../providers/daw-provider";
  * Updates isPlaying and currentTime based on SDK Transport state
  * Preserves other playback properties (bpm, duration, looping)
  */
-export function usePlaybackAtomSync<T extends { currentTime: number }>(
+export function usePlaybackAtomSync<
+	T extends { currentTime: number; isPlaying: boolean },
+>(
 	playbackAtom: WritableAtom<T, [T | ((prev: T) => T)], void>,
 ) {
 	const setPlayback = useSetAtom(playbackAtom);
 	const store = useStore();
 	const playbackRef = useRef(store.get(playbackAtom));
 	const disposedRef = useRef(false);
+	// Debounce timer for isPlaying changes - prevents re-renders during seek (pause→play cycle)
+	const isPlayingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
+		null,
+	);
+	const daw = useDAWContext();
 
 	useEffect(() => {
 		disposedRef.current = false;
@@ -37,30 +45,69 @@ export function usePlaybackAtomSync<T extends { currentTime: number }>(
 	useEffect(() => {
 		return () => {
 			disposedRef.current = true;
+			// Clean up debounce timer
+			if (isPlayingDebounceRef.current) {
+				clearTimeout(isPlayingDebounceRef.current);
+			}
 		};
 	}, []);
-	const daw = useDAWContext();
 
 	// Non-reactive event handler - always reads latest playback state
+	// Debounces isPlaying changes to prevent re-renders during rapid seek operations
 	const handleTransportEvent = useEffectEvent(
 		(event: CustomEvent<TransportEvent>) => {
 			const { state, currentTime } = event.detail;
+			const newIsPlaying = state === "playing";
+			const prevIsPlaying = playbackRef.current.isPlaying;
 
+			// #region agent log
+			fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-atom-sync.ts:handleTransportEvent',message:'Transport event received',data:{state,newIsPlaying,prevIsPlaying,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'I'})}).catch(()=>{});
+			// #endregion
+
+			// Update ref immediately (for other code that reads playbackRef)
 			const nextPlayback = {
 				...playbackRef.current,
-				isPlaying: state === "playing",
+				isPlaying: newIsPlaying,
 				currentTime,
 			};
 			playbackRef.current = nextPlayback;
+
 			if (disposedRef.current) return;
-			try {
-				setPlayback(nextPlayback);
-			} catch (error) {
-				if (!disposedRef.current) {
-					console.warn("[usePlaybackAtomSync] setPlayback failed", error);
-					disposedRef.current = true;
-				}
+
+			// If seeking, ignore Transport events (prevents pause→play re-renders)
+			const isSeeking = store.get(isSeekingAtom);
+			// #region agent log
+			fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-atom-sync.ts:seekingCheck',message:'Checking seeking flag',data:{isSeeking,state,newIsPlaying,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'J'})}).catch(()=>{});
+			// #endregion
+			if (isSeeking) return;
+
+			// If isPlaying didn't change, no need to update atom
+			if (newIsPlaying === prevIsPlaying) return;
+
+			// Clear any pending debounce
+			if (isPlayingDebounceRef.current) {
+				clearTimeout(isPlayingDebounceRef.current);
+				isPlayingDebounceRef.current = null;
 			}
+
+			// Debounce isPlaying changes by 30ms to filter out seek's pause→play cycle
+			isPlayingDebounceRef.current = setTimeout(() => {
+				// #region agent log
+				fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-atom-sync.ts:debounce-fire',message:'Debounce firing setPlayback',data:{isPlaying:playbackRef.current.isPlaying,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'I'})}).catch(()=>{});
+				// #endregion
+				isPlayingDebounceRef.current = null;
+				if (disposedRef.current) return;
+				// Re-read latest state after debounce period
+				const currentState = playbackRef.current;
+				try {
+					setPlayback(currentState);
+				} catch (error) {
+					if (!disposedRef.current) {
+						console.warn("[usePlaybackAtomSync] setPlayback failed", error);
+						disposedRef.current = true;
+					}
+				}
+			}, 30);
 		},
 	);
 

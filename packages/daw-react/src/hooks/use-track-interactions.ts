@@ -37,6 +37,7 @@ export type UseTrackInteractionsReturn = {
 		originalTrackIndex: number;
 		offsetX: number;
 		offsetY: number;
+		startScrollLeft: number;
 	}) => void;
 
 	startResize: (params: {
@@ -85,6 +86,7 @@ export function useTrackInteractions(): UseTrackInteractionsReturn {
 			originalTrackIndex: number;
 			offsetX: number;
 			offsetY: number;
+			startScrollLeft: number;
 		}) => {
 			send({ type: "START_CLIP_DRAG", ...params });
 		},

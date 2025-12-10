@@ -185,6 +185,9 @@ export const clipDragPreviewAtom = atom((get) => {
 		previewStartTime: context.previewStartTime,
 		cursorOffsetX: context.cursorOffsetX,
 		cursorOffsetY: context.cursorOffsetY,
+		startX: context.startX,
+		startY: context.startY,
+		startScrollLeft: context.startScrollLeft,
 	};
 });
 

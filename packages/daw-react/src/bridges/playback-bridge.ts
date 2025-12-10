@@ -78,16 +78,34 @@ export class PlaybackServiceBridge {
 		}
 
 		if (options?.onPlaybackEnd) {
+			// Use debounced handler to avoid false positives from internal stop→play cycles
+			// (e.g., transport.play() calls stop() before starting new playback)
+			let stopDebounce: ReturnType<typeof setTimeout> | null = null;
 			const handleStop = ((event: CustomEvent) => {
 				if (this.disposed) return;
 				if (event.detail.type === "stop") {
-					options.onPlaybackEnd?.();
+					// Debounce stop events - if play happens within 50ms, don't fire onPlaybackEnd
+					if (stopDebounce) clearTimeout(stopDebounce);
+					stopDebounce = setTimeout(() => {
+						stopDebounce = null;
+						// Only fire if we're still stopped (not playing again)
+						if (transport.getState() !== "playing") {
+							options.onPlaybackEnd?.();
+						}
+					}, 50);
+				} else if (event.detail.type === "play") {
+					// Cancel pending stop callback if play starts
+					if (stopDebounce) {
+						clearTimeout(stopDebounce);
+						stopDebounce = null;
+					}
 				}
 			}) as EventListener;
 			transport.addEventListener("transport", handleStop);
-			cleanupFns.push(() =>
-				transport.removeEventListener("transport", handleStop),
-			);
+			cleanupFns.push(() => {
+				if (stopDebounce) clearTimeout(stopDebounce);
+				transport.removeEventListener("transport", handleStop);
+			});
 		}
 
 		// Store cleanup for this playback session

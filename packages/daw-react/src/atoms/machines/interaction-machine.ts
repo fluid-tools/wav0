@@ -20,6 +20,7 @@ export type InteractionContext = {
 	previewStartTime: number;
 	cursorOffsetX: number;
 	cursorOffsetY: number;
+	startScrollLeft: number; // Scroll position at drag start for scroll compensation
 
 	// Resize specific
 	resizeType: "start" | "end" | null;
@@ -43,6 +44,7 @@ const initialContext: InteractionContext = {
 	previewStartTime: 0,
 	cursorOffsetX: 0,
 	cursorOffsetY: 0,
+	startScrollLeft: 0,
 	resizeType: null,
 	startTrimStart: 0,
 	startTrimEnd: 0,
@@ -61,6 +63,7 @@ export type InteractionEvent =
 			originalTrackIndex: number;
 			offsetX: number;
 			offsetY: number;
+			startScrollLeft: number;
 	  }
 	| {
 			type: "START_RESIZE";
@@ -115,6 +118,7 @@ export const interactionMachine = setup({
 						previewStartTime: ({ event }) => event.startTime,
 						cursorOffsetX: ({ event }) => event.offsetX,
 						cursorOffsetY: ({ event }) => event.offsetY,
+						startScrollLeft: ({ event }) => event.startScrollLeft,
 					}),
 				},
 				START_RESIZE: {

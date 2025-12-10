@@ -79,14 +79,19 @@ export function DAWProvider({
 		};
 	}, [daw]);
 
-	// Don't block render - allow children to mount even if DAW not ready
-	const contextValue: DAWContextValue | null = daw
-		? {
-				daw,
-				audioBridge: bridges.audio,
-				playbackBridge: bridges.playback,
-			}
-		: null;
+	// Memoize context value to prevent re-renders in consumers when provider re-renders
+	// Without this, all useContext(DAWContext) consumers re-render on every provider render
+	const contextValue = useMemo<DAWContextValue | null>(
+		() =>
+			daw
+				? {
+						daw,
+						audioBridge: bridges.audio,
+						playbackBridge: bridges.playback,
+					}
+				: null,
+		[daw, bridges.audio, bridges.playback],
+	);
 
 	return (
 		<DAWContext.Provider value={contextValue}>{children}</DAWContext.Provider>

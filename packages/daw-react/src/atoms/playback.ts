@@ -7,7 +7,12 @@
 
 import type { WritableAtom } from "jotai";
 import { atom, type Getter, type Setter } from "jotai";
-import { playbackAtom, totalDurationAtom, tracksAtom } from "./base";
+import {
+	isSeekingAtom,
+	playbackAtom,
+	totalDurationAtom,
+	tracksAtom,
+} from "./base";
 import { loopRegionAtom } from "./project";
 import { serviceRegistry } from "./service-registry";
 
@@ -269,7 +274,11 @@ export const setCurrentTimeAtom = atom(
 		const playbackService = serviceRegistry.playbackService;
 		const state = { disposed: false, label: "setCurrentTime" };
 
-		safeSet(set, playbackAtom, { ...playback, currentTime: timeMs }, state);
+		// Only update atom if NOT playing - during playback, Transport events handle state
+		// This prevents unnecessary re-renders during seek (pause→play cycle)
+		if (!playback.isPlaying) {
+			safeSet(set, playbackAtom, { ...playback, currentTime: timeMs }, state);
+		}
 
 		// If not playing, notify Transport via playback service seek
 		if (!playback.isPlaying) {
@@ -282,6 +291,12 @@ export const setCurrentTimeAtom = atom(
 		}
 
 		if (!playbackService) return;
+
+		// Set seeking flag to suppress isPlaying sync during pause→play cycle
+		set(isSeekingAtom, true);
+		// #region agent log
+		fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'playback.ts:setCurrentTimeAtom',message:'Set isSeekingAtom=true BEFORE pause',data:{timeMs,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'K'})}).catch(()=>{});
+		// #endregion
 
 		await playbackService.pause();
 
@@ -320,12 +335,18 @@ export const setCurrentTimeAtom = atom(
 		// Use the same callback for initial play
 		await playbackService.play(tracks, {
 			startTime: timeMs / 1000,
-		onTimeUpdate: guardedCallback,
+			onTimeUpdate: guardedCallback,
 			onPlaybackEnd: () => {
 				const endState = get(playbackAtom);
 				safeSet(set, playbackAtom, { ...endState, isPlaying: false }, state);
 			},
 		});
+
+		// Clear seeking flag after play starts
+		// #region agent log
+		fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'playback.ts:setCurrentTimeAtom',message:'Set isSeekingAtom=false AFTER play',data:{timeMs,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'L'})}).catch(()=>{});
+		// #endregion
+		set(isSeekingAtom, false);
 	},
 );
 
