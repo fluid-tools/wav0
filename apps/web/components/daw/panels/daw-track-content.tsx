@@ -823,6 +823,16 @@ export function DAWTrackContent() {
 		};
 
 		const onUp = async () => {
+			// Extract cleanup to avoid try/finally (React Compiler doesn't support finally)
+			const cleanup = () => {
+				sendDragEvent({ type: "DROP" });
+				lastPointer.current = null;
+				setResizingClip(null);
+				setDraggingClip(null);
+				setLoopDragging(null);
+				if (raf) cancelAnimationFrame(raf);
+			};
+
 			try {
 				if (dragPreview && draggingClip) {
 					let computedUpdated: Track[] | null = null;
@@ -1056,15 +1066,10 @@ export function DAWTrackContent() {
 						}
 					}
 				}
+				cleanup();
 			} catch (error) {
 				console.error("Error committing drag:", error);
-			} finally {
-				sendDragEvent({ type: "DROP" });
-				lastPointer.current = null;
-				setResizingClip(null);
-				setDraggingClip(null);
-				setLoopDragging(null);
-				if (raf) cancelAnimationFrame(raf);
+				cleanup();
 			}
 		};
 

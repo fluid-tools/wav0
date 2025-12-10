@@ -86,9 +86,10 @@ export function DAWContainer() {
 	const panLockRef = useRef(false);
 
 	const scrollRef = useRef({ left: 0, top: 0 });
+	// Initialize with store.get() instead of reading other refs during render (React Compiler requirement)
 	const autoFollowStateRef = useRef({
 		isPlaying,
-		isPlayheadDragging: isPlayheadDraggingRef.current,
+		isPlayheadDragging: store.get(playheadDraggingAtom),
 		userIsScrolling: store.get(userIsManuallyScrollingAtom),
 		autoFollowEnabled: store.get(playheadAutoFollowEnabledAtom),
 	});

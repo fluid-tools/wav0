@@ -56,8 +56,11 @@ export const UnifiedPlayhead = memo(function UnifiedPlayhead({
 	const playheadHandleRef = useRef<HTMLButtonElement>(null);
 
 	// Store current metrics in refs to avoid stale closures during drag
+	// Use useEffect to update refs (React Compiler requirement - no ref.current access during render)
 	const metricsRef = useRef({ pxPerMs, horizontalScroll, snapToGrid: timeline.snapToGrid });
-	metricsRef.current = { pxPerMs, horizontalScroll, snapToGrid: timeline.snapToGrid };
+	useEffect(() => {
+		metricsRef.current = { pxPerMs, horizontalScroll, snapToGrid: timeline.snapToGrid };
+	}, [pxPerMs, horizontalScroll, timeline.snapToGrid]);
 
 	const dragRef = useRef<{
 		active: boolean;
@@ -75,7 +78,9 @@ export const UnifiedPlayhead = memo(function UnifiedPlayhead({
 
 	const { snap } = useTimebase();
 	const snapRef = useRef(snap);
-	snapRef.current = snap;
+	useEffect(() => {
+		snapRef.current = snap;
+	}, [snap]);
 
 	// Direct DOM update function - bypasses React entirely
 	const updatePlayheadVisual = useCallback((timeMs: number) => {
