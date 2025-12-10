@@ -3,10 +3,11 @@
 import { isPlayingAtom, serviceRegistry } from "@wav0/daw-react";
 import { volume } from "@wav0/daw-sdk";
 import { useAtomValue } from "jotai";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
-export function MasterMeter() {
+// Memoized to prevent re-renders from parent - has its own update loop
+export const MasterMeter = memo(function MasterMeter() {
 	const isPlaying = useAtomValue(isPlayingAtom);
 	const [db, setDb] = useState(Number.NEGATIVE_INFINITY);
 	const lastDbRef = useRef(Number.NEGATIVE_INFINITY);
@@ -16,8 +17,11 @@ export function MasterMeter() {
 		let disposed = false;
 
 		if (!isPlaying) {
-			setDb(Number.NEGATIVE_INFINITY);
-			lastDbRef.current = Number.NEGATIVE_INFINITY;
+			// Only update if changed - prevents infinite loop under CPU throttle
+			if (lastDbRef.current !== Number.NEGATIVE_INFINITY) {
+				lastDbRef.current = Number.NEGATIVE_INFINITY;
+				setDb(Number.NEGATIVE_INFINITY);
+			}
 			return () => {
 				disposed = true;
 				if (rafId !== null) cancelAnimationFrame(rafId);
@@ -99,4 +103,4 @@ export function MasterMeter() {
 			</span>
 		</div>
 	);
-}
+});

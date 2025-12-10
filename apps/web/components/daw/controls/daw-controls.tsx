@@ -4,19 +4,17 @@ import {
 	isPlayingAtom,
 	selectedClipIdAtom,
 	selectedTrackIdAtom,
-	setCurrentTimeAtom,
 	setTimelineZoomAtom,
 	setTrackHeightZoomAtom,
 	stopPlaybackAtom,
 	timelineAtom,
 	togglePlaybackAtom,
-	totalDurationAtom,
 	trackHeightZoomAtom,
 	tracksAtom,
 	updateClipAtom,
 	useDAWContext,
 } from "@wav0/daw-react";
-import { computeLoopEndMs, time } from "@wav0/daw-sdk";
+import { computeLoopEndMs } from "@wav0/daw-sdk";
 import { useAtomValue, useSetAtom } from "jotai";
 import {
 	ChevronsUpDown,
@@ -30,7 +28,7 @@ import {
 	ZoomIn,
 	ZoomOut,
 } from "lucide-react";
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { memo } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	DAW_BUTTONS,
@@ -39,44 +37,18 @@ import {
 	DAW_TEXT,
 } from "@/lib/constants/daw-design";
 import { MasterMeter } from "./master-meter";
+import { TimeControls } from "./time-display";
 
-function DAWControls() {
+// Memoized to prevent re-renders from parent - state is now isolated in TimeControls
+const DAWControls = memo(function DAWControls() {
 	const isPlaying = useAtomValue(isPlayingAtom);
 	const timeline = useAtomValue(timelineAtom);
 	const trackHeightZoom = useAtomValue(trackHeightZoomAtom);
 	const togglePlayback = useSetAtom(togglePlaybackAtom);
 	const stopPlayback = useSetAtom(stopPlaybackAtom);
-	const setCurrentTime = useSetAtom(setCurrentTimeAtom);
 	const setTimelineZoom = useSetAtom(setTimelineZoomAtom);
 	const setTrackHeightZoom = useSetAtom(setTrackHeightZoomAtom);
-	const totalDuration = useAtomValue(totalDurationAtom);
-
-	// Throttled time display - polls Transport at 10Hz instead of subscribing to atom
 	const daw = useDAWContext();
-	const [displayTime, setDisplayTime] = useState(0);
-	const displayTimeRef = useRef(0);
-	const readTransportTime = useEffectEvent(
-		() => daw?.getTransport().getCurrentTime() ?? 0,
-	);
-
-	useEffect(() => {
-		if (!daw) return;
-
-		// Initial sync
-		displayTimeRef.current = readTransportTime();
-		setDisplayTime(displayTimeRef.current);
-
-		// Update display at 10Hz (100ms) for non-critical time readout
-		const interval = setInterval(() => {
-			const newTime = readTransportTime();
-			if (Math.abs(newTime - displayTimeRef.current) > 10) {
-				displayTimeRef.current = newTime;
-				setDisplayTime(newTime);
-			}
-		}, 100);
-
-		return () => clearInterval(interval);
-	}, [daw, readTransportTime]);
 
 	// Selection and clip update atoms
 	const selectedTrackId = useAtomValue(selectedTrackIdAtom);
@@ -92,12 +64,6 @@ function DAWControls() {
 		}
 	};
 
-	const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		const time = parseFloat(e.target.value);
-		// Clamp to project duration (don't allow past yellow marker)
-		const clampedTime = Math.min(Math.max(0, time), totalDuration);
-		setCurrentTime(clampedTime);
-	};
 
 	const handleZoomIn = () => {
 		setTimelineZoom(Math.min(timeline.zoom * 1.5, 4));
@@ -209,34 +175,8 @@ function DAWControls() {
 					</Button>
 				</div>
 
-				<div
-					className={`flex items-center gap-3 ${DAW_BUTTONS.PANEL} px-3 py-1.5`}
-				>
-					{/* Use deferred time for non-critical visual display */}
-					<span className={`${DAW_TEXT.MONO_TIME} min-w-14`}>
-						{time.formatDuration(displayTime)}
-					</span>
-					<div className="relative flex-1">
-						<input
-							type="range"
-							min={0}
-							max={totalDuration}
-							value={displayTime}
-							onChange={handleTimeChange}
-							className="w-48 h-1.5 bg-muted/50 rounded-full appearance-none cursor-pointer slider"
-							style={{
-								background: `linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) ${
-									(displayTime / totalDuration) * 100
-								}%, hsl(var(--muted)) ${
-									(displayTime / totalDuration) * 100
-								}%, hsl(var(--muted)) 100%)`,
-							}}
-						/>
-					</div>
-					<span className={`${DAW_TEXT.MONO_TIME} min-w-14`}>
-						{time.formatDuration(totalDuration)}
-					</span>
-				</div>
+				{/* Isolated time controls - updates at 10Hz without re-rendering parent */}
+				<TimeControls />
 			</div>
 
 			<div className="flex items-center gap-4">
@@ -341,6 +281,6 @@ function DAWControls() {
 			</div>
 		</div>
 	);
-}
+});
 
 export { DAWControls };
