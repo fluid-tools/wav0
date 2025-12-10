@@ -41,6 +41,9 @@ import {
 import { MasterMeter } from "./master-meter";
 
 function DAWControls() {
+	// #region agent log
+	fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-controls.tsx:DAWControls',message:'DAWControls RENDER',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H-TIMELINE'})}).catch(()=>{});
+	// #endregion
 	const isPlaying = useAtomValue(isPlayingAtom);
 	const timeline = useAtomValue(timelineAtom);
 	const trackHeightZoom = useAtomValue(trackHeightZoomAtom);

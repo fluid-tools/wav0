@@ -11,7 +11,7 @@ import {
 	playheadViewportAtom,
 	setTimelineZoomAtom,
 	timelineAtom,
-	timelineViewportAtom,
+	timelineStaticMetricsAtom,
 	timelineWidthAtom,
 	trackHeightZoomAtom,
 	tracksAtom,
@@ -48,6 +48,9 @@ import { UnifiedPlayhead } from "./panels/unified-playhead";
 import { ClipMoveToastManager } from "./toast/clip-move-toast";
 
 export function DAWContainer() {
+	// #region agent log
+	fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-container.tsx:DAWContainer',message:'DAWContainer RENDER',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
+	// #endregion
 	useDAWAtomSync(playbackAtom, tracksAtom);
 	const { audio: audioBridge } = useBridges();
 
@@ -60,8 +63,14 @@ export function DAWContainer() {
 	const [, setVerticalScroll] = useAtom(verticalScrollAtom);
 	const [isPlaying] = useAtom(isPlayingAtom);
 	const [_timeline] = useAtom(timelineAtom);
-	const [viewport] = useAtom(timelineViewportAtom);
-	const [isPlayheadDragging] = useAtom(playheadDraggingAtom);
+	// Use timelineStaticMetricsAtom instead of timelineViewportAtom to avoid re-renders on currentTime changes
+	// (timelineViewportAtom includes playheadViewportPx which changes on every seek)
+	const [viewport] = useAtom(timelineStaticMetricsAtom);
+	// Use store.sub() instead of useAtom to avoid re-renders - value only used in refs
+	const isPlayheadDraggingRef = useRef(store.get(playheadDraggingAtom));
+	// #region agent log
+	fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-container.tsx:64',message:'isPlayheadDragging ref init',data:{isPlayheadDragging:isPlayheadDraggingRef.current},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1-FIX'})}).catch(()=>{});
+	// #endregion
 	const [, initializeAudioFromOPFS] = useAtom(initializeAudioFromOPFSAtom);
 	const [, setTimelineZoom] = useAtom(setTimelineZoomAtom);
 	const [userIsScrolling, setUserIsScrolling] = useAtom(
@@ -91,19 +100,35 @@ const initialPlayheadViewport =
 const playheadViewportRef = useRef(initialPlayheadViewport);
 	const autoFollowStateRef = useRef({
 		isPlaying,
-		isPlayheadDragging,
+		isPlayheadDragging: isPlayheadDraggingRef.current,
 		userIsScrolling,
 		autoFollowEnabled,
 	});
 
+	// Sync isPlayheadDragging via store.sub() to avoid re-renders
 	useEffect(() => {
+		const unsubscribe = store.sub(playheadDraggingAtom, () => {
+			const value = store.get(playheadDraggingAtom);
+			isPlayheadDraggingRef.current = value;
+			autoFollowStateRef.current.isPlayheadDragging = value;
+			// #region agent log
+			fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-container.tsx:playheadDraggingSub',message:'playheadDragging changed via sub',data:{value},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1-FIX'})}).catch(()=>{});
+			// #endregion
+		});
+		return unsubscribe;
+	}, [store]);
+
+	useEffect(() => {
+		// #region agent log
+		fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-container.tsx:autoFollowEffect',message:'autoFollowStateRef useEffect RAN',data:{isPlayheadDragging:isPlayheadDraggingRef.current,isPlaying,userIsScrolling,autoFollowEnabled},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
+		// #endregion
 		autoFollowStateRef.current = {
 			isPlaying,
-			isPlayheadDragging,
+			isPlayheadDragging: isPlayheadDraggingRef.current,
 			userIsScrolling,
 			autoFollowEnabled,
 		};
-	}, [autoFollowEnabled, isPlayheadDragging, isPlaying, userIsScrolling]);
+	}, [autoFollowEnabled, isPlaying, userIsScrolling]);
 
 	useEffect(() => {
 		const unsubscribe = store.sub(playheadViewportAtom, () => {

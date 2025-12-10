@@ -261,22 +261,35 @@ export const UnifiedPlayhead = memo(function UnifiedPlayhead({
 					transform: "translateX(-12px)",
 					willChange: "transform",
 				}}
-				onPointerDown={(event) => {
-					event.preventDefault();
-					if (event.button !== 0) return;
+			onPointerDown={(event) => {
+				// #region agent log
+				const clickStart = performance.now();
+				fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'unified-playhead.tsx:onPointerDown',message:'CLICK START',data:{clickStart},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
+				// #endregion
+				event.preventDefault();
+				if (event.button !== 0) return;
 
-					// Initialize drag state
-					const state = dragRef.current;
-					state.active = true;
-					state.pointerId = event.pointerId;
-					state.lastMs = currentTimeRef.current;
-					state.pendingMs = currentTimeRef.current;
-					state.visualRaf = 0;
+				// Initialize drag state
+				const state = dragRef.current;
+				state.active = true;
+				state.pointerId = event.pointerId;
+				state.lastMs = currentTimeRef.current;
+				state.pendingMs = currentTimeRef.current;
+				state.visualRaf = 0;
 
-					setPlayheadDragging(true);
-					event.currentTarget.setPointerCapture?.(event.pointerId);
-					updateTime(event.clientX);
-				}}
+				// #region agent log
+				fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'unified-playhead.tsx:beforeSetDragging',message:'BEFORE setPlayheadDragging',data:{elapsed:performance.now()-clickStart},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
+				// #endregion
+				setPlayheadDragging(true);
+				// #region agent log
+				fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'unified-playhead.tsx:afterSetDragging',message:'AFTER setPlayheadDragging',data:{elapsed:performance.now()-clickStart},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
+				// #endregion
+				event.currentTarget.setPointerCapture?.(event.pointerId);
+				updateTime(event.clientX);
+				// #region agent log
+				fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'unified-playhead.tsx:handlerEnd',message:'HANDLER END',data:{elapsed:performance.now()-clickStart},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
+				// #endregion
+			}}
 				aria-label="Move playhead"
 			>
 				<span className="pointer-events-none absolute left-1/2 -translate-x-1/2 top-6 flex flex-col items-center">

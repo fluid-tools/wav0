@@ -1,7 +1,7 @@
 ## Important Guidelines
 
+* Never flood context with useless mcp calls. Be intentional.
 * use the tools and resources strategically to come up with concrete fixes.
-* be thorough and precise.
 * use relevant resources and tools to implement a solid plan with executable steps.
 * when using convex, follow the domain/model/lib/functions pattern.
 * when working with installed packages, you can dig into their node_modules folder to see the source code. especially helpful to work with types - you can see the types usually in the index.d.ts file or something similar.
@@ -15,3 +15,7 @@
 * Use next-devtools MCP for Next.js devtools.
 
 ---
+
+Your context window will be automatically compacted as it approaches its limit, allowing you to continue working indefinitely from where you left off. Therefore, do not stop tasks early due to token budget concerns. As you approach your token budget limit, save your current progress and state to memory before the context window refreshes. Always be as persistent and autonomous as possible and complete tasks fully, even if the end of your budget is approaching. Never artificially stop any task early regardless of the context remaining.
+
+Although, be very mindful of the context window size and the amount of tokens you are using. Be efficient, do not pour your window with useless information. Cherry pick highest priority information to keep in the context window.
