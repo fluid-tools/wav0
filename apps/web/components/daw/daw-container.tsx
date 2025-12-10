@@ -48,9 +48,6 @@ import { UnifiedPlayhead } from "./panels/unified-playhead";
 import { ClipMoveToastManager } from "./toast/clip-move-toast";
 
 export function DAWContainer() {
-	// #region agent log
-	fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-container.tsx:DAWContainer',message:'DAWContainer RENDER',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
-	// #endregion
 	useDAWAtomSync(playbackAtom, tracksAtom);
 	const { audio: audioBridge } = useBridges();
 	const daw = useDAWContext();
@@ -68,9 +65,6 @@ export function DAWContainer() {
 	// Use store.get() to read zoom directly in event handlers
 	// Use store.sub() instead of useAtom to avoid re-renders - value only used in refs
 	const isPlayheadDraggingRef = useRef(store.get(playheadDraggingAtom));
-	// #region agent log
-	fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-container.tsx:64',message:'isPlayheadDragging ref init',data:{isPlayheadDragging:isPlayheadDraggingRef.current},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1-FIX'})}).catch(()=>{});
-	// #endregion
 	const initializeAudioFromOPFS = useSetAtom(initializeAudioFromOPFSAtom);
 	const setTimelineZoom = useSetAtom(setTimelineZoomAtom);
 	// useSetAtom returns stable setter - no subscription, no re-renders on atom change

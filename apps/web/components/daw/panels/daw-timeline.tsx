@@ -20,9 +20,6 @@ import { TimelineGridCanvas } from "@/components/daw/panels/timeline-grid-canvas
 import { UnifiedOverlay } from "@/components/daw/unified-overlay";
 
 export function DAWTimeline() {
-	// #region agent log
-	fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-timeline.tsx:DAWTimeline',message:'DAWTimeline RENDER',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H-TIMELINE'})}).catch(()=>{});
-	// #endregion
 	const [timeline] = useAtom(timelineAtom);
 	const [, setCurrentTime] = useAtom(setCurrentTimeAtom);
 	const daw = useDAWContext();
@@ -86,16 +83,9 @@ export function DAWTimeline() {
 
 	const handleTimelineClick = useCallback(
 		async (e: React.MouseEvent | React.PointerEvent) => {
-			// #region agent log
-			const clickStart = performance.now();
-			fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-timeline.tsx:handleTimelineClick',message:'TIMELINE CLICK START',data:{clickStart},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H-TIMELINE'})}).catch(()=>{});
-			// #endregion
 			const timeMs = getTimeFromClientX(e.clientX);
 			if (timeMs === null) return;
 			await setCurrentTime(timeMs);
-			// #region agent log
-			fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-timeline.tsx:handleTimelineClick',message:'TIMELINE CLICK END',data:{elapsed:performance.now()-clickStart},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H-TIMELINE'})}).catch(()=>{});
-			// #endregion
 		},
 		[getTimeFromClientX, setCurrentTime],
 	);

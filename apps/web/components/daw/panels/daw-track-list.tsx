@@ -358,9 +358,6 @@ const TrackListRow = memo(function TrackListRow({
 
 // ===== Main DAWTrackList Component =====
 export function DAWTrackList() {
-	// #region agent log
-	fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-track-list.tsx:DAWTrackList',message:'DAWTrackList RENDER',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H-TIMELINE'})}).catch(()=>{});
-	// #endregion
 	const [tracks] = useAtom(tracksAtom);
 	const [selectedTrackId, setSelectedTrackId] = useAtom(selectedTrackIdAtom);
 	const [trackHeightZoom] = useAtom(trackHeightZoomAtom);
