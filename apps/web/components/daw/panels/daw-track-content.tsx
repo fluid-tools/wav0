@@ -3,8 +3,6 @@
 import {
 	activeToolAtom,
 	clipMoveHistoryAtom,
-	dragMachineAtom,
-	dragPreviewAtom,
 	isPlayingAtom,
 	loadAudioFileAtom,
 	projectEndPositionAtom,
@@ -20,6 +18,7 @@ import {
 	updateClipAtom,
 	updateTrackAtom,
 	useTimebase,
+	useTrackInteractions,
 } from "@wav0/daw-react";
 import type {
 	Clip,
@@ -530,36 +529,35 @@ export function DAWTrackContent() {
 	const [trackHeightZoom] = useAtom(trackHeightZoomAtom);
 	const [projectEndPosition] = useAtom(projectEndPositionAtom);
 	const [totalDuration] = useAtom(totalDurationAtom);
-	const [_dragMachineSnapshot, sendDragEvent] = useAtom(dragMachineAtom);
-	const dragPreview = useAtom(dragPreviewAtom)[0];
 	const { snap } = useTimebase();
-	const [resizingClip, setResizingClip] = useState<{
-		trackId: string;
-		clipId: string;
-		type: "start" | "end";
-		startX: number;
-		startTrimStart: number;
-		startTrimEnd: number;
-		startClipStartTime: number;
-	} | null>(null);
 
-	const [draggingClip, setDraggingClip] = useState<{
-		trackId: string;
-		clipId: string;
-		startX: number;
-		startY: number;
-		startTime: number;
-		originalTrackIndex: number;
-		sourceTrackId: string;
-	} | null>(null);
+	// Unified interaction state machine (replaces local useState)
+	const {
+		isActive: interactionActive,
+		clipDrag: dragPreview,
+		resize: resizingClip,
+		loopDrag: loopDragging,
+		startClipDrag,
+		startResize,
+		startLoopDrag,
+		move: sendInteractionMove,
+		commit: commitInteraction,
+	} = useTrackInteractions();
+
+	// Derived state for backwards compatibility
+	const draggingClip = dragPreview
+		? {
+				trackId: dragPreview.originalTrackId,
+				clipId: dragPreview.clipId,
+				startX: 0, // Not needed for commit logic
+				startY: 0,
+				startTime: dragPreview.originalStartTime,
+				originalTrackIndex: -1, // Computed during move
+				sourceTrackId: dragPreview.originalTrackId,
+			}
+		: null;
+
 	const [, setMoveHistory] = useAtom(clipMoveHistoryAtom);
-
-	const [loopDragging, setLoopDragging] = useState<{
-		trackId: string;
-		clipId: string;
-		startX: number;
-		startLoopEnd: number | undefined;
-	} | null>(null);
 
 	const containerRef = useRef<HTMLDivElement>(null);
 	const scrollRef = useRef<{ left: number; width: number }>({
@@ -683,9 +681,7 @@ export function DAWTrackContent() {
 		[pixelsPerMs, loadAudioFile],
 	);
 
-	const interactionActive = Boolean(
-		resizingClip || draggingClip || loopDragging,
-	);
+	// interactionActive is now from useTrackInteractions hook
 
 	useEffect(() => {
 		window.dispatchEvent(
@@ -791,8 +787,7 @@ export function DAWTrackContent() {
 					const previewTrackId =
 						tracks[newTrackIndex]?.id ?? draggingClip.trackId;
 
-					sendDragEvent({
-						type: "MOVE",
+					sendInteractionMove({
 						previewTrackId,
 						previewStartTime,
 					});
@@ -823,17 +818,14 @@ export function DAWTrackContent() {
 		};
 
 		const onUp = async () => {
-			// Extract cleanup to avoid try/finally (React Compiler doesn't support finally)
+			// Cleanup via state machine - no try/finally needed
 			const cleanup = () => {
-				sendDragEvent({ type: "DROP" });
+				commitInteraction(); // Machine resets to idle, clearing all state
 				lastPointer.current = null;
-				setResizingClip(null);
-				setDraggingClip(null);
-				setLoopDragging(null);
 				if (raf) cancelAnimationFrame(raf);
 			};
 
-			try {
+			// No try/catch needed - individual async ops have their own error handling
 				if (dragPreview && draggingClip) {
 					let computedUpdated: Track[] | null = null;
 					let computedClip: Clip | null = null;
@@ -1066,11 +1058,7 @@ export function DAWTrackContent() {
 						}
 					}
 				}
-				cleanup();
-			} catch (error) {
-				console.error("Error committing drag:", error);
-				cleanup();
-			}
+			cleanup();
 		};
 
 		const onCancel = onUp;
@@ -1100,7 +1088,8 @@ export function DAWTrackContent() {
 		isPlaying,
 		setTracks,
 		dragPreview,
-		sendDragEvent,
+		commitInteraction,
+		sendInteractionMove,
 		setMoveHistory,
 		snap,
 	]);
@@ -1149,25 +1138,18 @@ export function DAWTrackContent() {
 			offsetX: number;
 			offsetY: number;
 		}) => {
-			setDraggingClip({
+			startClipDrag({
 				trackId: params.trackId,
 				clipId: params.clipId,
 				startX: params.startX,
 				startY: params.startY,
 				startTime: params.startTime,
 				originalTrackIndex: params.originalTrackIndex,
-				sourceTrackId: params.sourceTrackId,
-			});
-			sendDragEvent({
-				type: "START_CLIP_DRAG",
-				clipId: params.clipId,
-				trackId: params.trackId,
-				startTime: params.startTime,
 				offsetX: params.offsetX,
 				offsetY: params.offsetY,
 			});
 		},
-		[sendDragEvent],
+		[startClipDrag],
 	);
 
 	const handleStartResize = useCallback(
@@ -1180,9 +1162,17 @@ export function DAWTrackContent() {
 			startTrimEnd: number;
 			startClipStartTime: number;
 		}) => {
-			setResizingClip(params);
+			startResize({
+				trackId: params.trackId,
+				clipId: params.clipId,
+				resizeType: params.type,
+				startX: params.startX,
+				startTrimStart: params.startTrimStart,
+				startTrimEnd: params.startTrimEnd,
+				startClipStartTime: params.startClipStartTime,
+			});
 		},
-		[],
+		[startResize],
 	);
 
 	const handleStartLoopDrag = useCallback(
@@ -1192,9 +1182,9 @@ export function DAWTrackContent() {
 			startX: number;
 			startLoopEnd: number | undefined;
 		}) => {
-			setLoopDragging(params);
+			startLoopDrag(params);
 		},
-		[],
+		[startLoopDrag],
 	);
 
 	const handleFadeChange = useCallback(

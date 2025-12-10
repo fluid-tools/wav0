@@ -25,6 +25,11 @@ import {
 	trackHeightZoomAtom,
 } from "./base";
 import { dragMachine } from "./machines/drag-machine";
+import {
+	type InteractionContext,
+	type InteractionState,
+	interactionMachine,
+} from "./machines/interaction-machine";
 
 export const setSelectedTrackAtom = atom(
 	null,
@@ -131,3 +136,95 @@ export const clipMoveHistoryAtom = atom<
 	}>
 >([]);
 
+/**
+ * Unified interaction state machine (replaces local useState in components)
+ * Handles: clip drag, clip resize, loop point drag
+ */
+export const interactionMachineAtom = atomWithMachine(() => interactionMachine);
+
+/**
+ * Current interaction state (idle, draggingClip, resizingClip, draggingLoop)
+ */
+export const interactionStateAtom = atom<InteractionState>((get) => {
+	const snapshot = get(interactionMachineAtom);
+	return snapshot.value as InteractionState;
+});
+
+/**
+ * Current interaction context (all data for current interaction)
+ */
+export const interactionContextAtom = atom<InteractionContext>((get) => {
+	const snapshot = get(interactionMachineAtom);
+	return snapshot.context;
+});
+
+/**
+ * Is any interaction currently active?
+ */
+export const isInteractionActiveAtom = atom<boolean>((get) => {
+	const state = get(interactionStateAtom);
+	return state !== "idle";
+});
+
+/**
+ * Clip drag preview (derived from interaction machine when dragging clip)
+ */
+export const clipDragPreviewAtom = atom((get) => {
+	const state = get(interactionStateAtom);
+	const context = get(interactionContextAtom);
+
+	if (state !== "draggingClip" || !context.clipId) {
+		return null;
+	}
+
+	return {
+		clipId: context.clipId,
+		originalTrackId: context.sourceTrackId ?? "",
+		originalStartTime: context.startTime,
+		previewTrackId: context.previewTrackId ?? "",
+		previewStartTime: context.previewStartTime,
+		cursorOffsetX: context.cursorOffsetX,
+		cursorOffsetY: context.cursorOffsetY,
+	};
+});
+
+/**
+ * Resize interaction data (derived from interaction machine when resizing)
+ */
+export const resizeInteractionAtom = atom((get) => {
+	const state = get(interactionStateAtom);
+	const context = get(interactionContextAtom);
+
+	if (state !== "resizingClip" || !context.clipId) {
+		return null;
+	}
+
+	return {
+		trackId: context.trackId ?? "",
+		clipId: context.clipId,
+		type: context.resizeType as "start" | "end",
+		startX: context.startX,
+		startTrimStart: context.startTrimStart,
+		startTrimEnd: context.startTrimEnd,
+		startClipStartTime: context.startClipStartTime,
+	};
+});
+
+/**
+ * Loop drag interaction data (derived from interaction machine when dragging loop)
+ */
+export const loopDragInteractionAtom = atom((get) => {
+	const state = get(interactionStateAtom);
+	const context = get(interactionContextAtom);
+
+	if (state !== "draggingLoop" || !context.clipId) {
+		return null;
+	}
+
+	return {
+		trackId: context.trackId ?? "",
+		clipId: context.clipId,
+		startX: context.startX,
+		startLoopEnd: context.startLoopEnd,
+	};
+});
