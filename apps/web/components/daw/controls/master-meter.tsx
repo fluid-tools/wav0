@@ -12,9 +12,6 @@ import { cn } from "@/lib/utils";
 
 // Memoized to prevent re-renders from parent - has its own update loop
 export const MasterMeter = memo(function MasterMeter() {
-	// #region agent log
-	fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'master-meter.tsx:RENDER',message:'MasterMeter RENDER',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
-	// #endregion
 	const isPlaying = useAtomValue(isPlayingAtom);
 	const [db, setDb] = useState(Number.NEGATIVE_INFINITY);
 	const lastDbRef = useRef(Number.NEGATIVE_INFINITY);

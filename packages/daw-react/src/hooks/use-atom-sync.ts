@@ -60,10 +60,6 @@ export function usePlaybackAtomSync<
 			const newIsPlaying = state === "playing";
 			const prevIsPlaying = playbackRef.current.isPlaying;
 
-			// #region agent log
-			fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-atom-sync.ts:handleTransportEvent',message:'Transport event received',data:{state,newIsPlaying,prevIsPlaying,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'I'})}).catch(()=>{});
-			// #endregion
-
 			// Update ref immediately (for other code that reads playbackRef)
 			const nextPlayback = {
 				...playbackRef.current,
@@ -76,9 +72,6 @@ export function usePlaybackAtomSync<
 
 			// If seeking, ignore Transport events (prevents pause→play re-renders)
 			const isSeeking = store.get(isSeekingAtom);
-			// #region agent log
-			fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-atom-sync.ts:seekingCheck',message:'Checking seeking flag',data:{isSeeking,state,newIsPlaying,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'J'})}).catch(()=>{});
-			// #endregion
 			if (isSeeking) return;
 
 			// If isPlaying didn't change, no need to update atom
@@ -92,9 +85,6 @@ export function usePlaybackAtomSync<
 
 			// Debounce isPlaying changes by 30ms to filter out seek's pause→play cycle
 			isPlayingDebounceRef.current = setTimeout(() => {
-				// #region agent log
-				fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-atom-sync.ts:debounce-fire',message:'Debounce firing setPlayback',data:{isPlaying:playbackRef.current.isPlaying,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'I'})}).catch(()=>{});
-				// #endregion
 				isPlayingDebounceRef.current = null;
 				if (disposedRef.current) return;
 				// Re-read latest state after debounce period

@@ -294,9 +294,6 @@ export const setCurrentTimeAtom = atom(
 
 		// Set seeking flag to suppress isPlaying sync during pause→play cycle
 		set(isSeekingAtom, true);
-		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'playback.ts:setCurrentTimeAtom',message:'Set isSeekingAtom=true BEFORE pause',data:{timeMs,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'K'})}).catch(()=>{});
-		// #endregion
 
 		await playbackService.pause();
 
@@ -343,9 +340,6 @@ export const setCurrentTimeAtom = atom(
 		});
 
 		// Clear seeking flag after play starts
-		// #region agent log
-		fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'playback.ts:setCurrentTimeAtom',message:'Set isSeekingAtom=false AFTER play',data:{timeMs,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'L'})}).catch(()=>{});
-		// #endregion
 		set(isSeekingAtom, false);
 	},
 );

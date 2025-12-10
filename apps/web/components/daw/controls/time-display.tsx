@@ -15,9 +15,6 @@ import { DAW_BUTTONS, DAW_TEXT } from "@/lib/constants/daw-design";
  * Prevents parent (DAWControls) from re-rendering on time updates
  */
 export const TimeControls = memo(function TimeControls() {
-	// #region agent log
-	fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'time-display.tsx:RENDER',message:'TimeControls RENDER',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
-	// #endregion
 	const daw = useDAWContext();
 	const [displayTime, setDisplayTime] = useState(0);
 	const displayTimeRef = useRef(0);

@@ -47,24 +47,14 @@ import { UnifiedPlayhead } from "./panels/unified-playhead";
 import { ClipMoveToastManager } from "./toast/clip-move-toast";
 
 export function DAWContainer() {
-	// #region agent log
-	fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-container.tsx:RENDER',message:'DAWContainer RENDER',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'F'})}).catch(()=>{});
-	// #endregion
 	useDAWAtomSync(playbackAtom, tracksAtom);
 	const { audio: audioBridge } = useBridges();
 	const daw = useDAWContext();
 
 	const store = useStore();
-	// #region agent log - track which atom causes re-renders
-	const timelineWidthVal = useAtomValue(timelineWidthAtom);
-	const tracksVal = useAtomValue(tracksAtom);
-	const trackHeightZoomVal = useAtomValue(trackHeightZoomAtom);
-	fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-container.tsx:ATOMS',message:'DAWContainer atom values',data:{timelineWidth:timelineWidthVal,tracksCount:tracksVal.length,trackHeightZoom:trackHeightZoomVal,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'G'})}).catch(()=>{});
-	// Alias for compatibility
-	const timelineWidth = timelineWidthVal;
-	const tracks = tracksVal;
-	const trackHeightZoom = trackHeightZoomVal;
-	// #endregion
+	const timelineWidth = useAtomValue(timelineWidthAtom);
+	const tracks = useAtomValue(tracksAtom);
+	const trackHeightZoom = useAtomValue(trackHeightZoomAtom);
 	const addTrack = useSetAtom(addTrackAtom);
 	const setHorizontalScroll = useSetAtom(horizontalScrollAtom);
 	const setVerticalScroll = useSetAtom(verticalScrollAtom);
@@ -109,9 +99,6 @@ export function DAWContainer() {
 	useEffect(() => {
 		return store.sub(isPlayingAtom, () => {
 			const newVal = store.get(isPlayingAtom);
-			// #region agent log
-			fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-container.tsx:isPlayingAtom.sub',message:'isPlayingAtom subscription fired',data:{newVal,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H'})}).catch(()=>{});
-			// #endregion
 			isPlayingRef.current = newVal;
 			autoFollowStateRef.current.isPlaying = newVal;
 		});
