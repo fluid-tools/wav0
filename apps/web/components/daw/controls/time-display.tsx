@@ -1,7 +1,11 @@
 "use client";
 
 import { setCurrentTimeAtom, totalDurationAtom, useDAWContext } from "@wav0/daw-react";
-import { time } from "@wav0/daw-sdk";
+import {
+	TIME_DISPLAY_CHANGE_THRESHOLD_MS,
+	TIME_DISPLAY_UPDATE_INTERVAL_MS,
+	time,
+} from "@wav0/daw-sdk";
 import { useAtomValue, useSetAtom } from "jotai";
 import { memo, useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
 import { DAW_BUTTONS, DAW_TEXT } from "@/lib/constants/daw-design";
@@ -14,34 +18,53 @@ export const TimeControls = memo(function TimeControls() {
 	const daw = useDAWContext();
 	const [displayTime, setDisplayTime] = useState(0);
 	const displayTimeRef = useRef(0);
+	const initializedRef = useRef(false);
+	const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 	const totalDuration = useAtomValue(totalDurationAtom);
 	const setCurrentTime = useSetAtom(setCurrentTimeAtom);
 
+	// useEffectEvent returns stable fn - do NOT include in deps
 	const readTransportTime = useEffectEvent(
 		() => daw?.getTransport().getCurrentTime() ?? 0,
 	);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: readTransportTime is from useEffectEvent - stable by design
 	useEffect(() => {
 		if (!daw) return;
 
-		// Initial sync - only update if value changed
-		const initialTime = readTransportTime();
-		if (Math.abs(initialTime - displayTimeRef.current) > 10) {
+		// Clear any existing interval to prevent stacking
+		if (intervalRef.current) {
+			clearInterval(intervalRef.current);
+			intervalRef.current = null;
+		}
+
+		// Sync on each daw instance change (initializedRef tracks per-instance init)
+		if (!initializedRef.current) {
+			initializedRef.current = true;
+			const initialTime = readTransportTime();
 			displayTimeRef.current = initialTime;
 			setDisplayTime(initialTime);
 		}
 
-		// Update at 10Hz (100ms) for non-critical time readout
-		const interval = setInterval(() => {
+		// Update at 10Hz (TIME_DISPLAY_UPDATE_INTERVAL_MS) - humans can't read faster
+		intervalRef.current = setInterval(() => {
 			const newTime = readTransportTime();
-			if (Math.abs(newTime - displayTimeRef.current) > 10) {
+			// Only update if change exceeds threshold (TIME_DISPLAY_CHANGE_THRESHOLD_MS)
+			if (Math.abs(newTime - displayTimeRef.current) > TIME_DISPLAY_CHANGE_THRESHOLD_MS) {
 				displayTimeRef.current = newTime;
 				setDisplayTime(newTime);
 			}
-		}, 100);
+		}, TIME_DISPLAY_UPDATE_INTERVAL_MS);
 
-		return () => clearInterval(interval);
-	}, [daw, readTransportTime]);
+		return () => {
+			if (intervalRef.current) {
+				clearInterval(intervalRef.current);
+				intervalRef.current = null;
+			}
+			// Reset flag so next daw instance triggers re-init
+			initializedRef.current = false;
+		};
+	}, [daw]);
 
 	const handleTimeChange = useCallback(
 		(e: React.ChangeEvent<HTMLInputElement>) => {

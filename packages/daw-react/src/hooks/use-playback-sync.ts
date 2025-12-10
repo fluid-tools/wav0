@@ -8,7 +8,7 @@
 
 import type { WritableAtom } from "jotai";
 import { useAtom } from "jotai";
-import { useEffect, useEffectEvent } from "react";
+import { useEffect, useEffectEvent, useRef } from "react";
 import { useTransportEvents } from "./use-transport-events";
 
 /**

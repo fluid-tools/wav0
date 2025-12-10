@@ -1,7 +1,11 @@
 "use client";
 
 import { isPlayingAtom, serviceRegistry } from "@wav0/daw-react";
-import { volume } from "@wav0/daw-sdk";
+import {
+	METER_DB_CHANGE_THRESHOLD,
+	METER_UPDATE_INTERVAL_MS,
+	volume,
+} from "@wav0/daw-sdk";
 import { useAtomValue } from "jotai";
 import { memo, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -11,43 +15,57 @@ export const MasterMeter = memo(function MasterMeter() {
 	const isPlaying = useAtomValue(isPlayingAtom);
 	const [db, setDb] = useState(Number.NEGATIVE_INFINITY);
 	const lastDbRef = useRef(Number.NEGATIVE_INFINITY);
+	const rafIdRef = useRef<number | null>(null);
+	const wasPlayingRef = useRef(false);
 
 	useEffect(() => {
-		let rafId: number | null = null;
-		let disposed = false;
+		// Cancel any existing RAF first
+		if (rafIdRef.current !== null) {
+			cancelAnimationFrame(rafIdRef.current);
+			rafIdRef.current = null;
+		}
 
 		if (!isPlaying) {
-			// Only update if changed - prevents infinite loop under CPU throttle
-			if (lastDbRef.current !== Number.NEGATIVE_INFINITY) {
+			// Only reset if we were previously playing - prevents loop
+			if (wasPlayingRef.current) {
+				wasPlayingRef.current = false;
 				lastDbRef.current = Number.NEGATIVE_INFINITY;
 				setDb(Number.NEGATIVE_INFINITY);
 			}
-			return () => {
-				disposed = true;
-				if (rafId !== null) cancelAnimationFrame(rafId);
-			};
+			return;
 		}
 
-		const tick = () => {
-			if (disposed) return;
+		wasPlayingRef.current = true;
+		let lastUpdateTime = 0;
+
+		const tick = (timestamp: number) => {
+			// Throttle to 30fps (METER_UPDATE_INTERVAL_MS) - industry standard for VU meters
+			if (timestamp - lastUpdateTime < METER_UPDATE_INTERVAL_MS) {
+				rafIdRef.current = requestAnimationFrame(tick);
+				return;
+			}
+			lastUpdateTime = timestamp;
+
 			const currentDb =
 				serviceRegistry.playbackService?.getMasterDb() ??
 				Number.NEGATIVE_INFINITY;
 
-			// Avoid re-renders when value is effectively unchanged
-			if (Math.abs(currentDb - lastDbRef.current) > 0.25) {
+			// Avoid re-renders when value is effectively unchanged (METER_DB_CHANGE_THRESHOLD)
+			if (Math.abs(currentDb - lastDbRef.current) > METER_DB_CHANGE_THRESHOLD) {
 				lastDbRef.current = currentDb;
 				setDb(currentDb);
 			}
 
-			rafId = requestAnimationFrame(tick);
+			rafIdRef.current = requestAnimationFrame(tick);
 		};
 
-		rafId = requestAnimationFrame(tick);
+		rafIdRef.current = requestAnimationFrame(tick);
 
 		return () => {
-			disposed = true;
-			if (rafId !== null) cancelAnimationFrame(rafId);
+			if (rafIdRef.current !== null) {
+				cancelAnimationFrame(rafIdRef.current);
+				rafIdRef.current = null;
+			}
 		};
 	}, [isPlaying]);
 
