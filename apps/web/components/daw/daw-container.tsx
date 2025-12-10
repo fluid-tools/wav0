@@ -8,7 +8,6 @@ import {
 	playbackAtom,
 	playheadAutoFollowEnabledAtom,
 	playheadDraggingAtom,
-	playheadViewportAtom,
 	setTimelineZoomAtom,
 	timelineAtom,
 	timelineStaticMetricsAtom,
@@ -17,6 +16,7 @@ import {
 	tracksAtom,
 	useBridges,
 	useDAWAtomSync,
+	useDAWContext,
 	userIsManuallyScrollingAtom,
 	verticalScrollAtom,
 } from "@wav0/daw-react";
@@ -53,6 +53,7 @@ export function DAWContainer() {
 	// #endregion
 	useDAWAtomSync(playbackAtom, tracksAtom);
 	const { audio: audioBridge } = useBridges();
+	const daw = useDAWContext();
 
 	const store = useStore();
 	const [timelineWidth] = useAtom(timelineWidthAtom);
@@ -95,9 +96,6 @@ export function DAWContainer() {
 	const panLockRef = useRef(false);
 
 	const scrollRef = useRef({ left: 0, top: 0 });
-const initialPlayheadViewport =
-	store.get(playheadViewportAtom) ?? { absolutePx: 0, viewportPx: 0, ms: 0 };
-const playheadViewportRef = useRef(initialPlayheadViewport);
 	const autoFollowStateRef = useRef({
 		isPlaying,
 		isPlayheadDragging: isPlayheadDraggingRef.current,
@@ -130,12 +128,14 @@ const playheadViewportRef = useRef(initialPlayheadViewport);
 		};
 	}, [autoFollowEnabled, isPlaying, userIsScrolling]);
 
+	// Auto-scroll: subscribe to Transport time-update events directly (not playheadViewportAtom)
+	// playheadViewportAtom depends on playbackAtom.currentTime which doesn't update during playback
 	useEffect(() => {
-		const unsubscribe = store.sub(playheadViewportAtom, () => {
-			const value = store.get(playheadViewportAtom);
-			if (!value) return;
-			playheadViewportRef.current = value;
+		if (!daw) return;
+		const transport = daw.getTransport();
+		const { pxPerMs } = store.get(timelineStaticMetricsAtom);
 
+		const handleTimeUpdate = (event: CustomEvent<{ currentTime: number }>) => {
 			const {
 				isPlaying: playing,
 				isPlayheadDragging: dragging,
@@ -149,7 +149,8 @@ const playheadViewportRef = useRef(initialPlayheadViewport);
 			const grid = trackGridScrollRef.current;
 			if (!controller || !grid) return;
 
-			const x = value.absolutePx;
+			const currentPxPerMs = store.get(timelineStaticMetricsAtom).pxPerMs;
+			const x = event.detail.currentTime * currentPxPerMs;
 			if (!Number.isFinite(x)) return;
 			const width = grid.clientWidth;
 			if (width <= 0) return;
@@ -163,10 +164,13 @@ const playheadViewportRef = useRef(initialPlayheadViewport);
 				if (Math.abs(target - controller.scrollLeft) < 0.5) return;
 				controller.setScroll(target, controller.scrollTop);
 			}
-		});
+		};
 
-		return unsubscribe;
-	}, [store]);
+		transport.addEventListener("time-update", handleTimeUpdate as EventListener);
+		return () => {
+			transport.removeEventListener("time-update", handleTimeUpdate as EventListener);
+		};
+	}, [daw, store]);
 
 	const scrollBatchRef = useRef<{
 		pending: boolean;
@@ -320,8 +324,11 @@ const playheadViewportRef = useRef(initialPlayheadViewport);
 
 				const controller = gridControllerRef.current;
 				const grid = trackGridScrollRef.current;
-				if (controller && grid) {
-					const x = playheadViewportRef.current?.absolutePx;
+				if (controller && grid && daw) {
+					// Get current playhead position directly from Transport
+					const currentTimeMs = daw.getTransport().getCurrentTime();
+					const { pxPerMs } = store.get(timelineStaticMetricsAtom);
+					const x = currentTimeMs * pxPerMs;
 					if (!Number.isFinite(x)) return;
 					const width = grid.clientWidth;
 					const viewportLeft = controller.scrollLeft;
@@ -338,6 +345,8 @@ const playheadViewportRef = useRef(initialPlayheadViewport);
 			batchScrollUpdate,
 			setUserIsScrolling,
 			setAutoFollowEnabled,
+			daw,
+			store,
 		],
 	);
 
