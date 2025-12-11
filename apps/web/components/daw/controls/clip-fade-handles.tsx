@@ -2,7 +2,7 @@
 
 import type { Clip } from "@wav0/daw-sdk";
 import { curves, time } from "@wav0/daw-sdk";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 type ClipFadeHandlesProps = {
@@ -38,90 +38,54 @@ export const ClipFadeHandles = memo(function ClipFadeHandles({
 	const clipDurationMs = clip.trimEnd - clip.trimStart;
 	const maxFadeMs = clipDurationMs / 2; // Max 50% of clip
 
-	const handleFadePointerDown = useCallback(
-		(fade: "fadeIn" | "fadeOut", e: React.PointerEvent) => {
-			e.stopPropagation();
-			e.preventDefault();
-			setDraggingFade(fade);
-			dragStartXRef.current = e.clientX;
+	const handleFadePointerDown = (fade: "fadeIn" | "fadeOut", e: React.PointerEvent) => {
+		e.stopPropagation();
+		e.preventDefault();
+		setDraggingFade(fade);
+		dragStartXRef.current = e.clientX;
 
-			// Start from the VISUAL value (enforcing minimum)
-			const actualValue = clip[fade] ?? 0;
-			const visualValue =
-				actualValue === 0 ? 0 : Math.max(actualValue, VISUAL_MIN_FADE_MS);
-			dragStartValueRef.current = visualValue;
+		const actualValue = clip[fade] ?? 0;
+		const visualValue = actualValue === 0 ? 0 : Math.max(actualValue, VISUAL_MIN_FADE_MS);
+		dragStartValueRef.current = visualValue;
 
-			(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+		window.dispatchEvent(new CustomEvent("wav0:grid-pan-lock", { detail: true }));
+	};
 
-			// Lock grid panning
-			window.dispatchEvent(
-				new CustomEvent("wav0:grid-pan-lock", { detail: true }),
-			);
-		},
-		[clip],
-	);
+	const handleFadePointerMove = (e: React.PointerEvent) => {
+		if (!draggingFade) return;
+		e.stopPropagation();
 
-	const handleFadePointerMove = useCallback(
-		(e: React.PointerEvent) => {
-			if (!draggingFade) return;
-			e.stopPropagation();
+		const deltaX = e.clientX - dragStartXRef.current;
+		const multiplier = e.shiftKey ? 0.1 : 1;
+		const deltaMs = (deltaX / pixelsPerMs) * multiplier;
 
-			const deltaX = e.clientX - dragStartXRef.current;
+		let newFadeMs = draggingFade === "fadeIn"
+			? dragStartValueRef.current + deltaMs
+			: dragStartValueRef.current - deltaMs;
 
-			// Fine-tuning: 10x slower when Shift is held
-			const multiplier = e.shiftKey ? 0.1 : 1;
-			const deltaMs = (deltaX / pixelsPerMs) * multiplier;
+		newFadeMs = Math.max(0, Math.min(newFadeMs, maxFadeMs));
 
-			let newFadeMs: number;
-			if (draggingFade === "fadeIn") {
-				newFadeMs = dragStartValueRef.current + deltaMs;
-			} else {
-				newFadeMs = dragStartValueRef.current - deltaMs;
-			}
+		if (newFadeMs > 0 && newFadeMs < VISUAL_MIN_FADE_MS) {
+			newFadeMs = newFadeMs <= SNAP_THRESHOLD_MS ? 0 : VISUAL_MIN_FADE_MS;
+		}
 
-			// Clamp to valid range first
-			newFadeMs = Math.max(0, Math.min(newFadeMs, maxFadeMs));
+		onFadeChange(clip.id, draggingFade, Math.round(newFadeMs));
+	};
 
-			// Enforce visual minimum: snap to 0 or VISUAL_MIN_FADE_MS
-			if (newFadeMs > 0 && newFadeMs < VISUAL_MIN_FADE_MS) {
-				// If very close to zero, snap to zero, otherwise enforce minimum
-				if (newFadeMs <= SNAP_THRESHOLD_MS) {
-					newFadeMs = 0;
-				} else {
-					// Enforce minimum: prevent any value between 0 and 500ms
-					newFadeMs = VISUAL_MIN_FADE_MS;
-				}
-			}
-
-			onFadeChange(clip.id, draggingFade, Math.round(newFadeMs));
-		},
-		[draggingFade, clip.id, pixelsPerMs, maxFadeMs, onFadeChange],
-	);
-
-	const handleFadePointerUp = useCallback((e: React.PointerEvent) => {
+	const handleFadePointerUp = (e: React.PointerEvent) => {
 		e.stopPropagation();
 		setDraggingFade(null);
 		(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+		window.dispatchEvent(new CustomEvent("wav0:grid-pan-lock", { detail: false }));
+	};
 
-		// Unlock grid panning
-		window.dispatchEvent(
-			new CustomEvent("wav0:grid-pan-lock", { detail: false }),
-		);
-	}, []);
-
-	// Double-click to reset/remove fade
-	const handleFadeDoubleClick = useCallback(
-		(fade: "fadeIn" | "fadeOut", e: React.MouseEvent) => {
-			e.stopPropagation();
-			const currentValue = clip[fade] ?? 0;
-
-			// If has fade, remove it; if no fade, add default
-			const newValue =
-				currentValue > 0 ? 0 : Math.min(DEFAULT_FADE_MS, maxFadeMs);
-			onFadeChange(clip.id, fade, newValue);
-		},
-		[clip, maxFadeMs, onFadeChange],
-	);
+	const handleFadeDoubleClick = (fade: "fadeIn" | "fadeOut", e: React.MouseEvent) => {
+		e.stopPropagation();
+		const currentValue = clip[fade] ?? 0;
+		const newValue = currentValue > 0 ? 0 : Math.min(DEFAULT_FADE_MS, maxFadeMs);
+		onFadeChange(clip.id, fade, newValue);
+	};
 
 	// Escape key to cancel drag
 	useEffect(() => {

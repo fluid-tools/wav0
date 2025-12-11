@@ -7,7 +7,7 @@ import {
 	time,
 } from "@wav0/daw-sdk";
 import { useAtomValue, useSetAtom } from "jotai";
-import { memo, useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
+import { memo, useEffect, useEffectEvent, useRef, useState } from "react";
 import { DAW_BUTTONS, DAW_TEXT } from "@/lib/constants/daw-design";
 
 /**
@@ -66,15 +66,12 @@ export const TimeControls = memo(function TimeControls() {
 		};
 	}, [daw]);
 
-	const handleTimeChange = useCallback(
-		(e: React.ChangeEvent<HTMLInputElement>) => {
-			const newTime = Number(e.target.value);
-			displayTimeRef.current = newTime;
-			setDisplayTime(newTime);
-			setCurrentTime(newTime);
-		},
-		[setCurrentTime],
-	);
+	const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const newTime = Number(e.target.value);
+		displayTimeRef.current = newTime;
+		setDisplayTime(newTime);
+		setCurrentTime(newTime);
+	};
 
 	const percentage = totalDuration > 0 ? (displayTime / totalDuration) * 100 : 0;
 

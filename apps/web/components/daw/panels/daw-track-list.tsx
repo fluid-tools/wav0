@@ -16,7 +16,7 @@ import type { AutomationType, Track } from "@wav0/daw-sdk";
 import { volume } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
 import { GripHorizontal, MoreVertical, Volume2, VolumeX } from "lucide-react";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import {
 	TrackContextMenu,
 	TrackMenuOptions,
@@ -100,59 +100,20 @@ const TrackListRow = memo(function TrackListRow({
 	const volumeLabel =
 		trackVolume <= 0 || track.muted ? "Muted" : volume.formatDb(dbValue);
 
-	// Create stable handlers that reference track.id
-	const handleSelect = useCallback(() => {
-		onSelect(track.id);
-	}, [onSelect, track.id]);
-
-	const handleStartEdit = useCallback(() => {
-		onStartEdit(track.id, track.name);
-	}, [onStartEdit, track.id, track.name]);
-
-	const handleFinishEdit = useCallback(() => {
-		onFinishEdit(track.id);
-	}, [onFinishEdit, track.id]);
-
-	const handleToggleMute = useCallback(() => {
-		onToggleMute(track.id, track.muted);
-	}, [onToggleMute, track.id, track.muted]);
-
-	const handleToggleSolo = useCallback(() => {
-		onToggleSolo(track.id, track.soloed);
-	}, [onToggleSolo, track.id, track.soloed]);
-
-	const handleVolumeChange = useCallback(
-		(e: React.ChangeEvent<HTMLInputElement>) => {
-			onVolumeChange(track.id, Number.parseInt(e.target.value, 10));
-		},
-		[onVolumeChange, track.id],
-	);
-
-	const handleSetVolumeDb = useCallback(
-		(db: number) => {
-			onSetVolumeDb(track.id, db);
-		},
-		[onSetVolumeDb, track.id],
-	);
-
-	const handleResetVolume = useCallback(() => {
-		onResetVolume(track.id);
-	}, [onResetVolume, track.id]);
-
-	const handleDeleteTrack = useCallback(() => {
-		onDeleteTrack(track.id);
-	}, [onDeleteTrack, track.id]);
-
-	const handleRequestRename = useCallback(() => {
-		onStartEdit(track.id, track.name);
-	}, [onStartEdit, track.id, track.name]);
-
-	const handleAutomationTypeChange = useCallback(
-		(value: AutomationType) => {
-			onAutomationTypeChange(track.id, value);
-		},
-		[onAutomationTypeChange, track.id],
-	);
+	// Handlers - compiler handles memoization
+	const handleSelect = () => onSelect(track.id);
+	const handleStartEdit = () => onStartEdit(track.id, track.name);
+	const handleFinishEdit = () => onFinishEdit(track.id);
+	const handleToggleMute = () => onToggleMute(track.id, track.muted);
+	const handleToggleSolo = () => onToggleSolo(track.id, track.soloed);
+	const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) =>
+		onVolumeChange(track.id, Number.parseInt(e.target.value, 10));
+	const handleSetVolumeDb = (db: number) => onSetVolumeDb(track.id, db);
+	const handleResetVolume = () => onResetVolume(track.id);
+	const handleDeleteTrack = () => onDeleteTrack(track.id);
+	const handleRequestRename = () => onStartEdit(track.id, track.name);
+	const handleAutomationTypeChange = (value: AutomationType) =>
+		onAutomationTypeChange(track.id, value);
 
 	return (
 		<TrackContextMenu
@@ -386,133 +347,76 @@ export function DAWTrackList() {
 	// Compute track height once
 	const trackHeight = Math.round(DAW_HEIGHTS.TRACK_ROW * trackHeightZoom);
 
-	// ===== Stable Callbacks =====
-	const handleSelect = useCallback(
-		(trackId: string) => {
-			setSelectedTrackId(trackId);
-		},
-		[setSelectedTrackId],
-	);
+	// Handlers - compiler handles memoization
+	const handleSelect = (trackId: string) => setSelectedTrackId(trackId);
 
-	const handleStartEdit = useCallback((trackId: string, name: string) => {
+	const handleStartEdit = (trackId: string, name: string) => {
 		setEditingTrackId(trackId);
 		setEditingTrackName(name);
-	}, []);
+	};
 
-	const handleFinishEdit = useCallback(
-		(trackId: string) => {
-			if (editingTrackName.trim()) {
-				updateTrack(trackId, { name: editingTrackName.trim() });
-			}
-			setEditingTrackId(null);
-			setEditingTrackName("");
-		},
-		[editingTrackName, updateTrack],
-	);
-
-	const handleCancelEdit = useCallback(() => {
+	const handleFinishEdit = (trackId: string) => {
+		if (editingTrackName.trim()) {
+			updateTrack(trackId, { name: editingTrackName.trim() });
+		}
 		setEditingTrackId(null);
 		setEditingTrackName("");
-	}, []);
+	};
 
-	const handleEditNameChange = useCallback((name: string) => {
-		setEditingTrackName(name);
-	}, []);
+	const handleCancelEdit = () => {
+		setEditingTrackId(null);
+		setEditingTrackName("");
+	};
 
-	const handleToggleMute = useCallback(
-		(trackId: string, _currentMuted: boolean) => {
-			updateTrack(trackId, { muted: !_currentMuted });
-		},
-		[updateTrack],
-	);
+	const handleEditNameChange = (name: string) => setEditingTrackName(name);
 
-	const handleToggleSolo = useCallback(
-		(trackId: string, currentSoloed: boolean) => {
-			updateTrack(trackId, { soloed: !currentSoloed });
-		},
-		[updateTrack],
-	);
+	const handleToggleMute = (trackId: string, _currentMuted: boolean) =>
+		updateTrack(trackId, { muted: !_currentMuted });
 
-	const handleVolumeChange = useCallback(
-		(trackId: string, volumePercent: number) => {
-			const volumeDb = volume.volumeToDb(volumePercent);
-			updateTrack(trackId, { volume: volumePercent, volumeDb });
+	const handleToggleSolo = (trackId: string, currentSoloed: boolean) =>
+		updateTrack(trackId, { soloed: !currentSoloed });
 
-			// If playing, use realtime update to avoid disrupting automation
-			// Read from ref to avoid callback recreation on play/pause state changes
-			if (isPlayingRef.current && serviceRegistry.playbackService) {
-				serviceRegistry.playbackService.updateTrackVolumeRealtime(
-					trackId,
-					volumeDb,
-				);
-			}
-		},
-		[updateTrack],
-	);
+	const handleVolumeChange = (trackId: string, volumePercent: number) => {
+		const volumeDb = volume.volumeToDb(volumePercent);
+		updateTrack(trackId, { volume: volumePercent, volumeDb });
+		if (isPlayingRef.current && serviceRegistry.playbackService) {
+			serviceRegistry.playbackService.updateTrackVolumeRealtime(trackId, volumeDb);
+		}
+	};
 
-	const handleSetVolumeDb = useCallback(
-		(trackId: string, db: number) => {
-			const volumeValue = volume.dbToVolume(db);
-			updateTrack(trackId, {
-				volume: volumeValue,
-				muted: volumeValue <= 0,
-			});
-		},
-		[updateTrack],
-	);
+	const handleSetVolumeDb = (trackId: string, db: number) => {
+		const volumeValue = volume.dbToVolume(db);
+		updateTrack(trackId, { volume: volumeValue, muted: volumeValue <= 0 });
+	};
 
-	const handleResetVolume = useCallback(
-		(trackId: string) => {
-			const volumeValue = volume.dbToVolume(0);
-			updateTrack(trackId, { volume: volumeValue });
-		},
-		[updateTrack],
-	);
+	const handleResetVolume = (trackId: string) => {
+		const volumeValue = volume.dbToVolume(0);
+		updateTrack(trackId, { volume: volumeValue });
+	};
 
-	const handleDeleteTrack = useCallback(
-		(trackId: string) => {
-			removeTrack(trackId);
-		},
-		[removeTrack],
-	);
+	const handleDeleteTrack = (trackId: string) => removeTrack(trackId);
 
-	const handleAutomationTypeChange = useCallback(
-		(trackId: string, type: AutomationType) => {
-			const newMap = new Map(trackAutomationTypes);
-			newMap.set(trackId, type);
-			setTrackAutomationTypes(newMap);
-		},
-		[trackAutomationTypes, setTrackAutomationTypes],
-	);
+	const handleAutomationTypeChange = (trackId: string, type: AutomationType) => {
+		const newMap = new Map(trackAutomationTypes);
+		newMap.set(trackId, type);
+		setTrackAutomationTypes(newMap);
+	};
 
-	const handleResizeStart = useCallback(
-		(e: React.MouseEvent) => {
-			e.preventDefault();
-			e.stopPropagation();
-			setResizingTrack({
-				startY: e.clientY,
-				startZoom: trackHeightZoom,
-			});
-		},
-		[trackHeightZoom],
-	);
+	const handleResizeStart = (e: React.MouseEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+		setResizingTrack({ startY: e.clientY, startZoom: trackHeightZoom });
+	};
 
-	const handleResizeMove = useCallback(
-		(e: MouseEvent) => {
-			if (!resizingTrack) return;
+	const handleResizeMove = (e: MouseEvent) => {
+		if (!resizingTrack) return;
+		const deltaY = e.clientY - resizingTrack.startY;
+		const deltaZoom = deltaY / DAW_HEIGHTS.TRACK_ROW;
+		const newZoom = resizingTrack.startZoom + deltaZoom;
+		setTrackHeightZoom(newZoom);
+	};
 
-			const deltaY = e.clientY - resizingTrack.startY;
-			const deltaZoom = deltaY / DAW_HEIGHTS.TRACK_ROW;
-			const newZoom = resizingTrack.startZoom + deltaZoom;
-
-			setTrackHeightZoom(newZoom);
-		},
-		[resizingTrack, setTrackHeightZoom],
-	);
-
-	const handleResizeEnd = useCallback(() => {
-		setResizingTrack(null);
-	}, []);
+	const handleResizeEnd = () => setResizingTrack(null);
 
 	// Attach global mouse events for resizing
 	useEffect(() => {

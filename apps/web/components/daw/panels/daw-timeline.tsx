@@ -14,7 +14,7 @@ import {
 } from "@wav0/daw-react";
 import { time } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
-import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { MarkerTrack } from "@/components/daw/panels/marker-track";
 import { TimelineGridCanvas } from "@/components/daw/panels/timeline-grid-canvas";
 import { UnifiedOverlay } from "@/components/daw/unified-overlay";
@@ -38,37 +38,26 @@ export function DAWTimeline() {
 	const [, addMarker] = useAtom(addMarkerAtom);
 	const { snap } = useTimebase();
 
-	const getTimeFromClientX = useCallback(
-		(clientX: number) => {
-			if (pxPerMs <= 0) return null;
-			const scrollContainer = document.querySelector('[data-daw-timeline-scroll="true"]') as
-				| HTMLElement
-				| null;
-			if (!scrollContainer) return null;
+	const getTimeFromClientX = (clientX: number) => {
+		if (pxPerMs <= 0) return null;
+		const scrollContainer = document.querySelector('[data-daw-timeline-scroll="true"]') as HTMLElement | null;
+		if (!scrollContainer) return null;
 
-			const rect = scrollContainer.getBoundingClientRect();
-			const viewportX = Math.max(0, clientX - rect.left);
-			if (!Number.isFinite(viewportX)) return null;
+		const rect = scrollContainer.getBoundingClientRect();
+		const viewportX = Math.max(0, clientX - rect.left);
+		if (!Number.isFinite(viewportX)) return null;
 
-			const rawMs = Math.max(
-				0,
-				time.pixelToTime(viewportX, pxPerMs, scrollContainer.scrollLeft),
-			);
-			return timeline.snapToGrid ? snap(rawMs) : rawMs;
-		},
-		[pxPerMs, snap, timeline.snapToGrid],
-	);
+		const rawMs = Math.max(0, time.pixelToTime(viewportX, pxPerMs, scrollContainer.scrollLeft));
+		return timeline.snapToGrid ? snap(rawMs) : rawMs;
+	};
 
-	const onMouseMove = useCallback(
-		(e: MouseEvent) => {
-			if (!isDraggingEnd || !containerRef.current) return;
-			const rect = containerRef.current.getBoundingClientRect();
-			const x = e.clientX - rect.left;
-			const ms = Math.max(0, Math.round(x / pxPerMs));
-			setProjectEndOverride(ms);
-		},
-		[isDraggingEnd, pxPerMs, setProjectEndOverride],
-	);
+	const onMouseMove = (e: MouseEvent) => {
+		if (!isDraggingEnd || !containerRef.current) return;
+		const rect = containerRef.current.getBoundingClientRect();
+		const x = e.clientX - rect.left;
+		const ms = Math.max(0, Math.round(x / pxPerMs));
+		setProjectEndOverride(ms);
+	};
 
 	useEffect(() => {
 		if (!isDraggingEnd) return;
@@ -81,14 +70,11 @@ export function DAWTimeline() {
 		};
 	}, [isDraggingEnd, onMouseMove]);
 
-	const handleTimelineClick = useCallback(
-		async (e: React.MouseEvent | React.PointerEvent) => {
-			const timeMs = getTimeFromClientX(e.clientX);
-			if (timeMs === null) return;
-			await setCurrentTime(timeMs);
-		},
-		[getTimeFromClientX, setCurrentTime],
-	);
+	const handleTimelineClick = async (e: React.MouseEvent | React.PointerEvent) => {
+		const timeMs = getTimeFromClientX(e.clientX);
+		if (timeMs === null) return;
+		await setCurrentTime(timeMs);
+	};
 
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {

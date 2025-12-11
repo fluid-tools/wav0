@@ -6,7 +6,6 @@
 "use client";
 
 import { useAtom, useAtomValue } from "jotai";
-import { useCallback } from "react";
 import type { InteractionState } from "../atoms/machines/interaction-machine";
 import {
 	clipDragPreviewAtom,
@@ -76,69 +75,57 @@ export function useTrackInteractions(): UseTrackInteractionsReturn {
 	const resize = useAtomValue(resizeInteractionAtom);
 	const loopDrag = useAtomValue(loopDragInteractionAtom);
 
-	const startClipDrag = useCallback(
-		(params: {
-			trackId: string;
-			clipId: string;
-			startX: number;
-			startY: number;
-			startTime: number;
-			originalTrackIndex: number;
-			offsetX: number;
-			offsetY: number;
-			startScrollLeft: number;
-		}) => {
-			send({ type: "START_CLIP_DRAG", ...params });
-		},
-		[send],
-	);
+	const startClipDrag = (params: {
+		trackId: string;
+		clipId: string;
+		startX: number;
+		startY: number;
+		startTime: number;
+		originalTrackIndex: number;
+		offsetX: number;
+		offsetY: number;
+		startScrollLeft: number;
+	}) => {
+		send({ type: "START_CLIP_DRAG", ...params });
+	};
 
-	const startResize = useCallback(
-		(params: {
-			trackId: string;
-			clipId: string;
-			resizeType: "start" | "end";
-			startX: number;
-			startTrimStart: number;
-			startTrimEnd: number;
-			startClipStartTime: number;
-		}) => {
-			send({ type: "START_RESIZE", ...params });
-		},
-		[send],
-	);
+	const startResize = (params: {
+		trackId: string;
+		clipId: string;
+		resizeType: "start" | "end";
+		startX: number;
+		startTrimStart: number;
+		startTrimEnd: number;
+		startClipStartTime: number;
+	}) => {
+		send({ type: "START_RESIZE", ...params });
+	};
 
-	const startLoopDrag = useCallback(
-		(params: {
-			trackId: string;
-			clipId: string;
-			startX: number;
-			startLoopEnd: number | undefined;
-		}) => {
-			send({ type: "START_LOOP_DRAG", ...params });
-		},
-		[send],
-	);
+	const startLoopDrag = (params: {
+		trackId: string;
+		clipId: string;
+		startX: number;
+		startLoopEnd: number | undefined;
+	}) => {
+		send({ type: "START_LOOP_DRAG", ...params });
+	};
 
-	const move = useCallback(
-		(params: {
-			previewTrackId?: string;
-			previewStartTime?: number;
-			x?: number;
-			y?: number;
-		}) => {
-			send({ type: "MOVE", ...params });
-		},
-		[send],
-	);
+	const move = (params: {
+		previewTrackId?: string;
+		previewStartTime?: number;
+		x?: number;
+		y?: number;
+	}) => {
+		send({ type: "MOVE", ...params });
+	};
 
-	const commit = useCallback(() => {
+	const commit = () => {
 		send({ type: "COMMIT" });
-	}, [send]);
+	};
 
-	const cancel = useCallback(() => {
+	const cancel = () => {
 		send({ type: "CANCEL" });
-	}, [send]);
+	};
 
 	return {
 		state,

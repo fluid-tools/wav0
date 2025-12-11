@@ -28,7 +28,7 @@ import type {
 } from "@wav0/daw-sdk";
 import { time } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { ClipContextMenu } from "@/components/daw/context-menus/clip-context-menu";
 import { ClipFadeHandles } from "@/components/daw/controls/clip-fade-handles";
 import { AutomationLane } from "@/components/daw/panels/automation-lane";
@@ -312,7 +312,7 @@ const TrackRow = memo(function TrackRow({
 	const trackY = index * trackHeight;
 
 	// Get clips for this track
-	const clips: Clip[] = useMemo(() => {
+	const clips: Clip[] = (() => {
 		const hasClipArray = Array.isArray(track.clips);
 		if (hasClipArray) {
 			return (track.clips as Clip[]) ?? [];
@@ -334,21 +334,13 @@ const TrackRow = memo(function TrackRow({
 			];
 		}
 		return [];
-	}, [track]);
+	})();
 
-	const handleSelect = useCallback(
-		(trackId: string, clipId: string) => {
-			onClipSelect(trackId, clipId);
-		},
-		[onClipSelect],
-	);
+	const handleSelect = (trackId: string, clipId: string) =>
+		onClipSelect(trackId, clipId);
 
-	const handleFadeChange = useCallback(
-		(clipId: string, fade: string, value: number) => {
-			onFadeChange(track.id, clipId, fade, value);
-		},
-		[track.id, onFadeChange],
-	);
+	const handleFadeChange = (clipId: string, fade: string, value: number) =>
+		onFadeChange(track.id, clipId, fade, value);
 
 	return (
 		<div
@@ -567,6 +559,12 @@ export function DAWTrackContent() {
 	});
 	const RAF = useRef(0);
 	const autoScrollActive = useRef(false);
+	// Refs for RAF loop to read current drag state (avoids stale closure)
+	const dragStateRef = useRef<{
+		dragging: boolean;
+		resizing: boolean;
+		looping: boolean;
+	}>({ dragging: false, resizing: false, looping: false });
 	const [_gridCount, setGridCount] = useState(0);
 
 	useEffect(() => {
@@ -603,9 +601,16 @@ export function DAWTrackContent() {
 	}, []);
 	const [dragOverTrackId, setDragOverTrackId] = useState<string | null>(null);
 
+	// Keep drag state ref in sync for RAF loop
+	dragStateRef.current = {
+		dragging: !!draggingClip,
+		resizing: !!resizingClip,
+		looping: !!loopDragging,
+	};
+
 	const pixelsPerMs = pxPerMs;
 
-	const ensureAutoScroll = useCallback(() => {
+	const ensureAutoScroll = () => {
 		if (RAF.current) return;
 		autoScrollActive.current = true;
 		const tick = () => {
@@ -613,7 +618,9 @@ export function DAWTrackContent() {
 			const scrollable = containerRef.current?.closest(
 				'[data-daw-grid-scroll="true"]',
 			) as HTMLDivElement | null;
-			const active = draggingClip || resizingClip || loopDragging;
+			// Read from ref to get current state (not stale closure)
+			const { dragging, resizing, looping } = dragStateRef.current;
+			const active = dragging || resizing || looping;
 			if (!scrollable || !active) {
 				autoScrollActive.current = false;
 				return;
@@ -651,36 +658,32 @@ export function DAWTrackContent() {
 			RAF.current = requestAnimationFrame(tick);
 		};
 		RAF.current = requestAnimationFrame(tick);
-	}, [draggingClip, loopDragging, resizingClip]);
+	};
 
 	const lastPointer = useRef<{ clientX: number } | null>(null);
 
-	const handleTrackDrop = useCallback(
-		async (trackId: string, e: React.DragEvent) => {
-			e.preventDefault();
-			setDragOverTrackId(null);
+	const handleTrackDrop = async (trackId: string, e: React.DragEvent) => {
+		e.preventDefault();
+		setDragOverTrackId(null);
 
-			const files = Array.from(e.dataTransfer.files).filter((file) =>
-				file.type.startsWith("audio/"),
-			);
+		const files = Array.from(e.dataTransfer.files).filter((file) =>
+			file.type.startsWith("audio/"),
+		);
 
-			if (files.length === 0) return;
+		if (files.length === 0) return;
 
-			const file = files[0];
+		const file = files[0];
 
-			// Calculate drop position
-			const rect = e.currentTarget.getBoundingClientRect();
-			const x = e.clientX - rect.left;
-			const startTime = x / pixelsPerMs;
+		const rect = e.currentTarget.getBoundingClientRect();
+		const x = e.clientX - rect.left;
+		const startTime = x / pixelsPerMs;
 
-			try {
-				await loadAudioFile(file, trackId, { startTimeMs: startTime });
-			} catch (error) {
-				console.error("Error loading audio file:", error);
-			}
-		},
-		[pixelsPerMs, loadAudioFile],
-	);
+		try {
+			await loadAudioFile(file, trackId, { startTimeMs: startTime });
+		} catch (error) {
+			console.error("Error loading audio file:", error);
+		}
+	};
 
 	// interactionActive is now from useTrackInteractions hook
 
@@ -700,7 +703,7 @@ export function DAWTrackContent() {
 			autoScrollActive.current = false;
 			lastPointer.current = null;
 		};
-	}, [interactionActive, ensureAutoScroll]);
+	}, [interactionActive]);
 
 	useEffect(() => {
 		if (!interactionActive) return;
@@ -1101,111 +1104,82 @@ export function DAWTrackContent() {
 		snap,
 	]);
 
-	// ===== Memoized callbacks for TrackRow =====
-	const handleTrackSelect = useCallback(
-		(trackId: string) => {
-			setSelectedTrackId(trackId);
-		},
-		[setSelectedTrackId],
-	);
+	// Handlers - compiler handles memoization
+	const handleTrackSelect = (trackId: string) => setSelectedTrackId(trackId);
 
-	const handleClipSelect = useCallback(
-		(trackId: string, clipId: string) => {
-			setSelectedTrackId(trackId);
-			setSelectedClipId(clipId);
-		},
-		[setSelectedTrackId, setSelectedClipId],
-	);
+	const handleClipSelect = (trackId: string, clipId: string) => {
+		setSelectedTrackId(trackId);
+		setSelectedClipId(clipId);
+	};
 
-	const handleDragEnter = useCallback((trackId: string) => {
-		setDragOverTrackId(trackId);
-	}, []);
+	const handleDragEnter = (trackId: string) => setDragOverTrackId(trackId);
 
-	const handleDragLeave = useCallback(
-		(_trackId: string, e: React.DragEvent) => {
-			const rect = e.currentTarget.getBoundingClientRect();
-			const x = e.clientX;
-			const y = e.clientY;
-			if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
-				setDragOverTrackId(null);
-			}
-		},
-		[],
-	);
+	const handleDragLeave = (_trackId: string, e: React.DragEvent) => {
+		const rect = e.currentTarget.getBoundingClientRect();
+		const x = e.clientX;
+		const y = e.clientY;
+		if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+			setDragOverTrackId(null);
+		}
+	};
 
-	const handleStartClipDrag = useCallback(
-		(params: {
-			trackId: string;
-			clipId: string;
-			startX: number;
-			startY: number;
-			startTime: number;
-			originalTrackIndex: number;
-			sourceTrackId: string;
-			offsetX: number;
-			offsetY: number;
-		}) => {
-			// Capture actual scroll position at drag start (read directly from DOM)
-			const scrollable = containerRef.current?.closest(
-				'[data-daw-grid-scroll="true"]',
-			) as HTMLDivElement | null;
-			const currentScrollLeft = scrollable?.scrollLeft ?? 0;
-			startClipDrag({
-				trackId: params.trackId,
-				clipId: params.clipId,
-				startX: params.startX,
-				startY: params.startY,
-				startTime: params.startTime,
-				originalTrackIndex: params.originalTrackIndex,
-				offsetX: params.offsetX,
-				offsetY: params.offsetY,
-				startScrollLeft: currentScrollLeft,
-			});
-		},
-		[startClipDrag],
-	);
+	const handleStartClipDrag = (params: {
+		trackId: string;
+		clipId: string;
+		startX: number;
+		startY: number;
+		startTime: number;
+		originalTrackIndex: number;
+		sourceTrackId: string;
+		offsetX: number;
+		offsetY: number;
+	}) => {
+		const scrollable = containerRef.current?.closest(
+			'[data-daw-grid-scroll="true"]',
+		) as HTMLDivElement | null;
+		const currentScrollLeft = scrollable?.scrollLeft ?? 0;
+		startClipDrag({
+			trackId: params.trackId,
+			clipId: params.clipId,
+			startX: params.startX,
+			startY: params.startY,
+			startTime: params.startTime,
+			originalTrackIndex: params.originalTrackIndex,
+			offsetX: params.offsetX,
+			offsetY: params.offsetY,
+			startScrollLeft: currentScrollLeft,
+		});
+	};
 
-	const handleStartResize = useCallback(
-		(params: {
-			trackId: string;
-			clipId: string;
-			type: "start" | "end";
-			startX: number;
-			startTrimStart: number;
-			startTrimEnd: number;
-			startClipStartTime: number;
-		}) => {
-			startResize({
-				trackId: params.trackId,
-				clipId: params.clipId,
-				resizeType: params.type,
-				startX: params.startX,
-				startTrimStart: params.startTrimStart,
-				startTrimEnd: params.startTrimEnd,
-				startClipStartTime: params.startClipStartTime,
-			});
-		},
-		[startResize],
-	);
+	const handleStartResize = (params: {
+		trackId: string;
+		clipId: string;
+		type: "start" | "end";
+		startX: number;
+		startTrimStart: number;
+		startTrimEnd: number;
+		startClipStartTime: number;
+	}) => {
+		startResize({
+			trackId: params.trackId,
+			clipId: params.clipId,
+			resizeType: params.type,
+			startX: params.startX,
+			startTrimStart: params.startTrimStart,
+			startTrimEnd: params.startTrimEnd,
+			startClipStartTime: params.startClipStartTime,
+		});
+	};
 
-	const handleStartLoopDrag = useCallback(
-		(params: {
-			trackId: string;
-			clipId: string;
-			startX: number;
-			startLoopEnd: number | undefined;
-		}) => {
-			startLoopDrag(params);
-		},
-		[startLoopDrag],
-	);
+	const handleStartLoopDrag = (params: {
+		trackId: string;
+		clipId: string;
+		startX: number;
+		startLoopEnd: number | undefined;
+	}) => startLoopDrag(params);
 
-	const handleFadeChange = useCallback(
-		(trackId: string, clipId: string, fade: string, value: number) => {
-			updateClip(trackId, clipId, { [fade]: value });
-		},
-		[updateClip],
-	);
+	const handleFadeChange = (trackId: string, clipId: string, fade: string, value: number) =>
+		updateClip(trackId, clipId, { [fade]: value });
 
 	// Compute track height once
 	const trackHeight = Math.round(DAW_HEIGHTS.TRACK_ROW * trackHeightZoom);

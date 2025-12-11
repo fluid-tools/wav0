@@ -9,7 +9,7 @@ import {
 import type { Clip, Track } from "@wav0/daw-sdk";
 import { time } from "@wav0/daw-sdk";
 import { useAtom } from "jotai";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,49 +47,35 @@ export function EventListSheet() {
 	const [searchTerm, setSearchTerm] = useState("");
 
 	// Flatten all clips into event rows
-	const allEvents = useMemo(() => {
+	const allEvents = (() => {
 		const events: EventRow[] = [];
 		for (const track of tracks) {
 			if (!track.clips) continue;
 			for (const clip of track.clips) {
-				events.push({
-					trackId: track.id,
-					trackName: track.name,
-					clip,
-					track,
-				});
+				events.push({ trackId: track.id, trackName: track.name, clip, track });
 			}
 		}
-		// Sort by start time
 		return events.sort((a, b) => a.clip.startTime - b.clip.startTime);
-	}, [tracks]);
+	})();
 
 	// Apply filters
-	const filteredEvents = useMemo(() => {
-		return allEvents.filter((event) => {
-			const matchesTrack =
-				filterTrack === "all" || event.trackId === filterTrack;
-			const matchesSearch =
-				searchTerm === "" ||
-				event.clip.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-				event.trackName.toLowerCase().includes(searchTerm.toLowerCase());
-			return matchesTrack && matchesSearch;
-		});
-	}, [allEvents, filterTrack, searchTerm]);
+	const filteredEvents = allEvents.filter((event) => {
+		const matchesTrack = filterTrack === "all" || event.trackId === filterTrack;
+		const matchesSearch =
+			searchTerm === "" ||
+			event.clip.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+			event.trackName.toLowerCase().includes(searchTerm.toLowerCase());
+		return matchesTrack && matchesSearch;
+	});
 
 	const handleEditClip = (trackId: string, clipId: string) => {
 		setClipInspectorTarget({ trackId, clipId });
 		setClipInspectorOpen(true);
 	};
 
-	const totalDuration = useMemo(() => {
-		if (allEvents.length === 0) return 0;
-		return Math.max(
-			...allEvents.map(
-				(e) => e.clip.startTime + (e.clip.trimEnd - e.clip.trimStart),
-			),
-		);
-	}, [allEvents]);
+	const totalDuration = allEvents.length === 0
+		? 0
+		: Math.max(...allEvents.map((e) => e.clip.startTime + (e.clip.trimEnd - e.clip.trimStart)));
 
 	return (
 		<Sheet open={open} onOpenChange={setOpen}>

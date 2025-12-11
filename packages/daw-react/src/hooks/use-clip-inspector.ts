@@ -28,6 +28,7 @@ export function useClipInspector() {
 	const [fadeInDraft, setFadeInDraft] = useState<number>(0);
 	const [fadeOutDraft, setFadeOutDraft] = useState<number>(0);
 
+	// useMemo required for stable reference - useEffect depends on this
 	const current = useMemo(() => {
 		if (!target) return null;
 		const track = tracks.find((candidate) => candidate.id === target.trackId);

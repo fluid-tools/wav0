@@ -79,8 +79,7 @@ export function DAWProvider({
 		};
 	}, [daw]);
 
-	// Memoize context value to prevent re-renders in consumers when provider re-renders
-	// Without this, all useContext(DAWContext) consumers re-render on every provider render
+	// useMemo required - context values need stable references
 	const contextValue = useMemo<DAWContextValue | null>(
 		() =>
 			daw
@@ -115,15 +114,12 @@ export function useBridges(): {
 	if (context === undefined) {
 		throw new Error("useBridges must be used within DAWProvider");
 	}
-	// Memoize to prevent new object reference on every render
-	// This ensures useEffect dependencies on bridges work correctly
-	const audioBridge = context?.audioBridge ?? null;
-	const playbackBridge = context?.playbackBridge ?? null;
+	// useMemo required for stable reference - consumers depend on this
 	return useMemo(
 		() => ({
-			audio: audioBridge,
-			playback: playbackBridge,
+			audio: context?.audioBridge ?? null,
+			playback: context?.playbackBridge ?? null,
 		}),
-		[audioBridge, playbackBridge],
+		[context?.audioBridge, context?.playbackBridge],
 	);
 }

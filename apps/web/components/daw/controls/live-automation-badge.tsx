@@ -5,7 +5,7 @@ import type { Track } from "@wav0/daw-sdk";
 import { volume } from "@wav0/daw-sdk";
 import { useAtomValue } from "jotai";
 import { selectAtom } from "jotai/utils";
-import { memo, useMemo } from "react";
+import { memo } from "react";
 
 const playbackCurrentTimeAtom = selectAtom(
 	playbackAtom,
@@ -25,15 +25,10 @@ export const LiveAutomationBadge = memo(function LiveAutomationBadge({
 	isPlaying,
 }: LiveAutomationBadgeProps) {
 	const currentTime = useAtomValue(playbackCurrentTimeAtom);
-	const quantizedTime = useMemo(
-		() => Math.round(currentTime / 16) * 16, // ~60fps to avoid excessive re-renders
-		[currentTime],
-	);
+	const quantizedTime = Math.round(currentTime / 16) * 16;
 
-	const { currentDb, isAutomated } = useMemo(() => {
-		const hasAutomation =
-			Boolean(envelope?.enabled) &&
-			Boolean(envelope?.points && envelope.points.length > 0);
+	const { currentDb, isAutomated } = (() => {
+		const hasAutomation = Boolean(envelope?.enabled) && Boolean(envelope?.points?.length);
 		if (!hasAutomation) return { currentDb: null, isAutomated: false };
 
 		const multiplier = getEnvelopeMultiplierAtTime(
@@ -43,7 +38,7 @@ export const LiveAutomationBadge = memo(function LiveAutomationBadge({
 		);
 		const currentDbValue = volume.getEffectiveDb(baseVolume ?? 75, multiplier);
 		return { currentDb: currentDbValue, isAutomated: true };
-	}, [envelope, baseVolume, quantizedTime]);
+	})();
 
 	// Only show during playback when automation is active
 	if (!isPlaying || !isAutomated || currentDb === null) {

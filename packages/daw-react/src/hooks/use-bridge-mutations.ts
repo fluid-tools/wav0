@@ -6,7 +6,7 @@
 "use client";
 
 import type { Clip, Track } from "@wav0/daw-sdk";
-import { useCallback, useEffectEvent } from "react";
+import { useEffectEvent } from "react";
 import { useBridges } from "../providers/daw-provider";
 
 export interface BridgeMutations {
@@ -150,21 +150,20 @@ export function useBridgeMutations(): BridgeMutations {
 		await playbackBridge.seek(timeMs);
 	});
 
-	// Return stable callbacks using useCallback
-	// The inner handlers are stable via useEffectEvent
+	// useEffectEvent provides stable refs, compiler handles the rest
 	return {
-		addTrack: useCallback(handleAddTrack, []),
-		updateTrack: useCallback(handleUpdateTrack, []),
-		deleteTrack: useCallback(handleDeleteTrack, []),
-		addClip: useCallback(handleAddClip, []),
-		updateClip: useCallback(handleUpdateClip, []),
-		deleteClip: useCallback(handleDeleteClip, []),
-		loadAudioFile: useCallback(handleLoadAudioFile, []),
-		loadFromOPFS: useCallback(handleLoadFromOPFS, []),
-		deleteFromOPFS: useCallback(handleDeleteFromOPFS, []),
-		play: useCallback(handlePlay, []),
-		stop: useCallback(handleStop, []),
-		pause: useCallback(handlePause, []),
-		seek: useCallback(handleSeek, []),
+		addTrack: handleAddTrack,
+		updateTrack: handleUpdateTrack,
+		deleteTrack: handleDeleteTrack,
+		addClip: handleAddClip,
+		updateClip: handleUpdateClip,
+		deleteClip: handleDeleteClip,
+		loadAudioFile: handleLoadAudioFile,
+		loadFromOPFS: handleLoadFromOPFS,
+		deleteFromOPFS: handleDeleteFromOPFS,
+		play: handlePlay,
+		stop: handleStop,
+		pause: handlePause,
+		seek: handleSeek,
 	};
 }

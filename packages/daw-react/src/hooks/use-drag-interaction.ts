@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export interface DragState {
 	active: boolean;
@@ -37,7 +37,7 @@ export function useDragInteraction(options: {
 	const optionsRef = useRef(options);
 	optionsRef.current = options;
 
-	const startDrag = useCallback((e: PointerEvent) => {
+	const startDrag = (e: PointerEvent) => {
 		const state: DragState = {
 			active: true,
 			startX: e.clientX,
@@ -50,7 +50,7 @@ export function useDragInteraction(options: {
 		dragStateRef.current = state;
 		setIsDragging(true);
 		optionsRef.current.onDragStart?.(e, state);
-	}, []);
+	};
 
 	useEffect(() => {
 		if (!isDragging) return;
