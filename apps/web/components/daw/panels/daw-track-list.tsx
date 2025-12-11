@@ -408,30 +408,30 @@ export function DAWTrackList() {
 		setResizingTrack({ startY: e.clientY, startZoom: trackHeightZoom });
 	};
 
-	const handleResizeMove = (e: MouseEvent) => {
-		if (!resizingTrack) return;
-		const deltaY = e.clientY - resizingTrack.startY;
-		const deltaZoom = deltaY / DAW_HEIGHTS.TRACK_ROW;
-		const newZoom = resizingTrack.startZoom + deltaZoom;
-		setTrackHeightZoom(newZoom);
-	};
-
-	const handleResizeEnd = () => setResizingTrack(null);
-
 	// Attach global mouse events for resizing
+	// Handlers defined inside effect to avoid deps changing every render
 	useEffect(() => {
-		if (resizingTrack) {
-			document.addEventListener("mousemove", handleResizeMove);
-			document.addEventListener("mouseup", handleResizeEnd);
-			document.body.style.cursor = "ns-resize";
-		}
+		if (!resizingTrack) return;
+
+		const handleResizeMove = (e: MouseEvent) => {
+			const deltaY = e.clientY - resizingTrack.startY;
+			const deltaZoom = deltaY / DAW_HEIGHTS.TRACK_ROW;
+			const newZoom = resizingTrack.startZoom + deltaZoom;
+			setTrackHeightZoom(newZoom);
+		};
+
+		const handleResizeEnd = () => setResizingTrack(null);
+
+		document.addEventListener("mousemove", handleResizeMove);
+		document.addEventListener("mouseup", handleResizeEnd);
+		document.body.style.cursor = "ns-resize";
 
 		return () => {
 			document.removeEventListener("mousemove", handleResizeMove);
 			document.removeEventListener("mouseup", handleResizeEnd);
 			document.body.style.cursor = "";
 		};
-	}, [resizingTrack, handleResizeMove, handleResizeEnd]);
+	}, [resizingTrack]);
 
 	return (
 		<div className="w-full">

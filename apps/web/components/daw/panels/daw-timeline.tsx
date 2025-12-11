@@ -51,16 +51,22 @@ export function DAWTimeline() {
 		return timeline.snapToGrid ? snap(rawMs) : rawMs;
 	};
 
-	const onMouseMove = (e: MouseEvent) => {
-		if (!isDraggingEnd || !containerRef.current) return;
-		const rect = containerRef.current.getBoundingClientRect();
-		const x = e.clientX - rect.left;
-		const ms = Math.max(0, Math.round(x / pxPerMs));
-		setProjectEndOverride(ms);
-	};
+	// Ref to access current pxPerMs in effect without re-running
+	const pxPerMsRef = useRef(pxPerMs);
+	pxPerMsRef.current = pxPerMs;
 
+	// Handler defined inside effect to avoid deps changing every render
 	useEffect(() => {
 		if (!isDraggingEnd) return;
+
+		const onMouseMove = (e: MouseEvent) => {
+			if (!containerRef.current) return;
+			const rect = containerRef.current.getBoundingClientRect();
+			const x = e.clientX - rect.left;
+			const ms = Math.max(0, Math.round(x / pxPerMsRef.current));
+			setProjectEndOverride(ms);
+		};
+
 		document.addEventListener("mousemove", onMouseMove);
 		document.addEventListener("mouseup", () => setIsDraggingEnd(false), {
 			once: true,
@@ -68,7 +74,7 @@ export function DAWTimeline() {
 		return () => {
 			document.removeEventListener("mousemove", onMouseMove);
 		};
-	}, [isDraggingEnd, onMouseMove]);
+	}, [isDraggingEnd]);
 
 	const handleTimelineClick = async (e: React.MouseEvent | React.PointerEvent) => {
 		const timeMs = getTimeFromClientX(e.clientX);
