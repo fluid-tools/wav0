@@ -27,5 +27,8 @@
 		"apps/*",
 		"packages/*",
 		"tooling/*"
-	]
+	],
+	"dependencies": {
+		"vercel": "^49.2.0"
+	}
 }
