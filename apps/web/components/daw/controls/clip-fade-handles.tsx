@@ -39,38 +39,38 @@ export const ClipFadeHandles = memo(function ClipFadeHandles({
 	const maxFadeMs = clipDurationMs / 2; // Max 50% of clip
 
 	const handleFadePointerDown = (fade: "fadeIn" | "fadeOut", e: React.PointerEvent) => {
-		e.stopPropagation();
-		e.preventDefault();
-		setDraggingFade(fade);
-		dragStartXRef.current = e.clientX;
+			e.stopPropagation();
+			e.preventDefault();
+			setDraggingFade(fade);
+			dragStartXRef.current = e.clientX;
 
-		const actualValue = clip[fade] ?? 0;
+			const actualValue = clip[fade] ?? 0;
 		const visualValue = actualValue === 0 ? 0 : Math.max(actualValue, VISUAL_MIN_FADE_MS);
-		dragStartValueRef.current = visualValue;
+			dragStartValueRef.current = visualValue;
 
-		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+			(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 		window.dispatchEvent(new CustomEvent("wav0:grid-pan-lock", { detail: true }));
 	};
 
 	const handleFadePointerMove = (e: React.PointerEvent) => {
-		if (!draggingFade) return;
-		e.stopPropagation();
+			if (!draggingFade) return;
+			e.stopPropagation();
 
-		const deltaX = e.clientX - dragStartXRef.current;
-		const multiplier = e.shiftKey ? 0.1 : 1;
-		const deltaMs = (deltaX / pixelsPerMs) * multiplier;
+			const deltaX = e.clientX - dragStartXRef.current;
+			const multiplier = e.shiftKey ? 0.1 : 1;
+			const deltaMs = (deltaX / pixelsPerMs) * multiplier;
 
 		let newFadeMs = draggingFade === "fadeIn"
 			? dragStartValueRef.current + deltaMs
 			: dragStartValueRef.current - deltaMs;
 
-		newFadeMs = Math.max(0, Math.min(newFadeMs, maxFadeMs));
+			newFadeMs = Math.max(0, Math.min(newFadeMs, maxFadeMs));
 
-		if (newFadeMs > 0 && newFadeMs < VISUAL_MIN_FADE_MS) {
+			if (newFadeMs > 0 && newFadeMs < VISUAL_MIN_FADE_MS) {
 			newFadeMs = newFadeMs <= SNAP_THRESHOLD_MS ? 0 : VISUAL_MIN_FADE_MS;
-		}
+			}
 
-		onFadeChange(clip.id, draggingFade, Math.round(newFadeMs));
+			onFadeChange(clip.id, draggingFade, Math.round(newFadeMs));
 	};
 
 	const handleFadePointerUp = (e: React.PointerEvent) => {
@@ -81,10 +81,10 @@ export const ClipFadeHandles = memo(function ClipFadeHandles({
 	};
 
 	const handleFadeDoubleClick = (fade: "fadeIn" | "fadeOut", e: React.MouseEvent) => {
-		e.stopPropagation();
-		const currentValue = clip[fade] ?? 0;
+			e.stopPropagation();
+			const currentValue = clip[fade] ?? 0;
 		const newValue = currentValue > 0 ? 0 : Math.min(DEFAULT_FADE_MS, maxFadeMs);
-		onFadeChange(clip.id, fade, newValue);
+			onFadeChange(clip.id, fade, newValue);
 	};
 
 	// Escape key to cancel drag

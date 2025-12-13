@@ -182,23 +182,23 @@ export function DAWContainer() {
 	});
 
 	const batchScrollUpdate = (left: number, top: number) => {
-		const batch = scrollBatchRef.current;
-		batch.nextLeft = left;
-		batch.nextTop = top;
+			const batch = scrollBatchRef.current;
+			batch.nextLeft = left;
+			batch.nextTop = top;
 
-		if (batch.pending) return;
+			if (batch.pending) return;
 
-		batch.pending = true;
-		batch.raf = requestAnimationFrame(() => {
-			batch.pending = false;
-			batch.raf = 0;
-			try {
-				setHorizontalScroll(batch.nextLeft);
-				setVerticalScroll(batch.nextTop);
-			} catch (error) {
-				console.warn("[DAWContainer] scroll batch set failed", error);
-			}
-		});
+			batch.pending = true;
+			batch.raf = requestAnimationFrame(() => {
+				batch.pending = false;
+				batch.raf = 0;
+				try {
+					setHorizontalScroll(batch.nextLeft);
+					setVerticalScroll(batch.nextTop);
+				} catch (error) {
+					console.warn("[DAWContainer] scroll batch set failed", error);
+				}
+			});
 	};
 
 	useEffect(() => {
@@ -266,62 +266,62 @@ export function DAWContainer() {
 	const contentHeight = Math.max(tracks.length * currentTrackHeight, 400);
 
 	const scheduleScrollSync = (scrollLeft: number, scrollTop: number) => {
-		const controller = gridControllerRef.current;
-		if (!controller) return;
-		controller.setScroll(scrollLeft, scrollTop);
-		scrollRef.current = { left: scrollLeft, top: scrollTop };
+			const controller = gridControllerRef.current;
+			if (!controller) return;
+			controller.setScroll(scrollLeft, scrollTop);
+			scrollRef.current = { left: scrollLeft, top: scrollTop };
 	};
 
 	const onTimelineScroll = (e: React.UIEvent<HTMLDivElement>) => {
-		const target = e.target as HTMLDivElement;
-		const left = target.scrollLeft;
-		scrollRef.current.left = left;
-		scheduleScrollSync(left, scrollRef.current.top);
-		batchScrollUpdate(left, scrollRef.current.top);
+			const target = e.target as HTMLDivElement;
+			const left = target.scrollLeft;
+			scrollRef.current.left = left;
+			scheduleScrollSync(left, scrollRef.current.top);
+			batchScrollUpdate(left, scrollRef.current.top);
 	};
 
 	const onTrackListScroll = (e: React.UIEvent<HTMLDivElement>) => {
-		const target = e.target as HTMLDivElement;
-		const top = target.scrollTop;
-		scrollRef.current.top = top;
-		scheduleScrollSync(scrollRef.current.left, top);
-		batchScrollUpdate(scrollRef.current.left, top);
+			const target = e.target as HTMLDivElement;
+			const top = target.scrollTop;
+			scrollRef.current.top = top;
+			scheduleScrollSync(scrollRef.current.left, top);
+			batchScrollUpdate(scrollRef.current.left, top);
 	};
 
 	const scrollDebounceRef = useRef<NodeJS.Timeout | null>(null);
 	const onTrackGridScroll = (e: React.UIEvent<HTMLDivElement>) => {
-		const target = e.target as HTMLDivElement;
-		const { scrollLeft: left, scrollTop: top } = target;
-		scrollRef.current = { left, top };
-		scheduleScrollSync(left, top);
-		batchScrollUpdate(left, top);
+			const target = e.target as HTMLDivElement;
+			const { scrollLeft: left, scrollTop: top } = target;
+			scrollRef.current = { left, top };
+			scheduleScrollSync(left, top);
+			batchScrollUpdate(left, top);
 
-		setUserIsScrolling(true);
-		setAutoFollowEnabled(false);
+			setUserIsScrolling(true);
+			setAutoFollowEnabled(false);
 
-		if (scrollDebounceRef.current) {
-			clearTimeout(scrollDebounceRef.current);
-		}
-
-		scrollDebounceRef.current = setTimeout(() => {
-			setUserIsScrolling(false);
-
-			const controller = gridControllerRef.current;
-			const grid = trackGridScrollRef.current;
-			if (controller && grid && daw) {
-				const currentTimeMs = daw.getTransport().getCurrentTime();
-				const { pxPerMs } = store.get(timelineStaticMetricsAtom);
-				const x = currentTimeMs * pxPerMs;
-				if (!Number.isFinite(x)) return;
-				const width = grid.clientWidth;
-				const viewportLeft = controller.scrollLeft;
-				const viewportRight = viewportLeft + width;
-
-				if (x >= viewportLeft && x <= viewportRight) {
-					setAutoFollowEnabled(true);
-				}
+			if (scrollDebounceRef.current) {
+				clearTimeout(scrollDebounceRef.current);
 			}
-		}, 500);
+
+			scrollDebounceRef.current = setTimeout(() => {
+				setUserIsScrolling(false);
+
+				const controller = gridControllerRef.current;
+				const grid = trackGridScrollRef.current;
+				if (controller && grid && daw) {
+					const currentTimeMs = daw.getTransport().getCurrentTime();
+					const { pxPerMs } = store.get(timelineStaticMetricsAtom);
+					const x = currentTimeMs * pxPerMs;
+					if (!Number.isFinite(x)) return;
+					const width = grid.clientWidth;
+					const viewportLeft = controller.scrollLeft;
+					const viewportRight = viewportLeft + width;
+
+					if (x >= viewportLeft && x <= viewportRight) {
+						setAutoFollowEnabled(true);
+					}
+				}
+			}, 500);
 	};
 
 	useEffect(() => {

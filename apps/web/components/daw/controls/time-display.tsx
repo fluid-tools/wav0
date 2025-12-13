@@ -67,10 +67,10 @@ export const TimeControls = memo(function TimeControls() {
 	}, [daw]);
 
 	const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		const newTime = Number(e.target.value);
-		displayTimeRef.current = newTime;
-		setDisplayTime(newTime);
-		setCurrentTime(newTime);
+			const newTime = Number(e.target.value);
+			displayTimeRef.current = newTime;
+			setDisplayTime(newTime);
+			setCurrentTime(newTime);
 	};
 
 	const percentage = totalDuration > 0 ? (displayTime / totalDuration) * 100 : 0;

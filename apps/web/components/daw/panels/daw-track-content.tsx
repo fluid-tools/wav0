@@ -2,10 +2,14 @@
 
 import {
 	activeToolAtom,
+	clipDragPreviewAtom,
 	clipMoveHistoryAtom,
+	isInteractionActiveAtom,
 	isPlayingAtom,
 	loadAudioFileAtom,
+	loopDragInteractionAtom,
 	projectEndPositionAtom,
+	resizeInteractionAtom,
 	selectedClipIdAtom,
 	selectedTrackIdAtom,
 	serviceRegistry,
@@ -18,7 +22,7 @@ import {
 	updateClipAtom,
 	updateTrackAtom,
 	useTimebase,
-	useTrackInteractions,
+	useTrackInteractionActions,
 } from "@wav0/daw-react";
 import type {
 	Clip,
@@ -27,8 +31,8 @@ import type {
 	TrackEnvelopeSegment,
 } from "@wav0/daw-sdk";
 import { time } from "@wav0/daw-sdk";
-import { useAtom } from "jotai";
-import { memo, useEffect, useRef, useState } from "react";
+import { atom, useAtom, useAtomValue, useStore } from "jotai";
+import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ClipContextMenu } from "@/components/daw/context-menus/clip-context-menu";
 import { ClipFadeHandles } from "@/components/daw/controls/clip-fade-handles";
 import { AutomationLane } from "@/components/daw/panels/automation-lane";
@@ -290,6 +294,101 @@ type TrackRowProps = {
 	) => void;
 };
 
+// Custom comparator: ignore handler props, compare clips by content not reference
+function trackRowPropsAreEqual(
+	prev: TrackRowProps,
+	next: TrackRowProps,
+): boolean {
+	// Compare primitive data props
+	if (prev.index !== next.index) return false;
+	if (prev.trackHeight !== next.trackHeight) return false;
+	if (prev.pixelsPerMs !== next.pixelsPerMs) return false;
+	if (prev.timelineWidth !== next.timelineWidth) return false;
+	if (prev.isSelected !== next.isSelected) return false;
+	if (prev.selectedClipId !== next.selectedClipId) return false;
+	if (prev.dragOverTrackId !== next.dragOverTrackId) return false;
+
+	// Compare track identity
+	const pt = prev.track;
+	const nt = next.track;
+	if (pt.id !== nt.id) return false;
+	if (pt.name !== nt.name) return false;
+	if (pt.color !== nt.color) return false;
+
+	// Compare clips by content (TrackRow renders clips, so changes matter)
+	const pClips = pt.clips ?? [];
+	const nClips = nt.clips ?? [];
+	if (pClips.length !== nClips.length) return false;
+	for (let i = 0; i < pClips.length; i++) {
+		const pc = pClips[i];
+		const nc = nClips[i];
+		if (pc.id !== nc.id) return false;
+		if (pc.startTime !== nc.startTime) return false;
+		if (pc.trimStart !== nc.trimStart) return false;
+		if (pc.trimEnd !== nc.trimEnd) return false;
+		if (pc.loopEnd !== nc.loopEnd) return false;
+		if (pc.fadeIn !== nc.fadeIn) return false;
+		if (pc.fadeOut !== nc.fadeOut) return false;
+	}
+
+	// Ignore handler props - they're recreated but functionally identical
+	return true;
+}
+
+// ===== Drag Preview Overlay - Isolated subscription =====
+// Local derived atom using correct DAW_HEIGHTS constant
+const localDragPreviewRenderDataAtom = atom((get) => {
+	const dragPreview = get(clipDragPreviewAtom);
+	if (!dragPreview) return null;
+
+	const tracks = get(tracksAtom);
+	const originalTrack = tracks.find((t) => t.id === dragPreview.originalTrackId);
+	const clip = originalTrack?.clips?.find((c) => c.id === dragPreview.clipId);
+	if (!clip) return null;
+
+	const trackHeightZoom = get(trackHeightZoomAtom);
+	const pixelsPerMs = get(timelinePxPerMsAtom);
+
+	const trackHeight = Math.round(DAW_HEIGHTS.TRACK_ROW * trackHeightZoom);
+	const targetIndex = tracks.findIndex((t) => t.id === dragPreview.previewTrackId);
+
+	return {
+		left: dragPreview.previewStartTime * pixelsPerMs,
+		top: Math.max(0, targetIndex) * trackHeight,
+		width: Math.max((clip.trimEnd - clip.trimStart) * pixelsPerMs, 8),
+		height: trackHeight - 2,
+		color: clip.color ?? originalTrack?.color ?? "#3b82f6",
+	};
+});
+
+// DragPreviewOverlay uses a derived atom that returns null when not dragging.
+// This prevents re-renders: when tracks change while NOT dragging, result stays null.
+const DragPreviewOverlay = memo(function DragPreviewOverlay() {
+	const renderData = useAtomValue(localDragPreviewRenderDataAtom);
+
+	// #region agent log
+	fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-track-content.tsx:DragPreviewOverlay',message:'DragPreviewOverlay render',data:{hasRenderData:!!renderData},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H6'})}).catch(()=>{});
+	// #endregion
+
+	if (!renderData) return null;
+
+	return (
+		<div
+			key="drag-preview"
+			className="absolute rounded-md pointer-events-none"
+			style={{
+				left: renderData.left,
+				top: renderData.top,
+				width: renderData.width,
+				height: renderData.height,
+				backgroundColor: `${renderData.color}33`,
+				border: `2px dashed ${renderData.color}`,
+				zIndex: 1000,
+			}}
+		/>
+	);
+});
+
 const TrackRow = memo(function TrackRow({
 	track,
 	index,
@@ -309,6 +408,9 @@ const TrackRow = memo(function TrackRow({
 	onStartLoopDrag,
 	onFadeChange,
 }: TrackRowProps) {
+	// #region agent log
+	fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-track-content.tsx:TrackRow',message:'TrackRow render',data:{trackId:track.id,index,isSelected,clipsLen:track.clips?.length??0},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
+	// #endregion
 	const trackY = index * trackHeight;
 
 	// Get clips for this track
@@ -503,9 +605,12 @@ const TrackRow = memo(function TrackRow({
 			</div>
 		</div>
 	);
-});
+}, trackRowPropsAreEqual);
 
 export function DAWTrackContent() {
+	// #region agent log
+	fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-track-content.tsx:DAWTrackContent',message:'DAWTrackContent render',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
+	// #endregion
 	const [tracks, setTracks] = useAtom(tracksAtom);
 	const [selectedTrackId, setSelectedTrackId] = useAtom(selectedTrackIdAtom);
 	const [selectedClipId, setSelectedClipId] = useAtom(selectedClipIdAtom);
@@ -523,32 +628,25 @@ export function DAWTrackContent() {
 	const [totalDuration] = useAtom(totalDurationAtom);
 	const { snap } = useTimebase();
 
-	// Unified interaction state machine (replaces local useState)
+	// Store for imperative atom reads in effects (avoids subscriptions)
+	const store = useStore();
+
+	// Only subscribe to isActive - triggers effect setup/teardown
+	const interactionActive = useAtomValue(isInteractionActiveAtom);
+
+	// Actions only - no subscriptions to preview atoms
 	const {
-		isActive: interactionActive,
-		clipDrag: dragPreview,
-		resize: resizingClip,
-		loopDrag: loopDragging,
 		startClipDrag,
 		startResize,
 		startLoopDrag,
 		move: sendInteractionMove,
 		commit: commitInteraction,
-	} = useTrackInteractions();
+	} = useTrackInteractionActions();
 
-	// Derived state for backwards compatibility
-	const draggingClip = dragPreview
-		? {
-				trackId: dragPreview.originalTrackId,
-				clipId: dragPreview.clipId,
-				startX: dragPreview.startX,
-				startY: dragPreview.startY,
-				startTime: dragPreview.originalStartTime,
-				originalTrackIndex: -1, // Computed during move
-				sourceTrackId: dragPreview.originalTrackId,
-				startScrollLeft: dragPreview.startScrollLeft,
-			}
-		: null;
+	// Helper to read drag preview imperatively (for effects)
+	const getDragPreview = () => store.get(clipDragPreviewAtom);
+	const getResizingClip = () => store.get(resizeInteractionAtom);
+	const getLoopDragging = () => store.get(loopDragInteractionAtom);
 
 	const [, setMoveHistory] = useAtom(clipMoveHistoryAtom);
 
@@ -601,12 +699,14 @@ export function DAWTrackContent() {
 	}, []);
 	const [dragOverTrackId, setDragOverTrackId] = useState<string | null>(null);
 
-	// Keep drag state ref in sync for RAF loop
-	dragStateRef.current = {
-		dragging: !!draggingClip,
-		resizing: !!resizingClip,
-		looping: !!loopDragging,
-	};
+	// Keep drag state ref in sync for RAF loop (useLayoutEffect = sync after render, before paint)
+	useLayoutEffect(() => {
+		dragStateRef.current = {
+			dragging: !!getDragPreview(),
+			resizing: !!getResizingClip(),
+			looping: !!getLoopDragging(),
+		};
+	});
 
 	const pixelsPerMs = pxPerMs;
 
@@ -724,6 +824,11 @@ export function DAWTrackContent() {
 			lastX = e.clientX;
 			lastY = e.clientY;
 			schedule(() => {
+				// Read atoms imperatively to avoid subscriptions
+				const resizingClip = getResizingClip();
+				const dragPreview = getDragPreview();
+				const loopDragging = getLoopDragging();
+
 				if (resizingClip) {
 					const deltaX = lastX - resizingClip.startX;
 					const deltaTime = deltaX / pixelsPerMs;
@@ -747,7 +852,8 @@ export function DAWTrackContent() {
 						});
 					} else {
 						// Right trim: adjust trimEnd only, clamp to source duration
-						const track = tracks.find((t) => t.id === resizingClip.trackId);
+						const currentTracks = store.get(tracksAtom);
+						const track = currentTracks.find((t) => t.id === resizingClip.trackId);
 						const clip = track?.clips?.find(
 							(c) => c.id === resizingClip.clipId,
 						);
@@ -763,18 +869,18 @@ export function DAWTrackContent() {
 					}
 				}
 
-				if (draggingClip) {
+				if (dragPreview) {
 					// Compensate for scroll changes during drag (read directly from scrollable)
 					const scrollable = containerRef.current?.closest(
 						'[data-daw-grid-scroll="true"]',
 					) as HTMLDivElement | null;
 					const currentScrollLeft = scrollable?.scrollLeft ?? scrollRef.current.left;
-					const scrollDelta = currentScrollLeft - draggingClip.startScrollLeft;
-					const deltaX = (lastX - draggingClip.startX) + scrollDelta;
+					const scrollDelta = currentScrollLeft - dragPreview.startScrollLeft;
+					const deltaX = (lastX - dragPreview.startX) + scrollDelta;
 					const deltaTime = deltaX / pixelsPerMs;
 					let previewStartTime = Math.max(
 						0,
-						draggingClip.startTime + deltaTime,
+						dragPreview.originalStartTime + deltaTime,
 					);
 					if (timeline.snapToGrid) {
 						previewStartTime = snap(previewStartTime);
@@ -784,18 +890,22 @@ export function DAWTrackContent() {
 						DAW_HEIGHTS.TRACK_ROW * trackHeightZoom,
 					);
 					const container = containerRef.current;
-					let newTrackIndex = draggingClip.originalTrackIndex;
+					const currentTracks = store.get(tracksAtom);
+					const originalTrackIndex = currentTracks.findIndex(
+						(t) => t.id === dragPreview.originalTrackId,
+					);
+					let newTrackIndex = originalTrackIndex;
 					if (container) {
 						const rect = container.getBoundingClientRect();
 						const relativeY = lastY - rect.top + container.scrollTop;
 						const targetTrackIndex = Math.floor(relativeY / trackHeight);
 						newTrackIndex = Math.max(
 							0,
-							Math.min(tracks.length - 1, targetTrackIndex),
+							Math.min(currentTracks.length - 1, targetTrackIndex),
 						);
 					}
 					const previewTrackId =
-						tracks[newTrackIndex]?.id ?? draggingClip.trackId;
+						currentTracks[newTrackIndex]?.id ?? dragPreview.originalTrackId;
 
 					sendInteractionMove({
 						previewTrackId,
@@ -806,7 +916,8 @@ export function DAWTrackContent() {
 				if (loopDragging) {
 					const deltaX = lastX - loopDragging.startX;
 					const deltaTime = deltaX / pixelsPerMs;
-					const track = tracks.find((t) => t.id === loopDragging.trackId);
+					const currentTracks = store.get(tracksAtom);
+					const track = currentTracks.find((t) => t.id === loopDragging.trackId);
 					const clip = track?.clips?.find((c) => c.id === loopDragging.clipId);
 					if (clip) {
 						const clipDur = Math.max(0, clip.trimEnd - clip.trimStart);
@@ -828,15 +939,27 @@ export function DAWTrackContent() {
 		};
 
 		const onUp = async () => {
+			// #region agent log
+			fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-track-content.tsx:onUp',message:'onUp START',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2,H3'})}).catch(()=>{});
+			// #endregion
 			// Cleanup via state machine - no try/finally needed
 			const cleanup = () => {
+				// #region agent log
+				fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-track-content.tsx:cleanup',message:'commitInteraction BEFORE',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
+				// #endregion
 				commitInteraction(); // Machine resets to idle, clearing all state
+				// #region agent log
+				fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-track-content.tsx:cleanup',message:'commitInteraction AFTER',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
+				// #endregion
 				lastPointer.current = null;
 				if (raf) cancelAnimationFrame(raf);
 			};
 
+			// Read atoms imperatively for commit logic
+			const dragPreview = getDragPreview();
+
 			// No try/catch needed - individual async ops have their own error handling
-				if (dragPreview && draggingClip) {
+				if (dragPreview) {
 					let computedUpdated: Track[] | null = null;
 					let computedClip: Clip | null = null;
 					let computedOriginalTrack: Track | null = null;
@@ -847,6 +970,9 @@ export function DAWTrackContent() {
 						pointIdsToRemove: string[];
 					} | null = null;
 
+					// #region agent log
+					fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-track-content.tsx:onUp',message:'setTracks BEFORE',data:{dragPreviewTrackId:dragPreview.previewTrackId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2,H4'})}).catch(()=>{});
+					// #endregion
 					setTracks((prev) => {
 						const originalTrack = prev.find(
 							(t) => t.id === dragPreview.originalTrackId,
@@ -1068,6 +1194,9 @@ export function DAWTrackContent() {
 						}
 					}
 				}
+			// #region agent log
+			fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-track-content.tsx:onUp',message:'cleanup BEFORE (after all setTracks)',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2,H3'})}).catch(()=>{});
+			// #endregion
 			cleanup();
 		};
 
@@ -1086,22 +1215,23 @@ export function DAWTrackContent() {
 		};
 	}, [
 		interactionActive,
-		resizingClip,
-		draggingClip,
-		loopDragging,
+		// All other values are read imperatively via store.get() or refs
+		// Only interactionActive triggers setup/teardown of listeners
 		pixelsPerMs,
 		updateClip,
-		tracks,
 		timeline.snapToGrid,
 		trackHeightZoom,
 		totalDuration,
 		isPlaying,
 		setTracks,
-		dragPreview,
 		commitInteraction,
 		sendInteractionMove,
 		setMoveHistory,
 		snap,
+		store,
+		getDragPreview,
+		getResizingClip,
+		getLoopDragging,
 	]);
 
 	// Handlers - compiler handles memoization
@@ -1190,7 +1320,7 @@ export function DAWTrackContent() {
 				ref={containerRef}
 				className="relative w-full h-full"
 				data-daw-grid
-				data-dragging={draggingClip ? "true" : undefined}
+				data-dragging={interactionActive ? "true" : undefined}
 			>
 				{tracks.map((track, index) => (
 					<TrackRow
@@ -1215,45 +1345,8 @@ export function DAWTrackContent() {
 					/>
 				))}
 
-				{/* Drag Preview Overlay */}
-				{dragPreview &&
-					(() => {
-						const originalTrack = tracks.find(
-							(t) => t.id === dragPreview.originalTrackId,
-						);
-						const clip = originalTrack?.clips?.find(
-							(c) => c.id === dragPreview.clipId,
-						);
-						if (!clip) return null;
-						const trackHeight = Math.round(
-							DAW_HEIGHTS.TRACK_ROW * trackHeightZoom,
-						);
-						const targetIndex = tracks.findIndex(
-							(t) => t.id === dragPreview.previewTrackId,
-						);
-						const left = dragPreview.previewStartTime * pixelsPerMs;
-						const top = Math.max(0, targetIndex) * trackHeight;
-						const width = Math.max(
-							(clip.trimEnd - clip.trimStart) * pixelsPerMs,
-							8,
-						);
-						const color = clip.color ?? originalTrack?.color ?? "#3b82f6";
-						return (
-							<div
-								key="drag-preview"
-								className="absolute rounded-md pointer-events-none"
-								style={{
-									left,
-									top,
-									width,
-									height: trackHeight - 2,
-									backgroundColor: `${color}33`,
-									border: `2px dashed ${color}`,
-									zIndex: 1000,
-								}}
-							/>
-						);
-					})()}
+				{/* Drag Preview Overlay - isolated subscriptions */}
+				<DragPreviewOverlay />
 
 				{/* Project end marker */}
 				<div

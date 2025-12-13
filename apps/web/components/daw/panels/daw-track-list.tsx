@@ -72,6 +72,36 @@ type TrackListRowProps = {
 	onResizeStart: (e: React.MouseEvent) => void;
 };
 
+// Custom comparator: ignore handler props + track.clips (clips change during drag but don't affect track list)
+function trackListRowPropsAreEqual(
+	prev: TrackListRowProps,
+	next: TrackListRowProps,
+): boolean {
+	// Compare primitive/stable data props only
+	if (prev.trackHeight !== next.trackHeight) return false;
+	if (prev.isSelected !== next.isSelected) return false;
+	if (prev.isEditing !== next.isEditing) return false;
+	if (prev.editingName !== next.editingName) return false;
+	if (prev.isPlaying !== next.isPlaying) return false;
+	if (prev.automationViewEnabled !== next.automationViewEnabled) return false;
+	if (prev.automationType !== next.automationType) return false;
+
+	// Compare track properties that affect track list UI (exclude clips)
+	const pt = prev.track;
+	const nt = next.track;
+	if (pt.id !== nt.id) return false;
+	if (pt.name !== nt.name) return false;
+	if (pt.color !== nt.color) return false;
+	if (pt.muted !== nt.muted) return false;
+	if (pt.soloed !== nt.soloed) return false;
+	if (pt.volume !== nt.volume) return false;
+	if (pt.volumeEnvelope?.enabled !== nt.volumeEnvelope?.enabled) return false;
+
+	// Ignore handler props (they're recreated every render but always do the same thing)
+	// Ignore track.clips (changes during drag but track list doesn't render clips)
+	return true;
+}
+
 const TrackListRow = memo(function TrackListRow({
 	track,
 	trackHeight,
@@ -315,7 +345,7 @@ const TrackListRow = memo(function TrackListRow({
 			</div>
 		</TrackContextMenu>
 	);
-});
+}, trackListRowPropsAreEqual);
 
 // ===== Main DAWTrackList Component =====
 export function DAWTrackList() {

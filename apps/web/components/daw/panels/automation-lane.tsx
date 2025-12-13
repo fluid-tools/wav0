@@ -72,99 +72,99 @@ export const AutomationLane = memo(function AutomationLane({
 
 	// Auto-migrate envelope on render
 	const envelope = track.volumeEnvelope
-		? migrateAutomationToSegments(track.volumeEnvelope)
+			? migrateAutomationToSegments(track.volumeEnvelope)
 		: null;
 
 	const handlePointPointerDown = (point: TrackEnvelopePoint, e: React.PointerEvent) => {
-		e.preventDefault();
-		e.stopPropagation();
-		isDraggingRef.current = true;
-		e.currentTarget.setPointerCapture(e.pointerId);
-		setDraggingPoint({
-			pointId: point.id,
-			startX: e.clientX,
-			startY: e.clientY,
-			startTime: point.time,
-			startValue: point.value,
-			pointerId: e.pointerId,
-		});
-		window.dispatchEvent(new CustomEvent("wav0:automation-drag-start"));
+			e.preventDefault();
+			e.stopPropagation();
+			isDraggingRef.current = true;
+			e.currentTarget.setPointerCapture(e.pointerId);
+			setDraggingPoint({
+				pointId: point.id,
+				startX: e.clientX,
+				startY: e.clientY,
+				startTime: point.time,
+				startValue: point.value,
+				pointerId: e.pointerId,
+			});
+			window.dispatchEvent(new CustomEvent("wav0:automation-drag-start"));
 	};
 
 	const handlePointerMove = (e: React.PointerEvent) => {
-		if (!draggingPoint || !isDraggingRef.current) return;
-		if (e.pointerId !== draggingPoint.pointerId) return;
+			if (!draggingPoint || !isDraggingRef.current) return;
+			if (e.pointerId !== draggingPoint.pointerId) return;
 
-		e.preventDefault();
-		e.stopPropagation();
+			e.preventDefault();
+			e.stopPropagation();
 
-		const padding = 20;
-		const usableHeight = trackHeight - padding * 2;
+			const padding = 20;
+			const usableHeight = trackHeight - padding * 2;
 
-		const deltaY = e.clientY - draggingPoint.startY;
+			const deltaY = e.clientY - draggingPoint.startY;
 		const deltaValue = -(deltaY / usableHeight) * 4;
 		const newValue = Math.max(0, Math.min(4, draggingPoint.startValue + deltaValue));
 
-		const deltaX = e.clientX - draggingPoint.startX;
-		const deltaTime = deltaX / pxPerMs;
-		const newTime = Math.max(0, draggingPoint.startTime + deltaTime);
+			const deltaX = e.clientX - draggingPoint.startX;
+			const deltaTime = deltaX / pxPerMs;
+			const newTime = Math.max(0, draggingPoint.startTime + deltaTime);
 
-		const clipStartTimeMap = new Map<string, number>(
-			(track.clips ?? []).map((c) => [c.id, c.startTime]),
-		);
+			const clipStartTimeMap = new Map<string, number>(
+				(track.clips ?? []).map((c) => [c.id, c.startTime]),
+			);
 
-		if (!envelope) return;
-		const updatedPoints = envelope.points.map((p) => {
-			if (p.id !== draggingPoint.pointId) return p;
+			if (!envelope) return;
+			const updatedPoints = envelope.points.map((p) => {
+				if (p.id !== draggingPoint.pointId) return p;
 
-			if (p.clipId) {
-				const clipExists = clipStartTimeMap.has(p.clipId);
-				if (!clipExists) {
-					const { clipId: _, clipRelativeTime: __, ...rest } = p;
-					return { ...rest, value: newValue, time: newTime };
-				}
-				const clipStartTime = clipStartTimeMap.get(p.clipId) ?? 0;
+				if (p.clipId) {
+					const clipExists = clipStartTimeMap.has(p.clipId);
+					if (!clipExists) {
+						const { clipId: _, clipRelativeTime: __, ...rest } = p;
+						return { ...rest, value: newValue, time: newTime };
+					}
+					const clipStartTime = clipStartTimeMap.get(p.clipId) ?? 0;
 				return { ...p, value: newValue, time: newTime, clipRelativeTime: newTime - clipStartTime };
-			}
+				}
 
 			return { ...p, value: newValue, time: newTime };
-		});
+			});
 
 		updateTrack(track.id, { volumeEnvelope: { ...envelope, points: updatedPoints } });
 	};
 
 	const handlePointerUp = (e: React.PointerEvent) => {
-		if (draggingPoint && e.pointerId === draggingPoint.pointerId) {
-			isDraggingRef.current = false;
-			setDraggingPoint(null);
-			window.dispatchEvent(new CustomEvent("wav0:automation-drag-end"));
-		}
+			if (draggingPoint && e.pointerId === draggingPoint.pointerId) {
+				isDraggingRef.current = false;
+				setDraggingPoint(null);
+				window.dispatchEvent(new CustomEvent("wav0:automation-drag-end"));
+			}
 	};
 
 	const handleSvgClick = (e: React.MouseEvent<SVGSVGElement>) => {
-		if (!svgRef.current || !envelope) return;
+			if (!svgRef.current || !envelope) return;
 
-		const isCmdCtrlClick = e.metaKey || e.ctrlKey;
-		const isDoubleClick = e.detail === 2;
-		if (!isCmdCtrlClick && !isDoubleClick) return;
+			const isCmdCtrlClick = e.metaKey || e.ctrlKey;
+			const isDoubleClick = e.detail === 2;
+			if (!isCmdCtrlClick && !isDoubleClick) return;
 
-		const rect = svgRef.current.getBoundingClientRect();
-		const x = e.clientX - rect.left;
-		const y = e.clientY - rect.top;
+			const rect = svgRef.current.getBoundingClientRect();
+			const x = e.clientX - rect.left;
+			const y = e.clientY - rect.top;
 
-		const time = x / pxPerMs;
-		const padding = 20;
-		const usableHeight = trackHeight - padding * 2;
-		const normalizedY = (trackHeight - padding - y) / usableHeight;
-		const value = Math.max(0, Math.min(4, normalizedY * 4));
+			const time = x / pxPerMs;
+			const padding = 20;
+			const usableHeight = trackHeight - padding * 2;
+			const normalizedY = (trackHeight - padding - y) / usableHeight;
+			const value = Math.max(0, Math.min(4, normalizedY * 4));
 
-		const newPoint: TrackEnvelopePoint = {
-			id: `point-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-			time,
-			value,
-		};
+			const newPoint: TrackEnvelopePoint = {
+				id: `point-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+				time,
+				value,
+			};
 
-		const updatedEnvelope = addAutomationPoint(envelope, newPoint);
+			const updatedEnvelope = addAutomationPoint(envelope, newPoint);
 		updateTrack(track.id, { volumeEnvelope: updatedEnvelope });
 	};
 

@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useAtom, useAtomValue } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import type { InteractionState } from "../atoms/machines/interaction-machine";
 import {
 	clipDragPreviewAtom,
@@ -67,6 +67,87 @@ export type UseTrackInteractionsReturn = {
 	cancel: () => void;
 };
 
+/**
+ * Actions-only hook - NO subscriptions to preview atoms
+ * Use this in components that only need to dispatch actions
+ */
+export type UseTrackInteractionActionsReturn = {
+	startClipDrag: UseTrackInteractionsReturn["startClipDrag"];
+	startResize: UseTrackInteractionsReturn["startResize"];
+	startLoopDrag: UseTrackInteractionsReturn["startLoopDrag"];
+	move: UseTrackInteractionsReturn["move"];
+	commit: UseTrackInteractionsReturn["commit"];
+	cancel: UseTrackInteractionsReturn["cancel"];
+};
+
+export function useTrackInteractionActions(): UseTrackInteractionActionsReturn {
+	const send = useSetAtom(interactionMachineAtom);
+
+	const startClipDrag = (params: {
+		trackId: string;
+		clipId: string;
+		startX: number;
+		startY: number;
+		startTime: number;
+		originalTrackIndex: number;
+		offsetX: number;
+		offsetY: number;
+		startScrollLeft: number;
+	}) => {
+		send({ type: "START_CLIP_DRAG", ...params });
+	};
+
+	const startResize = (params: {
+		trackId: string;
+		clipId: string;
+		resizeType: "start" | "end";
+		startX: number;
+		startTrimStart: number;
+		startTrimEnd: number;
+		startClipStartTime: number;
+	}) => {
+		send({ type: "START_RESIZE", ...params });
+	};
+
+	const startLoopDrag = (params: {
+		trackId: string;
+		clipId: string;
+		startX: number;
+		startLoopEnd: number | undefined;
+	}) => {
+		send({ type: "START_LOOP_DRAG", ...params });
+	};
+
+	const move = (params: {
+		previewTrackId?: string;
+		previewStartTime?: number;
+		x?: number;
+		y?: number;
+	}) => {
+		send({ type: "MOVE", ...params });
+	};
+
+	const commit = () => {
+		send({ type: "COMMIT" });
+	};
+
+	const cancel = () => {
+		send({ type: "CANCEL" });
+	};
+
+	return {
+		startClipDrag,
+		startResize,
+		startLoopDrag,
+		move,
+		commit,
+		cancel,
+	};
+}
+
+/**
+ * Full hook with subscriptions - Use when you need reactive preview data
+ */
 export function useTrackInteractions(): UseTrackInteractionsReturn {
 	const [, send] = useAtom(interactionMachineAtom);
 	const state = useAtomValue(interactionStateAtom);

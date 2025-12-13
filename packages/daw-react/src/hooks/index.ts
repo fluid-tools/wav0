@@ -28,7 +28,9 @@ export { usePlaybackSync } from "./use-playback-sync";
 // Timebase hooks
 export { useTimebase } from "./use-timebase";
 export {
+	type UseTrackInteractionActionsReturn,
 	type UseTrackInteractionsReturn,
+	useTrackInteractionActions,
 	useTrackInteractions,
 } from "./use-track-interactions";
 export type { UseTransportEventsOptions } from "./use-transport-events";
