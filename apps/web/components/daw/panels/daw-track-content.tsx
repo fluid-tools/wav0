@@ -366,10 +366,6 @@ const localDragPreviewRenderDataAtom = atom((get) => {
 const DragPreviewOverlay = memo(function DragPreviewOverlay() {
 	const renderData = useAtomValue(localDragPreviewRenderDataAtom);
 
-	// #region agent log
-	fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-track-content.tsx:DragPreviewOverlay',message:'DragPreviewOverlay render',data:{hasRenderData:!!renderData},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H6'})}).catch(()=>{});
-	// #endregion
-
 	if (!renderData) return null;
 
 	return (
@@ -408,9 +404,6 @@ const TrackRow = memo(function TrackRow({
 	onStartLoopDrag,
 	onFadeChange,
 }: TrackRowProps) {
-	// #region agent log
-	fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-track-content.tsx:TrackRow',message:'TrackRow render',data:{trackId:track.id,index,isSelected,clipsLen:track.clips?.length??0},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
-	// #endregion
 	const trackY = index * trackHeight;
 
 	// Get clips for this track
@@ -608,9 +601,6 @@ const TrackRow = memo(function TrackRow({
 }, trackRowPropsAreEqual);
 
 export function DAWTrackContent() {
-	// #region agent log
-	fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-track-content.tsx:DAWTrackContent',message:'DAWTrackContent render',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
-	// #endregion
 	const [tracks, setTracks] = useAtom(tracksAtom);
 	const [selectedTrackId, setSelectedTrackId] = useAtom(selectedTrackIdAtom);
 	const [selectedClipId, setSelectedClipId] = useAtom(selectedClipIdAtom);
@@ -939,18 +929,9 @@ export function DAWTrackContent() {
 		};
 
 		const onUp = async () => {
-			// #region agent log
-			fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-track-content.tsx:onUp',message:'onUp START',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2,H3'})}).catch(()=>{});
-			// #endregion
 			// Cleanup via state machine - no try/finally needed
 			const cleanup = () => {
-				// #region agent log
-				fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-track-content.tsx:cleanup',message:'commitInteraction BEFORE',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
-				// #endregion
 				commitInteraction(); // Machine resets to idle, clearing all state
-				// #region agent log
-				fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-track-content.tsx:cleanup',message:'commitInteraction AFTER',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
-				// #endregion
 				lastPointer.current = null;
 				if (raf) cancelAnimationFrame(raf);
 			};
@@ -970,9 +951,6 @@ export function DAWTrackContent() {
 						pointIdsToRemove: string[];
 					} | null = null;
 
-					// #region agent log
-					fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-track-content.tsx:onUp',message:'setTracks BEFORE',data:{dragPreviewTrackId:dragPreview.previewTrackId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2,H4'})}).catch(()=>{});
-					// #endregion
 					setTracks((prev) => {
 						const originalTrack = prev.find(
 							(t) => t.id === dragPreview.originalTrackId,
@@ -1194,9 +1172,6 @@ export function DAWTrackContent() {
 						}
 					}
 				}
-			// #region agent log
-			fetch('http://127.0.0.1:7242/ingest/0a60aa8d-6783-4d70-bd00-4ed3f63d6711',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'daw-track-content.tsx:onUp',message:'cleanup BEFORE (after all setTracks)',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2,H3'})}).catch(()=>{});
-			// #endregion
 			cleanup();
 		};
 

@@ -2,19 +2,16 @@
 
 import {
 	isPlayingAtom,
-	selectedClipIdAtom,
-	selectedTrackIdAtom,
+	selectedClipLoopStateAtom,
 	setTimelineZoomAtom,
 	setTrackHeightZoomAtom,
 	stopPlaybackAtom,
 	timelineAtom,
 	togglePlaybackAtom,
 	trackHeightZoomAtom,
-	tracksAtom,
 	updateClipAtom,
 	useDAWContext,
 } from "@wav0/daw-react";
-import { computeLoopEndMs } from "@wav0/daw-sdk";
 import { useAtomValue, useSetAtom } from "jotai";
 import {
 	ChevronsUpDown,
@@ -80,10 +77,8 @@ const DAWControls = memo(function DAWControls() {
 	const setTrackHeightZoom = useSetAtom(setTrackHeightZoomAtom);
 	const daw = useDAWContext();
 
-	// Selection and clip update atoms
-	const selectedTrackId = useAtomValue(selectedTrackIdAtom);
-	const selectedClipId = useAtomValue(selectedClipIdAtom);
-	const tracks = useAtomValue(tracksAtom);
+	// Selected clip loop state - only re-renders when selection or loop state changes
+	const selectedClipData = useAtomValue(selectedClipLoopStateAtom);
 	const updateClip = useSetAtom(updateClipAtom);
 
 	const handleStop = async () => {
@@ -111,53 +106,37 @@ const DAWControls = memo(function DAWControls() {
 		setTrackHeightZoom(Math.max(trackHeightZoom - 0.2, 0.6));
 	};
 
-	// Selected clip lookup
-	const findSelectedClip = () => {
-		if (!selectedTrackId || !selectedClipId)
-			return null as {
-				track: import("@wav0/daw-sdk").Track;
-				clip: import("@wav0/daw-sdk").Clip;
-			} | null;
-		const track = tracks.find((t) => t.id === selectedTrackId);
-		if (!track || !track.clips) return null;
-		const clip = track.clips.find((c) => c.id === selectedClipId);
-		if (!clip) return null;
-		return { track, clip } as const;
-	};
-
-	const loopState = (() => {
-		const sel = findSelectedClip();
-		return sel?.clip?.loop === true;
-	})();
+	const loopState = selectedClipData?.loop ?? false;
 
 	const onToggleLoop = async (e?: React.MouseEvent) => {
-		const sel = findSelectedClip();
-		if (!sel) return;
-		const { track, clip } = sel;
-		const isLooping = clip.loop === true;
+		if (!selectedClipData) return;
+		const { trackId, clipId, loop: isLooping, loopEnd: currentLoopEnd, trimStart, trimEnd, startTime } = selectedClipData;
+		
 		if (isLooping) {
-			await updateClip(track.id, clip.id, { loop: false, loopEnd: undefined });
+			await updateClip(trackId, clipId, { loop: false, loopEnd: undefined });
 			return;
 		}
 		// enabling loop
 		const infinite = !!(e && (e.shiftKey || e.altKey));
 		if (infinite) {
-			await updateClip(track.id, clip.id, { loop: true, loopEnd: undefined });
+			await updateClip(trackId, clipId, { loop: true, loopEnd: undefined });
 			return;
 		}
-		let loopEnd = clip.loopEnd;
+		let loopEnd = currentLoopEnd;
 		if (loopEnd === undefined) {
-			loopEnd = computeLoopEndMs(clip);
+			// Compute default loop end (2x clip duration)
+			const clipDuration = trimEnd - trimStart;
+			loopEnd = startTime + clipDuration * 2;
 		}
 		// If playhead is past computed loopEnd, extend to include current position
-		const clipDuration = clip.trimEnd - clip.trimStart;
+		const clipDuration = trimEnd - trimStart;
 		const transportTime = daw?.getTransport().getCurrentTime() ?? 0;
 		if (clipDuration > 0 && transportTime >= loopEnd) {
-			const pastEnd = transportTime - clip.startTime;
+			const pastEnd = transportTime - startTime;
 			const cycles = Math.ceil(pastEnd / clipDuration);
-			loopEnd = clip.startTime + clipDuration * (cycles + 2);
+			loopEnd = startTime + clipDuration * (cycles + 2);
 		}
-		await updateClip(track.id, clip.id, { loop: true, loopEnd });
+		await updateClip(trackId, clipId, { loop: true, loopEnd });
 	};
 
 	return (
@@ -263,7 +242,7 @@ const DAWControls = memo(function DAWControls() {
 					variant={loopState ? "secondary" : "ghost"}
 					size="sm"
 					onClick={(e) => onToggleLoop(e)}
-					disabled={!findSelectedClip()}
+					disabled={!selectedClipData}
 					title="Toggle loop for selected clip (Shift = infinite)"
 					aria-label="Toggle loop for selected clip"
 				>

@@ -163,6 +163,39 @@ export const isSeekingAtom = atom<boolean>(false);
 // ===== Derived Atoms =====
 
 /**
+ * Track count atom - only re-renders when number of tracks changes
+ * Use this instead of tracksAtom when you only need the count
+ */
+export const tracksCountAtom = atom((get) => get(tracksAtom).length);
+
+/**
+ * Selected clip with loop state - for UI components that need to show loop toggle
+ * Only re-renders when selection changes or selected clip's loop state changes
+ */
+export const selectedClipLoopStateAtom = atom((get) => {
+	const selectedTrackId = get(selectedTrackIdAtom);
+	const selectedClipId = get(selectedClipIdAtom);
+	if (!selectedTrackId || !selectedClipId) return null;
+
+	const tracks = get(tracksAtom);
+	const track = tracks.find((t) => t.id === selectedTrackId);
+	if (!track?.clips) return null;
+
+	const clip = track.clips.find((c) => c.id === selectedClipId);
+	if (!clip) return null;
+
+	return {
+		trackId: track.id,
+		clipId: clip.id,
+		loop: clip.loop ?? false,
+		loopEnd: clip.loopEnd,
+		trimStart: clip.trimStart,
+		trimEnd: clip.trimEnd,
+		startTime: clip.startTime,
+	};
+});
+
+/**
  * Total duration across all tracks/clips
  * Uses trimmed region (trimEnd - trimStart) for accurate duration calculation
  */

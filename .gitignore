@@ -11,3 +11,5 @@ opencode.json
 
 .DS_Store
 Trace-20251202T163614.json
+
+.cursor/debug.log

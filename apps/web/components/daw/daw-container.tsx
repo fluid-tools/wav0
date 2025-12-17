@@ -13,6 +13,7 @@ import {
 	timelineWidthAtom,
 	trackHeightZoomAtom,
 	tracksAtom,
+	tracksCountAtom,
 	useBridges,
 	useDAWAtomSync,
 	useDAWContext,
@@ -53,7 +54,7 @@ export function DAWContainer() {
 
 	const store = useStore();
 	const timelineWidth = useAtomValue(timelineWidthAtom);
-	const tracks = useAtomValue(tracksAtom);
+	const tracksCount = useAtomValue(tracksCountAtom);
 	const trackHeightZoom = useAtomValue(trackHeightZoomAtom);
 	const addTrack = useSetAtom(addTrackAtom);
 	const setHorizontalScroll = useSetAtom(horizontalScrollAtom);
@@ -263,7 +264,7 @@ export function DAWContainer() {
 	const currentTrackHeight = Math.round(
 		DAW_HEIGHTS.TRACK_ROW * trackHeightZoom,
 	);
-	const contentHeight = Math.max(tracks.length * currentTrackHeight, 400);
+	const contentHeight = Math.max(tracksCount * currentTrackHeight, 400);
 
 	const scheduleScrollSync = (scrollLeft: number, scrollTop: number) => {
 			const controller = gridControllerRef.current;
@@ -464,15 +465,15 @@ export function DAWContainer() {
 									}}
 								>
 									<h3 className={DAW_TEXT.SECTION_TITLE}>Tracks</h3>
-									<Button
-										variant="ghost"
-										size="sm"
-										onClick={() => {
-											const trackNumber = tracks.length + 1;
-											const colorIndex =
-												tracks.length % DAW_COLORS.TRACK_COLORS.length;
+								<Button
+									variant="ghost"
+									size="sm"
+									onClick={() => {
+										const trackNumber = tracksCount + 1;
+										const colorIndex =
+											tracksCount % DAW_COLORS.TRACK_COLORS.length;
 
-											addTrack({
+										addTrack({
 												name: `Track ${trackNumber}`,
 												duration: 0,
 												startTime: 0,
