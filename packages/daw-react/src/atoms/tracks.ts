@@ -14,6 +14,8 @@ import type {
 import { atom } from "jotai";
 import { bindEnvelopeToClips } from "../utils/envelope-helpers";
 import {
+	audioInitializedAtom,
+	audioInitializingAtom,
 	createDefaultEnvelope,
 	DEFAULT_TRACK_1,
 	playbackAtom,
@@ -23,7 +25,7 @@ import {
 	totalDurationAtom,
 	tracksAtom,
 } from "./base";
-import { serviceRegistry } from "./service-registry";
+import { servicesAtom } from "./service-registry";
 
 // ===== Helper Functions =====
 
@@ -57,9 +59,10 @@ export const addTrackAtom = atom(
 
 		// Synchronize with playback service if playing
 		const playback = get(playbackAtom);
-		if (playback.isPlaying && serviceRegistry.playbackService) {
+		const { playbackService } = get(servicesAtom);
+		if (playback.isPlaying && playbackService) {
 			try {
-				await serviceRegistry.playbackService.synchronizeTracks(updatedTracks);
+				await playbackService.synchronizeTracks(updatedTracks);
 			} catch (error) {
 				console.error("Failed to synchronize tracks after adding", error);
 			}
@@ -114,24 +117,22 @@ export const updateTrackAtom = atom(
 		if (!updatedTrack) return;
 
 		// Sync with playback service
-		if (serviceRegistry.playbackService) {
+		const { playbackService } = get(servicesAtom);
+		if (playbackService) {
 			try {
-				await serviceRegistry.playbackService.synchronizeTracks(updatedTracks);
+				await playbackService.synchronizeTracks(updatedTracks);
 			} catch (error) {
 				console.error("Failed to synchronize tracks after update", error);
 			}
 
 			if (typeof updates.volume === "number") {
-				serviceRegistry.playbackService.updateTrackVolume(
-					trackId,
-					updates.volume,
-				);
+				playbackService.updateTrackVolume(trackId, updates.volume);
 			}
 			if (typeof updates.muted === "boolean") {
 				const track = updatedTracks.find((t) => t.id === trackId);
 				const soloEngaged = updatedTracks.some((t) => t.soloed);
 				const isSoloed = track?.soloed ?? false;
-				serviceRegistry.playbackService.updateTrackMute(
+				playbackService.updateTrackMute(
 					trackId,
 					updates.muted,
 					isSoloed,
@@ -139,7 +140,7 @@ export const updateTrackAtom = atom(
 				);
 			}
 			if (typeof updates.soloed === "boolean") {
-				serviceRegistry.playbackService.updateSoloStates(updatedTracks);
+				playbackService.updateSoloStates(updatedTracks);
 			}
 		}
 	},
@@ -154,41 +155,53 @@ export const renameTrackAtom = atom(
 	},
 );
 
-export const initializeAudioFromOPFSAtom = atom(null, async (get, _set) => {
-	if (!serviceRegistry.audioService) {
-		// Expected on first render - will retry when AudioServiceBridge is ready
+export const initializeAudioFromOPFSAtom = atom(null, async (get, set) => {
+	const { audioService } = get(servicesAtom);
+	if (!audioService) {
+		// Expected on first render - will retry when services are ready
 		return;
 	}
+
+	// Mark as initializing
+	set(audioInitializingAtom, true);
+
 	const tracks = get(tracksAtom);
 	const loadedIds = new Set<string>();
 
-	for (const track of tracks) {
-		// Load clip audio (primary - this is what playback uses)
-		for (const clip of track.clips ?? []) {
-			if (!clip.opfsFileId || loadedIds.has(clip.opfsFileId)) continue;
-			loadedIds.add(clip.opfsFileId);
-			try {
-				await serviceRegistry.audioService.loadTrackFromOPFS(
-					clip.opfsFileId,
-					clip.audioFileName ?? clip.name ?? "",
-				);
-			} catch (error) {
-				console.error("Failed to load clip audio:", clip.name, error);
+	try {
+		for (const track of tracks) {
+			// Load clip audio (primary - this is what playback uses)
+			for (const clip of track.clips ?? []) {
+				if (!clip.opfsFileId || loadedIds.has(clip.opfsFileId)) continue;
+				loadedIds.add(clip.opfsFileId);
+				try {
+					await audioService.loadTrackFromOPFS(
+						clip.opfsFileId,
+						clip.audioFileName ?? clip.name ?? "",
+					);
+				} catch (error) {
+					console.error("Failed to load clip audio:", clip.name, error);
+				}
+			}
+
+			// Backward compatibility: load track-level opfsFileId if no clips loaded it
+			if (track.opfsFileId && !loadedIds.has(track.opfsFileId)) {
+				loadedIds.add(track.opfsFileId);
+				try {
+					await audioService.loadTrackFromOPFS(
+						track.opfsFileId,
+						track.audioFileName ?? track.name ?? "",
+					);
+				} catch (error) {
+					console.error("Failed to load track audio:", track.name, error);
+				}
 			}
 		}
 
-		// Backward compatibility: load track-level opfsFileId if no clips loaded it
-		if (track.opfsFileId && !loadedIds.has(track.opfsFileId)) {
-			loadedIds.add(track.opfsFileId);
-			try {
-				await serviceRegistry.audioService.loadTrackFromOPFS(
-					track.opfsFileId,
-					track.audioFileName ?? track.name ?? "",
-				);
-			} catch (error) {
-				console.error("Failed to load track audio:", track.name, error);
-			}
-		}
+		// Mark as initialized
+		set(audioInitializedAtom, true);
+	} finally {
+		set(audioInitializingAtom, false);
 	}
 });
 
@@ -201,17 +214,15 @@ export const loadAudioFileAtom = atom(
 		existingTrackId?: string,
 		opts?: { startTimeMs?: number },
 	) => {
-		if (!serviceRegistry.audioService) {
+		const { audioService, playbackService, generateTrackId } =
+			get(servicesAtom);
+		if (!audioService) {
 			throw new Error("Audio service not registered");
 		}
 
-		const generateId =
-			serviceRegistry.generateTrackId ?? (() => crypto.randomUUID());
+		const generateId = generateTrackId ?? (() => crypto.randomUUID());
 		const opfsFileId = generateId();
-		const audioInfo = await serviceRegistry.audioService.loadAudioFile(
-			file,
-			opfsFileId,
-		);
+		const audioInfo = await audioService.loadAudioFile(file, opfsFileId);
 
 		if (existingTrackId) {
 			const tracks = get(tracksAtom);
@@ -251,12 +262,9 @@ export const loadAudioFileAtom = atom(
 				set(tracksAtom, allTracks);
 
 				const playback = get(playbackAtom);
-				if (playback.isPlaying && serviceRegistry.playbackService) {
+				if (playback.isPlaying && playbackService) {
 					try {
-						await serviceRegistry.playbackService.rescheduleTrack(
-							updatedTrack,
-							allTracks,
-						);
+						await playbackService.rescheduleTrack(updatedTrack, allTracks);
 					} catch (error) {
 						console.error("Failed to reschedule after adding clip", error);
 					}
@@ -303,13 +311,10 @@ export const loadAudioFileAtom = atom(
 		set(tracksAtom, [...get(tracksAtom), newTrack]);
 
 		const playback = get(playbackAtom);
-		if (playback.isPlaying && serviceRegistry.playbackService) {
+		if (playback.isPlaying && playbackService) {
 			try {
 				const allTracks = get(tracksAtom);
-				await serviceRegistry.playbackService.rescheduleTrack(
-					newTrack,
-					allTracks,
-				);
+				await playbackService.rescheduleTrack(newTrack, allTracks);
 			} catch (error) {
 				console.error("Failed to reschedule after creating track", error);
 			}
@@ -325,7 +330,7 @@ export const selectedTrackAtom = atom((get) => {
 	return tracks.find((track) => track.id === selectedId) || null;
 });
 
-export const clearTracksAtom = atom(null, (_get, set) => {
+export const clearTracksAtom = atom(null, (get, set) => {
 	// Create fresh copy of default track to avoid mutations (preserves stable ID)
 	const defaultTrack: Track = {
 		...DEFAULT_TRACK_1,
@@ -336,11 +341,13 @@ export const clearTracksAtom = atom(null, (_get, set) => {
 	set(selectedTrackIdAtom, null);
 	set(selectedClipIdAtom, null);
 
-	serviceRegistry.playbackService?.stop().catch(console.error);
+	const { playbackService } = get(servicesAtom);
+	playbackService?.stop().catch(console.error);
 });
 
-export const resetProjectAtom = atom(null, (_get, set) => {
-	serviceRegistry.playbackService?.stop().catch(console.error);
+export const resetProjectAtom = atom(null, (get, set) => {
+	const { playbackService } = get(servicesAtom);
+	playbackService?.stop().catch(console.error);
 
 	// Create fresh copy of default track to avoid mutations (preserves stable ID)
 	const defaultTrack: Track = {

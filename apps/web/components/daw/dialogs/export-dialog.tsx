@@ -5,8 +5,13 @@ import {
 	encode,
 	renderProjectToAudioBuffer,
 } from "@wav0/daw-sdk";
-import { loopRegionAtom, projectNameAtom, tracksAtom } from "@wav0/daw-react";
-import { useAtom } from "jotai";
+import {
+	loopRegionAtom,
+	projectNameAtom,
+	servicesAtom,
+	tracksAtom,
+} from "@wav0/daw-react";
+import { useAtom, useAtomValue } from "jotai";
 import {
 	useCallback,
 	useEffect,
@@ -27,7 +32,6 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { serviceRegistry } from "@wav0/daw-react";
 
 type Props = { open: boolean; onOpenChange: (v: boolean) => void };
 
@@ -47,11 +51,12 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 	const [tracks] = useAtom(tracksAtom);
 	const [projectName] = useAtom(projectNameAtom);
 	const [loopRegion] = useAtom(loopRegionAtom);
+	const services = useAtomValue(servicesAtom);
 
-	// AudioBufferProvider wrapper for service registry
+	// AudioBufferProvider wrapper for services atom
 	const audioProvider = {
 		getAudioBuffer: (opfsFileId: string, fileName: string) =>
-			serviceRegistry.audioService?.getAudioBuffer(opfsFileId, fileName) ??
+			services.audioService?.getAudioBuffer(opfsFileId, fileName) ??
 			Promise.resolve(null),
 	};
 

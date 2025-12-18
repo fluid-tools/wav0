@@ -14,7 +14,7 @@ import {
 	selectedTrackIdAtom,
 	tracksAtom,
 } from "./base";
-import { serviceRegistry } from "./service-registry";
+import { servicesAtom } from "./service-registry";
 
 // ===== Write Atoms =====
 
@@ -126,9 +126,10 @@ export const updateClipAtom = atom(
 		set(tracksAtom, updatedTracks);
 
 		// Synchronize via global path
-		if (playback.isPlaying && serviceRegistry.playbackService) {
+		const { playbackService } = get(servicesAtom);
+		if (playback.isPlaying && playbackService) {
 			try {
-				await serviceRegistry.playbackService.synchronizeTracks(updatedTracks);
+				await playbackService.synchronizeTracks(updatedTracks);
 			} catch (error) {
 				console.error("Failed to synchronize tracks after clip update", error);
 			}
@@ -200,9 +201,10 @@ export const removeClipAtom = atom(
 		}
 
 		// Synchronize via global path
-		if (playback.isPlaying && serviceRegistry.playbackService) {
+		const { playbackService } = get(servicesAtom);
+		if (playback.isPlaying && playbackService) {
 			try {
-				await serviceRegistry.playbackService.synchronizeTracks(updatedTracks);
+				await playbackService.synchronizeTracks(updatedTracks);
 			} catch (error) {
 				console.error("Failed to synchronize tracks after clip removal", error);
 			}
@@ -260,9 +262,10 @@ export const splitClipAtPlayheadAtom = atom(null, async (get, set) => {
 	set(tracksAtom, updatedTracks);
 	set(selectedClipIdAtom, newRight.id);
 
-	if (playback.isPlaying && serviceRegistry.playbackService) {
+	const { playbackService } = get(servicesAtom);
+	if (playback.isPlaying && playbackService) {
 		try {
-			await serviceRegistry.playbackService.synchronizeTracks(updatedTracks);
+			await playbackService.synchronizeTracks(updatedTracks);
 		} catch (error) {
 			console.error("Failed to synchronize after split", error);
 		}

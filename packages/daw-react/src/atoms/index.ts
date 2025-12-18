@@ -6,8 +6,6 @@
 export * from "./base";
 // Clip write atoms
 export * from "./clips";
-// Drag machine (legacy)
-export { dragMachine } from "./machines/drag-machine";
 // Unified interaction machine (handles clip drag, resize, loop drag)
 export {
 	type InteractionContext,
@@ -19,9 +17,18 @@ export {
 export * from "./playback";
 // Project atoms (markers, grid, musical metadata)
 export * from "./project";
-// Service registration (single shared registry for all atoms)
-export type { ServiceRegistry } from "./service-registry";
-export { registerServices, serviceRegistry } from "./service-registry";
+// Service atoms (reactive service access)
+export type {
+	AudioService,
+	PlaybackService,
+	ServiceRegistry,
+	Services,
+} from "./service-registry";
+export {
+	registerServices,
+	serviceRegistry,
+	servicesAtom,
+} from "./service-registry";
 // Storage utilities
 export { atomWithStorage } from "./storage";
 // Timeline write atoms (zoom, scroll, snap, sections)

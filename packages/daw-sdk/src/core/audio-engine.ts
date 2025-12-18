@@ -87,7 +87,18 @@ export class AudioEngine extends EventTarget {
 	): Promise<
 		AsyncIterableIterator<{ buffer: AudioBuffer; timestamp: number }>
 	> {
-		const track = this.loadedTracks.get(audioId);
+		let track = this.loadedTracks.get(audioId);
+
+		// Self-healing: if track not loaded, try to load from OPFS
+		if (!track && this.opfsManager) {
+			try {
+				await this.loadFromOPFS(audioId, "");
+				track = this.loadedTracks.get(audioId);
+			} catch (e) {
+				// OPFS load failed, fall through to error
+			}
+		}
+
 		if (!track) throw new Error(`Audio ${audioId} not loaded`);
 
 		return track.sink.buffers(startTime, endTime);
@@ -140,7 +151,7 @@ export class AudioEngine extends EventTarget {
 
 		// Cache the result with LRU eviction
 		this.audioBufferCache.set(opfsFileId, result);
-		
+
 		// Evict oldest entry if cache exceeds max size
 		if (this.audioBufferCache.size > AudioEngine.MAX_CACHE_SIZE) {
 			const oldest = this.audioBufferCache.keys().next().value;
@@ -148,7 +159,7 @@ export class AudioEngine extends EventTarget {
 				this.audioBufferCache.delete(oldest);
 			}
 		}
-		
+
 		return result;
 	}
 

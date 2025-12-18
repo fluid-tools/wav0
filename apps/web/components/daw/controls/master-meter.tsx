@@ -1,18 +1,19 @@
 "use client";
 
-import { isPlayingAtom, serviceRegistry } from "@wav0/daw-react";
+import { isPlayingAtom, servicesAtom } from "@wav0/daw-react";
 import {
 	METER_DB_CHANGE_THRESHOLD,
 	METER_UPDATE_INTERVAL_MS,
 	volume,
 } from "@wav0/daw-sdk";
-import { useAtomValue } from "jotai";
+import { useAtomValue, useStore } from "jotai";
 import { memo, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 // Memoized to prevent re-renders from parent - has its own update loop
 export const MasterMeter = memo(function MasterMeter() {
 	const isPlaying = useAtomValue(isPlayingAtom);
+	const store = useStore();
 	const [db, setDb] = useState(Number.NEGATIVE_INFINITY);
 	const lastDbRef = useRef(Number.NEGATIVE_INFINITY);
 	const rafIdRef = useRef<number | null>(null);
@@ -46,9 +47,9 @@ export const MasterMeter = memo(function MasterMeter() {
 			}
 			lastUpdateTime = timestamp;
 
+			const { playbackService } = store.get(servicesAtom);
 			const currentDb =
-				serviceRegistry.playbackService?.getMasterDb() ??
-				Number.NEGATIVE_INFINITY;
+				playbackService?.getMasterDb() ?? Number.NEGATIVE_INFINITY;
 
 			// Avoid re-renders when value is effectively unchanged (METER_DB_CHANGE_THRESHOLD)
 			if (Math.abs(currentDb - lastDbRef.current) > METER_DB_CHANGE_THRESHOLD) {
@@ -67,7 +68,7 @@ export const MasterMeter = memo(function MasterMeter() {
 				rafIdRef.current = null;
 			}
 		};
-	}, [isPlaying]);
+	}, [isPlaying, store]);
 
 	// Calculate fill percentage for visual bar
 	const minDb = -60;

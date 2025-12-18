@@ -29,6 +29,51 @@ export type TrackEnvelopeSegment = {
 
 export namespace automation {
 	/**
+	 * Find interpolation context at a given time
+	 * Returns previous point, next point, and interpolated multiplier
+	 */
+	export function interpolateEnvelopeValue(
+		sortedPoints: TrackEnvelopePoint[],
+		segments: TrackEnvelopeSegment[] | undefined,
+		timeMs: number,
+	): {
+		multiplier: number;
+		prevPoint: TrackEnvelopePoint | null;
+		nextPoint: TrackEnvelopePoint | null;
+	} {
+		let multiplier = 1.0;
+		let prevPoint: TrackEnvelopePoint | null = null;
+		let nextPoint: TrackEnvelopePoint | null = null;
+
+		for (let i = 0; i < sortedPoints.length; i++) {
+			const point = sortedPoints[i];
+			if (point.time <= timeMs) {
+				multiplier = point.value;
+				prevPoint = point;
+				nextPoint = sortedPoints[i + 1] || null;
+			} else {
+				nextPoint = point;
+				break;
+			}
+		}
+
+		// If between two points, interpolate with curve
+		if (prevPoint && nextPoint && timeMs < nextPoint.time) {
+			const segment = segments?.find(
+				(seg) =>
+					seg.fromPointId === prevPoint!.id && seg.toPointId === nextPoint!.id,
+			);
+			const t = (timeMs - prevPoint.time) / (nextPoint.time - prevPoint.time);
+			const curve = segment?.curve ?? 0;
+			const curvedT = curves.applyCurvedT(t, curve);
+			multiplier =
+				prevPoint.value + (nextPoint.value - prevPoint.value) * curvedT;
+		}
+
+		return { multiplier, prevPoint, nextPoint };
+	}
+
+	/**
 	 * Get envelope multiplier at specific time with interpolation
 	 * Uses segment-based curves (Logic Pro style)
 	 */
@@ -68,6 +113,37 @@ export namespace automation {
 		}
 
 		return 1.0;
+	}
+
+	/**
+	 * Generate Float32Array of gain values for Web Audio API setValueCurveAtTime
+	 * @param baseVolume Base volume (linear gain)
+	 * @param startMultiplier Envelope multiplier at segment start
+	 * @param endMultiplier Envelope multiplier at segment end
+	 * @param curve Curve value (-99 to +99)
+	 * @param durationSec Segment duration in seconds
+	 * @param stepsPerSecond Number of steps per second (default 60)
+	 */
+	export function generateSegmentCurveValues(
+		baseVolume: number,
+		startMultiplier: number,
+		endMultiplier: number,
+		curve: number,
+		durationSec: number,
+		stepsPerSecond = 60,
+	): Float32Array {
+		const steps = Math.max(2, Math.ceil(durationSec * stepsPerSecond));
+		const values = new Float32Array(steps);
+
+		for (let i = 0; i < steps; i++) {
+			const t = i / (steps - 1);
+			const curvedT = curves.applyCurvedT(t, curve);
+			const mult =
+				startMultiplier + (endMultiplier - startMultiplier) * curvedT;
+			values[i] = baseVolume * mult;
+		}
+
+		return values;
 	}
 
 	/**

@@ -1,5 +1,5 @@
 /**
- * UI state atoms - selection, tools, inspector, drag machine
+ * UI state atoms - selection, tools, inspector, interaction machine
  */
 
 "use client";
@@ -24,7 +24,6 @@ import {
 	trackAutomationTypeAtom,
 	trackHeightZoomAtom,
 } from "./base";
-import { dragMachine } from "./machines/drag-machine";
 import {
 	type InteractionContext,
 	type InteractionState,
@@ -89,33 +88,6 @@ export const setProjectNameAtom = atom(null, (_get, set, name: string) => {
 	const trimmed = name.trim();
 	if (!trimmed) return;
 	set(projectNameAtom, trimmed);
-});
-
-/**
- * Drag state machine atom (XState-powered)
- */
-export const dragMachineAtom = atomWithMachine(() => dragMachine);
-
-/**
- * Read-only drag preview atom derived from machine state
- */
-export const dragPreviewAtom = atom((get) => {
-	const snapshot = get(dragMachineAtom);
-	const { context, value } = snapshot;
-
-	if (value === "idle" || !context.clipId) {
-		return null;
-	}
-
-	return {
-		clipId: context.clipId,
-		originalTrackId: context.originTrackId ?? "",
-		originalStartTime: context.originStartTime,
-		previewTrackId: context.previewTrackId ?? "",
-		previewStartTime: context.previewStartTime,
-		cursorOffsetX: context.cursorOffsetX,
-		cursorOffsetY: context.cursorOffsetY,
-	};
 });
 
 /**

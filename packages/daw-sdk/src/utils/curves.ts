@@ -5,6 +5,19 @@
 
 export namespace curves {
 	/**
+	 * Apply curve transformation to a normalized progress value (0-1)
+	 * @param t Progress 0-1
+	 * @param curve Curve amount: -99 to +99 (0 = linear, negative = exponential, positive = logarithmic)
+	 * @returns Curved progress value (0-1)
+	 */
+	export function applyCurvedT(t: number, curve: number): number {
+		if (curve === 0) return t;
+
+		const power = 1 + (Math.abs(curve) / 99) * 3;
+		return curve < 0 ? t ** power : 1 - (1 - t) ** power;
+	}
+
+	/**
 	 * Evaluate curve between two values using -99 to +99 curve parameter
 	 * @param start Starting value
 	 * @param end Ending value
@@ -18,27 +31,8 @@ export namespace curves {
 		curve: number,
 	): number {
 		const clamped = Math.max(0, Math.min(1, t));
-
-		if (curve === 0) {
-			// Linear
-			return start + (end - start) * clamped;
-		}
-
-		// Normalize curve to 0-1 range
-		const normalized = Math.abs(curve) / 99;
-
-		let adjusted: number;
-		if (curve < 0) {
-			// Negative = Exponential (fast start, slow end)
-			const power = 1 + normalized * 3;
-			adjusted = clamped ** power;
-		} else {
-			// Positive = Logarithmic (slow start, fast end)
-			const power = 1 + normalized * 3;
-			adjusted = 1 - (1 - clamped) ** power;
-		}
-
-		return start + (end - start) * adjusted;
+		const curvedT = applyCurvedT(clamped, curve);
+		return start + (end - start) * curvedT;
 	}
 
 	/**

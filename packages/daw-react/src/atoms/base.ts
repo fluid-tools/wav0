@@ -160,6 +160,14 @@ export const playheadAutoFollowEnabledAtom = atom<boolean>(true);
 // Flag to suppress isPlaying sync during seek operations (prevents pause→play flicker)
 export const isSeekingAtom = atom<boolean>(false);
 
+/**
+ * Audio initialization state
+ * Tracks whether audio has been loaded from OPFS into AudioEngine
+ * Playback should wait for this to be true before starting
+ */
+export const audioInitializedAtom = atom<boolean>(false);
+export const audioInitializingAtom = atom<boolean>(false);
+
 // ===== Derived Atoms =====
 
 /**

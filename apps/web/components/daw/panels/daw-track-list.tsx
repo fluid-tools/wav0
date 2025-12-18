@@ -5,7 +5,7 @@ import {
 	isPlayingAtom,
 	removeTrackAtom,
 	selectedTrackIdAtom,
-	serviceRegistry,
+	servicesAtom,
 	setTrackHeightZoomAtom,
 	trackAutomationTypeAtom,
 	trackHeightZoomAtom,
@@ -14,7 +14,7 @@ import {
 } from "@wav0/daw-react";
 import type { AutomationType, Track } from "@wav0/daw-sdk";
 import { volume } from "@wav0/daw-sdk";
-import { useAtom } from "jotai";
+import { useAtom, useStore } from "jotai";
 import { GripHorizontal, MoreVertical, Volume2, VolumeX } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import {
@@ -320,11 +320,11 @@ const TrackListRow = memo(function TrackListRow({
 								{volumeLabel}
 							</span>
 							{track.volumeEnvelope?.enabled && (
-				<LiveAutomationBadge
-					envelope={track.volumeEnvelope}
-					baseVolume={track.volume ?? 75}
-					isPlaying={isPlaying}
-				/>
+								<LiveAutomationBadge
+									envelope={track.volumeEnvelope}
+									baseVolume={track.volume ?? 75}
+									isPlaying={isPlaying}
+								/>
 							)}
 						</div>
 					</div>
@@ -361,6 +361,7 @@ export function DAWTrackList() {
 	);
 	// Use isPlayingAtom instead of playbackAtom to avoid re-renders on currentTime changes
 	const [isPlaying] = useAtom(isPlayingAtom);
+	const store = useStore();
 	// Ref to read isPlaying in callbacks without adding to deps (prevents callback recreation on play/pause)
 	const isPlayingRef = useRef(isPlaying);
 	useEffect(() => {
@@ -409,8 +410,9 @@ export function DAWTrackList() {
 	const handleVolumeChange = (trackId: string, volumePercent: number) => {
 		const volumeDb = volume.volumeToDb(volumePercent);
 		updateTrack(trackId, { volume: volumePercent, volumeDb });
-		if (isPlayingRef.current && serviceRegistry.playbackService) {
-			serviceRegistry.playbackService.updateTrackVolumeRealtime(trackId, volumeDb);
+		const { playbackService } = store.get(servicesAtom);
+		if (isPlayingRef.current && playbackService) {
+			playbackService.updateTrackVolumeRealtime(trackId, volumeDb);
 		}
 	};
 
@@ -426,7 +428,10 @@ export function DAWTrackList() {
 
 	const handleDeleteTrack = (trackId: string) => removeTrack(trackId);
 
-	const handleAutomationTypeChange = (trackId: string, type: AutomationType) => {
+	const handleAutomationTypeChange = (
+		trackId: string,
+		type: AutomationType,
+	) => {
 		const newMap = new Map(trackAutomationTypes);
 		newMap.set(trackId, type);
 		setTrackAutomationTypes(newMap);

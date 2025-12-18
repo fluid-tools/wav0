@@ -9,10 +9,6 @@ export {
 } from "./use-atom-sync";
 export type { UseAudioEventsOptions } from "./use-audio-events";
 export { useAudioEvents } from "./use-audio-events";
-export {
-	type BridgeMutations,
-	useBridgeMutations,
-} from "./use-bridge-mutations";
 // Inspector hooks
 export { useClipInspector } from "./use-clip-inspector";
 export { useDAW } from "./use-daw";

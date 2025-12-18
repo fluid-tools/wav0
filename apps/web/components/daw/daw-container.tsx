@@ -14,7 +14,6 @@ import {
 	trackHeightZoomAtom,
 	tracksAtom,
 	tracksCountAtom,
-	useBridges,
 	useDAWAtomSync,
 	useDAWContext,
 	userIsManuallyScrollingAtom,
@@ -49,7 +48,6 @@ import { ClipMoveToastManager } from "./toast/clip-move-toast";
 
 export function DAWContainer() {
 	useDAWAtomSync(playbackAtom, tracksAtom);
-	const { audio: audioBridge } = useBridges();
 	const daw = useDAWContext();
 
 	const store = useStore();
@@ -114,13 +112,19 @@ export function DAWContainer() {
 				autoFollowStateRef.current.isPlayheadDragging = value;
 			}),
 			store.sub(userIsManuallyScrollingAtom, () => {
-				autoFollowStateRef.current.userIsScrolling = store.get(userIsManuallyScrollingAtom);
+				autoFollowStateRef.current.userIsScrolling = store.get(
+					userIsManuallyScrollingAtom,
+				);
 			}),
 			store.sub(playheadAutoFollowEnabledAtom, () => {
-				autoFollowStateRef.current.autoFollowEnabled = store.get(playheadAutoFollowEnabledAtom);
+				autoFollowStateRef.current.autoFollowEnabled = store.get(
+					playheadAutoFollowEnabledAtom,
+				);
 			}),
 		];
-		return () => { for (const u of unsubs) u(); };
+		return () => {
+			for (const u of unsubs) u();
+		};
 	}, [store]);
 
 	// REMOVED: isPlaying sync effect - now handled in store.sub above
@@ -164,9 +168,15 @@ export function DAWContainer() {
 			}
 		};
 
-		transport.addEventListener("time-update", handleTimeUpdate as EventListener);
+		transport.addEventListener(
+			"time-update",
+			handleTimeUpdate as EventListener,
+		);
 		return () => {
-			transport.removeEventListener("time-update", handleTimeUpdate as EventListener);
+			transport.removeEventListener(
+				"time-update",
+				handleTimeUpdate as EventListener,
+			);
 		};
 	}, [daw, store]);
 
@@ -183,23 +193,23 @@ export function DAWContainer() {
 	});
 
 	const batchScrollUpdate = (left: number, top: number) => {
-			const batch = scrollBatchRef.current;
-			batch.nextLeft = left;
-			batch.nextTop = top;
+		const batch = scrollBatchRef.current;
+		batch.nextLeft = left;
+		batch.nextTop = top;
 
-			if (batch.pending) return;
+		if (batch.pending) return;
 
-			batch.pending = true;
-			batch.raf = requestAnimationFrame(() => {
-				batch.pending = false;
-				batch.raf = 0;
-				try {
-					setHorizontalScroll(batch.nextLeft);
-					setVerticalScroll(batch.nextTop);
-				} catch (error) {
-					console.warn("[DAWContainer] scroll batch set failed", error);
-				}
-			});
+		batch.pending = true;
+		batch.raf = requestAnimationFrame(() => {
+			batch.pending = false;
+			batch.raf = 0;
+			try {
+				setHorizontalScroll(batch.nextLeft);
+				setVerticalScroll(batch.nextTop);
+			} catch (error) {
+				console.warn("[DAWContainer] scroll batch set failed", error);
+			}
+		});
 	};
 
 	useEffect(() => {
@@ -253,13 +263,11 @@ export function DAWContainer() {
 		};
 	}, [batchScrollUpdate]);
 
-	// Re-run when audioBridge becomes available to load audio into SDK AudioEngine
-	// First run (mount): uses legacy service → loads into legacy storage
-	// Second run (bridge ready): uses AudioServiceBridge → loads into SDK + legacy
-	// biome-ignore lint/correctness/useExhaustiveDependencies: audioBridge triggers re-init when SDK is ready
+	// Re-run when DAW becomes available to load audio into SDK AudioEngine
+	// biome-ignore lint/correctness/useExhaustiveDependencies: daw triggers re-init when SDK is ready
 	useEffect(() => {
 		initializeAudioFromOPFS();
-	}, [initializeAudioFromOPFS, audioBridge]);
+	}, [initializeAudioFromOPFS, daw]);
 
 	const currentTrackHeight = Math.round(
 		DAW_HEIGHTS.TRACK_ROW * trackHeightZoom,
@@ -267,62 +275,62 @@ export function DAWContainer() {
 	const contentHeight = Math.max(tracksCount * currentTrackHeight, 400);
 
 	const scheduleScrollSync = (scrollLeft: number, scrollTop: number) => {
-			const controller = gridControllerRef.current;
-			if (!controller) return;
-			controller.setScroll(scrollLeft, scrollTop);
-			scrollRef.current = { left: scrollLeft, top: scrollTop };
+		const controller = gridControllerRef.current;
+		if (!controller) return;
+		controller.setScroll(scrollLeft, scrollTop);
+		scrollRef.current = { left: scrollLeft, top: scrollTop };
 	};
 
 	const onTimelineScroll = (e: React.UIEvent<HTMLDivElement>) => {
-			const target = e.target as HTMLDivElement;
-			const left = target.scrollLeft;
-			scrollRef.current.left = left;
-			scheduleScrollSync(left, scrollRef.current.top);
-			batchScrollUpdate(left, scrollRef.current.top);
+		const target = e.target as HTMLDivElement;
+		const left = target.scrollLeft;
+		scrollRef.current.left = left;
+		scheduleScrollSync(left, scrollRef.current.top);
+		batchScrollUpdate(left, scrollRef.current.top);
 	};
 
 	const onTrackListScroll = (e: React.UIEvent<HTMLDivElement>) => {
-			const target = e.target as HTMLDivElement;
-			const top = target.scrollTop;
-			scrollRef.current.top = top;
-			scheduleScrollSync(scrollRef.current.left, top);
-			batchScrollUpdate(scrollRef.current.left, top);
+		const target = e.target as HTMLDivElement;
+		const top = target.scrollTop;
+		scrollRef.current.top = top;
+		scheduleScrollSync(scrollRef.current.left, top);
+		batchScrollUpdate(scrollRef.current.left, top);
 	};
 
 	const scrollDebounceRef = useRef<NodeJS.Timeout | null>(null);
 	const onTrackGridScroll = (e: React.UIEvent<HTMLDivElement>) => {
-			const target = e.target as HTMLDivElement;
-			const { scrollLeft: left, scrollTop: top } = target;
-			scrollRef.current = { left, top };
-			scheduleScrollSync(left, top);
-			batchScrollUpdate(left, top);
+		const target = e.target as HTMLDivElement;
+		const { scrollLeft: left, scrollTop: top } = target;
+		scrollRef.current = { left, top };
+		scheduleScrollSync(left, top);
+		batchScrollUpdate(left, top);
 
-			setUserIsScrolling(true);
-			setAutoFollowEnabled(false);
+		setUserIsScrolling(true);
+		setAutoFollowEnabled(false);
 
-			if (scrollDebounceRef.current) {
-				clearTimeout(scrollDebounceRef.current);
-			}
+		if (scrollDebounceRef.current) {
+			clearTimeout(scrollDebounceRef.current);
+		}
 
-			scrollDebounceRef.current = setTimeout(() => {
-				setUserIsScrolling(false);
+		scrollDebounceRef.current = setTimeout(() => {
+			setUserIsScrolling(false);
 
-				const controller = gridControllerRef.current;
-				const grid = trackGridScrollRef.current;
-				if (controller && grid && daw) {
-					const currentTimeMs = daw.getTransport().getCurrentTime();
-					const { pxPerMs } = store.get(timelineStaticMetricsAtom);
-					const x = currentTimeMs * pxPerMs;
-					if (!Number.isFinite(x)) return;
-					const width = grid.clientWidth;
-					const viewportLeft = controller.scrollLeft;
-					const viewportRight = viewportLeft + width;
+			const controller = gridControllerRef.current;
+			const grid = trackGridScrollRef.current;
+			if (controller && grid && daw) {
+				const currentTimeMs = daw.getTransport().getCurrentTime();
+				const { pxPerMs } = store.get(timelineStaticMetricsAtom);
+				const x = currentTimeMs * pxPerMs;
+				if (!Number.isFinite(x)) return;
+				const width = grid.clientWidth;
+				const viewportLeft = controller.scrollLeft;
+				const viewportRight = viewportLeft + width;
 
-					if (x >= viewportLeft && x <= viewportRight) {
-						setAutoFollowEnabled(true);
-					}
+				if (x >= viewportLeft && x <= viewportRight) {
+					setAutoFollowEnabled(true);
 				}
-			}, 500);
+			}
+		}, 500);
 	};
 
 	useEffect(() => {
@@ -465,15 +473,15 @@ export function DAWContainer() {
 									}}
 								>
 									<h3 className={DAW_TEXT.SECTION_TITLE}>Tracks</h3>
-								<Button
-									variant="ghost"
-									size="sm"
-									onClick={() => {
-										const trackNumber = tracksCount + 1;
-										const colorIndex =
-											tracksCount % DAW_COLORS.TRACK_COLORS.length;
+									<Button
+										variant="ghost"
+										size="sm"
+										onClick={() => {
+											const trackNumber = tracksCount + 1;
+											const colorIndex =
+												tracksCount % DAW_COLORS.TRACK_COLORS.length;
 
-										addTrack({
+											addTrack({
 												name: `Track ${trackNumber}`,
 												duration: 0,
 												startTime: 0,

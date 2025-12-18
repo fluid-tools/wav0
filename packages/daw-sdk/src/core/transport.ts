@@ -398,7 +398,8 @@ export class Transport extends EventTarget {
 				clip.startTime + (cycleOffsetSec + timeInTrimmed) * 1000;
 			// Convert to AudioContext time using the original play reference
 			const startTime =
-				this.contextStartTime + (bufferTimelineMs - this.playbackStartTime) / 1000;
+				this.contextStartTime +
+				(bufferTimelineMs - this.playbackStartTime) / 1000;
 
 			if (startTime >= this.audioContext.currentTime) {
 				node.start(startTime);
@@ -697,22 +698,15 @@ export class Transport extends EventTarget {
 		// Cancel from now - MAX_CURVE_DURATION to ensure all active curves are canceled
 		const cancelFrom = Math.max(0, now - MAX_AUTOMATION_CURVE_DURATION_SEC);
 		envelopeGain.gain.cancelScheduledValues(cancelFrom);
-
-		// Reset automation tracking to now after cancellation
 		state.lastAutomationEndTime = now;
 
-		// Anchor to instantaneous effective gain at current transport time
+		// Calculate base volume and current position
 		const currentTimeMs = this.getPlaybackTimeSec() * 1000;
 		const baseVolumeDb =
 			track.volumeDb ?? volume.volumeToDb(track.volume ?? 75);
 		const baseVolume = volume.dbToGain(baseVolumeDb);
-		const multiplier = automation.evaluateEnvelopeGainAt(
-			envelope,
-			currentTimeMs,
-		);
-		const anchorGain = baseVolume * multiplier;
-		envelopeGain.gain.setValueAtTime(anchorGain, now);
 
+		// Early exit: no envelope or empty
 		if (!envelope || !envelope.enabled || envelope.points.length === 0) {
 			envelopeGain.gain.setValueAtTime(baseVolume, now);
 			return;
@@ -720,69 +714,37 @@ export class Transport extends EventTarget {
 
 		const sorted = [...envelope.points].sort((a, b) => a.time - b.time);
 
-		// Find current multiplier at playback position with proper interpolation
-		let currentMultiplier = 1.0;
-		let prevPoint: (typeof sorted)[0] | null = null;
-		let nextPoint: (typeof sorted)[0] | null = null;
-
-		for (let i = 0; i < sorted.length; i++) {
-			const point = sorted[i];
-			if (point.time <= currentTimeMs) {
-				currentMultiplier = point.value;
-				prevPoint = point;
-				nextPoint = sorted[i + 1] || null;
-			} else {
-				nextPoint = point;
-				break;
-			}
-		}
-
-		// If we're between two points, interpolate with curve
-		if (prevPoint && nextPoint && currentTimeMs < nextPoint.time) {
-			const segment = envelope.segments?.find(
-				(seg) =>
-					seg.fromPointId === prevPoint.id && seg.toPointId === nextPoint.id,
+		// Use helper to find interpolated multiplier at current position
+		const { multiplier: currentMultiplier } =
+			automation.interpolateEnvelopeValue(
+				sorted,
+				envelope.segments,
+				currentTimeMs,
 			);
-			const t =
-				(currentTimeMs - prevPoint.time) / (nextPoint.time - prevPoint.time);
-			const curve = segment?.curve ?? 0;
-
-			const curvedT =
-				curve === 0
-					? t
-					: curve < 0
-						? t ** (1 + (Math.abs(curve) / 99) * 3)
-						: 1 - (1 - t) ** (1 + (curve / 99) * 3);
-
-			currentMultiplier =
-				prevPoint.value + (nextPoint.value - prevPoint.value) * curvedT;
-		}
 
 		// Schedule only future segments relative to transport
 		const futurePoints = sorted.filter((point) => point.time > currentTimeMs);
-		if (futurePoints.length === 0) {
-			const targetGain = baseVolume * currentMultiplier;
-			if (Math.abs(envelopeGain.gain.value - targetGain) > 0.00001) {
-				envelopeGain.gain.setValueAtTime(targetGain, now);
-			}
-			return;
-		}
-
 		const initialGain = baseVolume * currentMultiplier;
+
+		// Set initial value if different from current
 		if (Math.abs(envelopeGain.gain.value - initialGain) > 0.00001) {
 			envelopeGain.gain.setValueAtTime(initialGain, now);
 		}
 
+		if (futurePoints.length === 0) {
+			return;
+		}
+
+		// Schedule future automation segments
 		let lastMultiplier = currentMultiplier;
 		let lastTime = currentTimeMs;
-
-		const schedulingEpsilon = AUTOMATION_SCHEDULING_EPSILON_SEC;
 		let lastScheduledEnd = now;
 
 		for (const point of futurePoints) {
 			const segmentStart = lastTime;
 			const segmentEnd = point.time;
 
+			// Skip invalid or too-short segments
 			if (segmentEnd <= segmentStart) {
 				lastTime = point.time;
 				lastMultiplier = point.value;
@@ -796,56 +758,58 @@ export class Transport extends EventTarget {
 				continue;
 			}
 
-			const steps = Math.max(2, Math.ceil(durationSec * 60));
-			const values = new Float32Array(steps);
-
-			// Find the segment connecting the previous point to this point
+			// Find curve for this segment
 			const previousPoint = sorted.find((p) => p.time === lastTime);
-			const currentSegment = envelope.segments?.find(
+			const segment = envelope.segments?.find(
 				(seg) =>
 					seg.fromPointId === previousPoint?.id && seg.toPointId === point.id,
 			);
-			const curveValue = currentSegment?.curve ?? 0;
+			const curveValue = segment?.curve ?? 0;
 
-			for (let i = 0; i < steps; i++) {
-				const t = i / (steps - 1);
-				const curvedT =
-					curveValue === 0
-						? t
-						: curveValue < 0
-							? t ** (1 + (Math.abs(curveValue) / 99) * 3)
-							: 1 - (1 - t) ** (1 + (curveValue / 99) * 3);
-				const mult = lastMultiplier + (point.value - lastMultiplier) * curvedT;
-				values[i] = baseVolume * mult;
-			}
+			// Generate curve values using helper
+			const values = automation.generateSegmentCurveValues(
+				baseVolume,
+				lastMultiplier,
+				point.value,
+				curveValue,
+				durationSec,
+			);
 
+			// Calculate safe scheduling times (no overlaps)
 			const acStart = now + (segmentStart - currentTimeMs) / 1000;
-			// Single Math.max guarantees no overlap regardless of floating-point edge cases
 			const adjustedStart = Math.max(
 				acStart,
-				lastScheduledEnd + schedulingEpsilon,
-				now + schedulingEpsilon,
+				lastScheduledEnd + AUTOMATION_SCHEDULING_EPSILON_SEC,
+				now + AUTOMATION_SCHEDULING_EPSILON_SEC,
 			);
-			// Keep original duration (don't try to preserve end time - causes overlap)
-			const adjustedDuration = Math.max(durationSec, schedulingEpsilon);
-			if (adjustedDuration <= schedulingEpsilon) {
+			const safeDuration = Math.max(
+				durationSec,
+				AUTOMATION_SCHEDULING_EPSILON_SEC,
+			);
+
+			if (safeDuration <= AUTOMATION_SCHEDULING_EPSILON_SEC) {
 				lastTime = point.time;
 				lastMultiplier = point.value;
 				continue;
 			}
-			const safeDuration = Math.max(adjustedDuration, schedulingEpsilon);
+
 			envelopeGain.gain.setValueCurveAtTime(
 				values,
 				adjustedStart,
 				safeDuration,
 			);
-			// Enforce monotonic forward progress (prevents floating-point boundary overlap)
+
+			// Enforce monotonic forward progress
 			const newEnd = adjustedStart + safeDuration;
-			lastScheduledEnd = Math.max(lastScheduledEnd + schedulingEpsilon, newEnd);
+			lastScheduledEnd = Math.max(
+				lastScheduledEnd + AUTOMATION_SCHEDULING_EPSILON_SEC,
+				newEnd,
+			);
 
 			lastTime = point.time;
 			lastMultiplier = point.value;
 		}
+
 		state.lastAutomationEndTime = lastScheduledEnd;
 	}
 
