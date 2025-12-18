@@ -187,7 +187,7 @@ See [act documentation](https://github.com/nektos/act) for full usage.
 
 ## 📄 License
 
-By contributing to WAV0, you agree that your contributions will be licensed under the MIT License.
+By contributing to WAV0, you agree that your contributions will be licensed under the GNU AGPL-3.0 License.
 
 ## 🙏 Recognition
 

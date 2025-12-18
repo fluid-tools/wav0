@@ -2,7 +2,7 @@
 
 # [WAV0 AI - The Studio for Everything Audio](https://wav0.app)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Website](https://img.shields.io/badge/website-wav0.app-blue)](https://wav0.app)
 [![Discord](https://img.shields.io/badge/discord-join%20us-5865F2)](https://wav0.app/discord)
 [![X Follow](https://img.shields.io/twitter/follow/wav0ai?style=social)](https://x.com/wav0ai)

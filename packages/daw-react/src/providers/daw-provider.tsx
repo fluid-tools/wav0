@@ -20,7 +20,6 @@ import {
 	useRef,
 } from "react";
 import {
-	registerServices,
 	servicesAtom,
 	type AudioService,
 	type PlaybackService,
@@ -185,19 +184,11 @@ export function DAWProvider({
 			},
 		};
 
-		// Register services to both:
-		// 1. servicesAtom (for atoms using get(servicesAtom))
-		// 2. Legacy serviceRegistry (for backwards compatibility during migration)
+		// Register services to servicesAtom for atoms to access via get(servicesAtom)
 		store.set(servicesAtom, {
 			audioService: audioService as AudioService,
 			playbackService: playbackService as PlaybackService,
 			generateTrackId: null,
-		});
-
-		// Legacy registration (deprecated, will be removed)
-		registerServices({
-			audioService,
-			playbackService,
 		});
 
 		return () => {

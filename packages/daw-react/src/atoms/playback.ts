@@ -9,8 +9,6 @@ import type { Track } from "@wav0/daw-sdk";
 import type { WritableAtom } from "jotai";
 import { atom, type Getter, type Setter } from "jotai";
 import {
-	audioInitializedAtom,
-	audioInitializingAtom,
 	isSeekingAtom,
 	playbackAtom,
 	totalDurationAtom,
@@ -265,28 +263,8 @@ export const togglePlaybackAtom = atom(null, async (get, set) => {
 		return;
 	}
 
-	// Wait for audio to be initialized from OPFS before playing
-	const isInitialized = get(audioInitializedAtom);
-	const isInitializing = get(audioInitializingAtom);
-
-	if (!isInitialized && isInitializing) {
-		// Audio is currently loading - wait for it
-		console.log("[Playback] Waiting for audio initialization...");
-		await new Promise<void>((resolve) => {
-			const checkInterval = setInterval(() => {
-				if (get(audioInitializedAtom)) {
-					clearInterval(checkInterval);
-					resolve();
-				}
-			}, 50);
-			// Timeout after 10 seconds to prevent infinite wait
-			setTimeout(() => {
-				clearInterval(checkInterval);
-				resolve();
-			}, 10000);
-		});
-	}
-
+	// Note: SDK AudioEngine has self-healing - will auto-load from OPFS if needed
+	// The audioInitializedAtom tracking is kept for potential UI loading indicators
 	await playbackService.initializeWithTracks(tracks);
 
 	const { onTimeUpdate, onPlaybackEnd } = createPlaybackSession(

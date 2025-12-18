@@ -21,14 +21,9 @@ export * from "./project";
 export type {
 	AudioService,
 	PlaybackService,
-	ServiceRegistry,
 	Services,
 } from "./service-registry";
-export {
-	registerServices,
-	serviceRegistry,
-	servicesAtom,
-} from "./service-registry";
+export { servicesAtom } from "./service-registry";
 // Storage utilities
 export { atomWithStorage } from "./storage";
 // Timeline write atoms (zoom, scroll, snap, sections)

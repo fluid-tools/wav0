@@ -73,27 +73,3 @@ export const servicesAtom = atom<Services>({
 	playbackService: null,
 	generateTrackId: null,
 });
-
-// Legacy exports for backwards compatibility during migration
-// TODO: Remove after Phase 2 is complete
-
-/**
- * @deprecated Use servicesAtom instead
- */
-export interface ServiceRegistry {
-	audioService?: AudioService;
-	playbackService?: PlaybackService;
-	generateTrackId?: () => string;
-}
-
-/**
- * @deprecated Use servicesAtom instead - this global object will be removed
- */
-export const serviceRegistry: ServiceRegistry = {};
-
-/**
- * @deprecated Use store.set(servicesAtom, services) instead
- */
-export function registerServices(services: Partial<ServiceRegistry>): void {
-	Object.assign(serviceRegistry, services);
-}
