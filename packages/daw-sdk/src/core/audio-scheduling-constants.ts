@@ -71,7 +71,7 @@ export const MAX_AUTOMATION_CURVE_DURATION_SEC = 30;
 /**
  * Grace period (in seconds) for playback start.
  * If we're within this threshold of a clip boundary, snap to the boundary.
- * 
+ *
  * Matches legacy PlaybackService value (0.0125s = 12.5ms) to prevent timing differences.
  */
 export const START_GRACE_SEC = 0.0125;

@@ -42,6 +42,8 @@ flowchart TB
     ServicesAtom --> SDK2
 ```
 
+
+
 ### Key Changes
 
 1. **Deleted Files (bridges layer removed)**:
@@ -103,8 +105,11 @@ flowchart TB
 
 - Line 1151 in [`daw-track-content.tsx`](apps/web/components/daw/panels/daw-track-content.tsx) references `serviceRegistry.playbackService` in a comment:
      ```typescript
-                         // updateClipAtom internally calls serviceRegistry.playbackService.synchronizeTracks()
+                              // updateClipAtom internally calls serviceRegistry.playbackService.synchronizeTracks()
      ```
+
+
+
 
 - The actual code migrated, but comment is outdated. Minor issue, but indicates rushed migration.
 
@@ -116,7 +121,7 @@ flowchart TB
 
 3. **Import Still Present** in [`daw-track-content.tsx`](apps/web/components/daw/panels/daw-track-content.tsx):
    ```typescript
-               import { servicesAtom } from "@wav0/daw-react"
+                  import { servicesAtom } from "@wav0/daw-react"
    ```
 
 
@@ -140,11 +145,7 @@ But `servicesAtom` is not used directly in this file - only `serviceRegistry` re
 
 ### 1. Stale Comment (Low Priority)
 
-**File:** `apps/web/components/daw/panels/daw-track-content.tsx` line 1151
-
-Comment references old `serviceRegistry` pattern but actual code uses `servicesAtom`.
-
-**Fix:** Update comment to reflect `servicesAtom` pattern.
+**File:** `apps/web/components/daw/panels/daw-track-content.tsx` line 1151Comment references old `serviceRegistry` pattern but actual code uses `servicesAtom`.**Fix:** Update comment to reflect `servicesAtom` pattern.
 
 ### 3. No Critical Security Vulnerabilities
 
@@ -164,4 +165,3 @@ The changes are internal refactoring with no new attack surface:
 1. **Fix stale comment**: Update `serviceRegistry` reference in comment at line 1151 of `daw-track-content.tsx`
 2. **Add TODO to remove legacy dual-registration** once migration is verified complete
 3. **Consider adding a test** for the 50ms debounce behavior to prevent regression if SDK timing changes
-4. **Document unit conversion** (ms vs seconds) at service interface level to prevent future confusion

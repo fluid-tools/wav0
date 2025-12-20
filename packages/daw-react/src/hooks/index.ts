@@ -31,3 +31,6 @@ export {
 } from "./use-track-interactions";
 export type { UseTransportEventsOptions } from "./use-transport-events";
 export { useTransportEvents } from "./use-transport-events";
+// Sampler hook
+export type { UseSamplerOptions, UseSamplerReturn } from "./use-sampler";
+export { useSampler } from "./use-sampler";

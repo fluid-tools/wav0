@@ -37,4 +37,3 @@ export const DAW_MIN_TRACK_HEIGHT = 60;
  * Maximum track height in pixels
  */
 export const DAW_MAX_TRACK_HEIGHT = 300;
-

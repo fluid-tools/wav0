@@ -6,6 +6,8 @@
 export * from "./base";
 // Clip write atoms
 export * from "./clips";
+// Sampler atoms
+export * from "./sampler";
 // Unified interaction machine (handles clip drag, resize, loop drag)
 export {
 	type InteractionContext,

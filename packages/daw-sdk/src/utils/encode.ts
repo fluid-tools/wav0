@@ -98,4 +98,3 @@ function pickFormat(fmt: AudioFormat) {
 			return new WebMOutputFormat();
 	}
 }
-

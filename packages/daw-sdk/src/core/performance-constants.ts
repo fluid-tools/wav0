@@ -89,7 +89,8 @@ export const TIME_DISPLAY_UPDATE_RATE_HZ = 10;
 /**
  * Interval between time display updates (ms)
  */
-export const TIME_DISPLAY_UPDATE_INTERVAL_MS = 1000 / TIME_DISPLAY_UPDATE_RATE_HZ; // 100ms
+export const TIME_DISPLAY_UPDATE_INTERVAL_MS =
+	1000 / TIME_DISPLAY_UPDATE_RATE_HZ; // 100ms
 
 /**
  * Minimum time change (ms) to trigger display update
@@ -181,4 +182,3 @@ export const PERFORMANCE_CONFIG = {
 	frameBudgetMs: FRAME_BUDGET_MS,
 	throttleTriggerCount: THROTTLE_TRIGGER_COUNT,
 } as const;
-

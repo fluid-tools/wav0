@@ -43,4 +43,3 @@ export function computeLoopEndMs(
 			: policy.minRepetitionsDefault;
 	return clip.startTime + duration * (minReps + 1);
 }
-

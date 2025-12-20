@@ -14,6 +14,10 @@ export {
 } from "./core/audio-scheduling-constants";
 // Core classes
 export { createDAW, DAW } from "./core/daw";
+// MIDI Player
+export { MIDIPlayer } from "./core/midi-player";
+export type { MIDIServiceEventMap } from "./core/midi-service";
+export { getSharedMIDIService, MIDIService } from "./core/midi-service";
 export { OPFSManager } from "./core/opfs-manager";
 // Performance & update rate constants
 export {
@@ -43,9 +47,20 @@ export {
 // Preview Player
 export type { PreviewPlayer } from "./core/preview-player";
 export { createPreviewPlayer } from "./core/preview-player";
+export type {
+	RecordingConfig,
+	RecordingEventMap,
+} from "./core/recording-service";
+// Recording
+export {
+	DEFAULT_RECORDING_CONFIG,
+	RecordingService,
+} from "./core/recording-service";
 // Renderer
 export type { AudioBufferProvider, RenderOptions } from "./core/renderer";
 export { renderProjectToAudioBuffer } from "./core/renderer";
+// Sampler
+export { SamplerEngine } from "./core/sampler-engine";
 export { Transport } from "./core/transport";
 // Visual/timeline constants
 export {
@@ -55,11 +70,44 @@ export {
 	DAW_PIXELS_PER_SECOND_AT_ZOOM_1,
 	DAW_TIMELINE_HEADER_HEIGHT,
 } from "./core/visual-constants";
-
 // Core types
 export type * from "./types/core";
+export type * from "./types/midi";
+export type { MIDIPlayerCallbacks } from "./types/midi";
+// MIDI
+export {
+	DEFAULT_TIMEBASE,
+	isControlChange,
+	isNoteOff,
+	isNoteOn,
+	isPitchBend,
+	MIDI_CC,
+} from "./types/midi";
+export type {
+	ADSREnvelope,
+	PadLayout,
+	PlayMode,
+	SampleInfo,
+	SamplerConfig,
+	SamplerEventMap,
+	SamplerPad,
+	Voice,
+	VoiceState,
+	VoiceStealingConfig,
+	VoiceStealingMode,
+} from "./types/sampler";
+export {
+	calculatePlaybackRate,
+	createDefaultPad,
+	DEFAULT_ENVELOPE,
+	DEFAULT_SAMPLER_CONFIG,
+	DEFAULT_VOICE_STEALING,
+	getPadGridPosition,
+	getPadIndexFromGrid,
+	rateToSemitones,
+	semitonesToRate,
+} from "./types/sampler";
 export type * from "./types/schemas";
-
 // Schema validators
 export {
 	AudioFileInfoSchema,
@@ -71,7 +119,6 @@ export {
 	TrackEnvelopeSegmentSchema,
 	TrackSchema,
 } from "./types/schemas";
-
 // Utilities as namespaces
 export { audioBuffer } from "./utils/audio-buffer";
 export { automation } from "./utils/automation";
@@ -79,10 +126,12 @@ export { curves } from "./utils/curves";
 // Audio encoding utilities
 export type { AudioFormat } from "./utils/encode";
 export { encode, getFileExtension, getMimeType } from "./utils/encode";
-
 // Looping utilities
 export type { LoopingPolicy } from "./utils/looping";
 export { computeLoopEndMs, DEFAULT_LOOPING_POLICY } from "./utils/looping";
+export { midiTime } from "./utils/midi-time";
+// MIDI utilities
+export { quantization } from "./utils/quantization";
 export { time } from "./utils/time";
 export { volume } from "./utils/volume";
 
